@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">ImageSearch</string>
+    <string name="photos">Photos</string>
+    <string name="albums">Albums</string>
+    <string name="search">Search</string>
+    <string name="label">Label</string>
+    <string name="NavPopUpItem_NotDone">NotDone</string>
+</resources>
