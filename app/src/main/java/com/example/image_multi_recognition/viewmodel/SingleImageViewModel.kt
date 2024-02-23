@@ -1,9 +1,7 @@
 package com.example.image_multi_recognition.viewmodel
 
-import android.graphics.Bitmap
 import android.graphics.Rect
 import android.util.Log
-import androidx.core.graphics.drawable.toBitmap
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -24,8 +22,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.emptyFlow
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 
 @HiltViewModel
@@ -54,7 +50,7 @@ class SingleImageViewModel @Inject constructor(
     private var requestSent = false
 
     private var currentPage: Int = initialKey
-    private var ImageLabelList = mutableListOf<ImageLabelResult>()
+    private var imageLabelList = mutableListOf<ImageLabelResult>()
     private var finishedLabelingTask = 0
 
     init {
@@ -143,12 +139,12 @@ class SingleImageViewModel @Inject constructor(
                         Log.d(getCallSiteInfoFunc(), "recognized label: $labelList")
                         if (rect != rootRect) {
                             labelList.filter { it.confidence >= 0.6 }.maxBy { it.confidence }.let { label: ImageLabel ->
-                                ImageLabelList.add(ImageLabelResult(imageInfo.id, rect, label.text))
+                                imageLabelList.add(ImageLabelResult(imageInfo.id, rect, label.text))
                             }
                         } else {
                             labelList.filter { it.confidence >= 0.6 }.sortedBy { it.confidence }.reversed()
                                 .subList(0, if (labelList.size > 1) 2 else labelList.size).forEach { label ->
-                                    ImageLabelList.add(ImageLabelResult(imageInfo.id, rect, label.text))
+                                    imageLabelList.add(ImageLabelResult(imageInfo.id, null, label.text))
                                 }
                         }
                     } else {
@@ -172,8 +168,8 @@ class SingleImageViewModel @Inject constructor(
 
     private fun checkLabelingTaskCompletion(requiredTaskCount: Int, currentPageWhenRunning: Int) {
         if (currentPage == currentPageWhenRunning && requiredTaskCount == finishedLabelingTask) {
-            _imageLabelFlow.value = ImageLabelList
-            Log.d(getCallSiteInfoFunc(), "recognized label list: $ImageLabelList")
+            _imageLabelFlow.value = imageLabelList
+            Log.d(getCallSiteInfoFunc(), "recognized label list: $imageLabelList")
         }
     }
 
@@ -184,7 +180,7 @@ class SingleImageViewModel @Inject constructor(
         requestSent = false
         currentPage = nextPage
         finishedLabelingTask = 0
-        ImageLabelList =
+        imageLabelList =
             mutableListOf()    // create a new list to change the reference (so that recomposition can be triggered)
     }
 }

@@ -12,7 +12,10 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material3.*
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
@@ -21,12 +24,14 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.unit.dp
+import androidx.constraintlayout.compose.ConstraintLayout
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.collectAsLazyPagingItems
 import coil.compose.AsyncImage
 import com.example.image_multi_recognition.R
 import com.example.image_multi_recognition.compose.statelessElements.SingleImageView
 import com.example.image_multi_recognition.db.ImageInfo
+import com.example.image_multi_recognition.util.LabelPlacingStrategy
 import com.example.image_multi_recognition.util.getCallSiteInfoFunc
 import com.example.image_multi_recognition.viewmodel.ImageLabelResult
 import com.example.image_multi_recognition.viewmodel.SingleImageViewModel
@@ -92,13 +97,37 @@ fun SingleImageComposable(
     ) { paddingValues ->
         HorizontalPager(
             state = pagerState,
-            modifier = Modifier.padding(paddingValues)
+            modifier = Modifier.padding(paddingValues),
         ) { itemIndex ->
             val partImageLabelResult = imageLabelResult.filter { it.rect != null }
+            Log.d(getCallSiteInfoFunc(), "partImageLabelResult: ${partImageLabelResult.toString()}")
             val wholeImageLabelResult = imageLabelResult.filter { it.rect == null }
+            Log.d(getCallSiteInfoFunc(), "wholeImageLabelResult: ${partImageLabelResult.toString()}")
             pagingItems[itemIndex]?.let { imageInfo ->
-                Column {
-                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                ConstraintLayout(
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    val (imageRef, rowRef, customInputRef) = createRefs()
+                    CustomImageLayout(
+                        imageInfo = imageInfo,
+                        originalWidth = viewModel.imageSize.first,
+                        originalHeight = viewModel.imageSize.second,
+                        imageLabelList = partImageLabelResult,
+                        onLabelClick = {},
+                        onLabelDone = {},
+                        modifier = Modifier.constrainAs(imageRef){
+                            top.linkTo(parent.top)
+                            bottom.linkTo(parent.bottom)
+                            start.linkTo(parent.start)
+                            end.linkTo(parent.end)
+                        }
+                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        modifier = Modifier.constrainAs(rowRef){
+                            bottom.linkTo(imageRef.top)
+                        }
+                    ) {
                         wholeImageLabelResult.forEach {
                             LabelSelectButton(
                                 imageLabelResult = it,
@@ -106,14 +135,8 @@ fun SingleImageComposable(
                             )
                         }
                     }
-                    CustomImageLayout(
-                        imageInfo = imageInfo,
-                        originalWidth = viewModel.imageSize.first,
-                        originalHeight = viewModel.imageSize.second,
-                        imageLabelList = partImageLabelResult,
-                        onLabelClick = {},
-                        onLabelDone = {}
-                    )
+                    //TextField()
+
                 }
             }
         }
@@ -160,14 +183,6 @@ fun CustomImageLayout(
     ) { (imageMeasurables, rectMeasurables, labelMesurables), constrains ->
         val imagePlaceable = imageMeasurables.first().measure(constrains)
         val labelPlaceables = labelMesurables.map { it.measure(constrains) }
-        // when rect is null, the label is for the whole image instead of a part of the image
-//        val wholeImageLabelPlaceable = labelPlaceables.filterIndexed { index, placeable ->
-//            imageLabelList[index].rect == null
-//        }
-//        val partImageLabelPlaceable = labelPlaceables.filterIndexed { index, placeable ->
-//            imageLabelList[index].rect != null
-//        }
-
         val widthProportion: Double = imagePlaceable.width.toDouble() / originalWidth
         val heightProportion: Double = imagePlaceable.height.toDouble() / originalHeight
 
@@ -203,26 +218,21 @@ fun CustomImageLayout(
                 )
             }
             if (labelPlaceables.isNotEmpty()) {
+                val places = LabelPlacingStrategy.placeLabels(imageLabelList.map { it.rect!! })
+                val convertedPlaces = LabelPlacingStrategy.convertPlacingResult(
+                    placingResultList = places,
+                    labelWidth = labelPlaceables.map { it.width },
+                    labelHeight = labelPlaceables.map { it.height },
+                    widthProportion = widthProportion,
+                    heightProportion = heightProportion,
+                    boundaryWidth = imagePlaceable.width,
+                    boundaryHeight = imagePlaceable.height
+                )
+                Log.d(getCallSiteInfoFunc(), "placing strategy: $places.toString()")
                 labelPlaceables.forEachIndexed { index, labelPlaceable ->
-                    // place the label in the middle of the rect
-                    val x =
-                        (imageLabelList[index].rect!!.left + (imageLabelList[index].rect!!.width() - labelPlaceable.width) / 2) * widthProportion
-                    val y =
-                        (imageLabelList[index].rect!!.top + (imageLabelList[index].rect!!.height() - labelPlaceable.height) / 2) * heightProportion
-                    labelPlaceable.place(x.toInt(), y.toInt())
+                    labelPlaceable.place(convertedPlaces[index].first, convertedPlaces[index].second)
                 }
             }
-//            if (wholeImageLabelPlaceable.isNotEmpty()) {
-//                val intervalWidth = (imagePlaceable.width -
-//                        wholeImageLabelPlaceable.map { it.width }
-//                            .reduce { acc, width -> acc + width }) / (wholeImageLabelPlaceable.size + 1)
-//                var accX = intervalWidth
-//                wholeImageLabelPlaceable.forEach { labelPlaceable ->
-//                    // put the label below the image with SpaceEvenly effect
-//                    labelPlaceable.place(accX, imagePlaceable.height)
-//                    accX += labelPlaceable.width + intervalWidth
-//                }
-//            }
         }
     }
 }
