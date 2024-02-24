@@ -17,11 +17,13 @@ import com.google.mlkit.vision.label.ImageLabel
 import com.google.mlkit.vision.label.ImageLabeler
 import com.google.mlkit.vision.objects.ObjectDetector
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.*
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 @HiltViewModel
@@ -52,6 +54,7 @@ class SingleImageViewModel @Inject constructor(
     private var currentPage: Int = initialKey
     private var imageLabelList = mutableListOf<ImageLabelResult>()
     private var finishedLabelingTask = 0
+    private var labelAdded = 0
 
     init {
         setPagingFlow(album, initialKey)
@@ -65,7 +68,7 @@ class SingleImageViewModel @Inject constructor(
     // then swipe to next page immediately, the previous labeling results may show in the next page!
     // To avoid this, you cannot cancel the callback from "OnSuccessListener" of "objectDetector",
     // instead, you should avoid doing something when you know the task is not needed in the callback
-    fun setObjectDetectingRects(imageInfo: ImageInfo) {
+    fun detectAndLabelImage(imageInfo: ImageInfo) {
         // handle the request only once for each page
         if (requestSent) return
         requestSent = true
@@ -162,26 +165,26 @@ class SingleImageViewModel @Inject constructor(
                     checkLabelingTaskCompletion(detectedRectList.size, currentPageWhenRunning)
                 }
             }
-
         } ?: Log.e(getCallSiteInfoFunc(), "bitmapInternal of imageHandled is null!")
     }
 
     private fun checkLabelingTaskCompletion(requiredTaskCount: Int, currentPageWhenRunning: Int) {
         if (currentPage == currentPageWhenRunning && requiredTaskCount == finishedLabelingTask) {
-            _imageLabelFlow.value = imageLabelList
+            _imageLabelFlow.value = if(imageLabelList.isEmpty()) ImageLabelResult.EmptyResultList.toMutableList() else imageLabelList
             Log.d(getCallSiteInfoFunc(), "recognized label list: $imageLabelList")
         }
     }
 
+    // clearPage does not change states
     fun clearPage(nextPage: Int) {
         // clear list does not change the reference, so the recomposition will be triggered by this "clearRectList()"
-        //_rectListFlow.value.clear()
         _imageLabelFlow.value.clear()
         requestSent = false
         currentPage = nextPage
         finishedLabelingTask = 0
-        imageLabelList =
-            mutableListOf()    // create a new list to change the reference (so that recomposition can be triggered)
+        // create a new list to change the reference (so that recomposition can be triggered when you run "_imageLabelFlow.value = imageLabelList")
+        imageLabelList = mutableListOf()
+        labelAdded = 0
     }
 }
 
@@ -189,4 +192,10 @@ data class ImageLabelResult(
     val imageId: Long,
     val rect: Rect?,    // when rect is null, it means that the label is for the whole image, not a part of the image
     val label: String
-)
+){
+    companion object{
+        // a special object to identify an empty labeling result from the initial empty list
+        val EmptyResultList = listOf(ImageLabelResult(-1, null, ""))
+        fun isEmptyResult(resultList: List<ImageLabelResult>) = resultList.size == 1 && resultList[0] == EmptyResultList[0]
+    }
+}

@@ -4,10 +4,21 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.util.Log
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AlertDialog
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.res.stringResource
 import androidx.core.content.ContextCompat
+import com.example.image_multi_recognition.R
+import com.example.image_multi_recognition.ui.theme.Image_multi_recognitionTheme
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -50,39 +61,97 @@ class PermissionAccessor @Inject constructor() {
         return permissions.all { hasPermission(it) }
     }
 
-    private fun ComponentActivity.showPermissionRationale(permissions: List<String>, positiveAction: () -> Unit) {
-        AlertDialog.Builder(this)
-            .setTitle("Permission Required")
-            .setMessage("This app will not work without the following permissions: $permissions")
-            .setPositiveButton("Grant Permission") { _, _ -> positiveAction() }
-            .setNegativeButton("Cancel") { dialog, _ -> finalPermissionPrompt(permissions) }
-            .setOnCancelListener { finalPermissionPrompt(permissions) }
-            .create().show()
-    }
+    private fun ComponentActivity.showPermissionRationale(
+        permissions: List<String>,
+        permissionRequestDenied: Boolean = false, // whether showPermissionRationale is called because the user has denied the permission request
+        positiveAction: () -> Unit
+    ) {
+        setContent {
+            Image_multi_recognitionTheme {
+                var showPermissionDialog by rememberSaveable { mutableStateOf(1) }
 
-    private fun ComponentActivity.finalPermissionPrompt(permissions: List<String>) {
-        if (!hasAllPermissions(permissions)) {
-            AlertDialog.Builder(this)
-                .setTitle("No Permission")
-                .setMessage("$permissions ${if (permissions.size > 1) "are" else "is"} not granted, the app will stop running")
-                .setPositiveButton("OK") { _, _ -> finishAndRemoveTask() }
-                .setOnCancelListener { finishAndRemoveTask() }
-                .create().show()
+                if (showPermissionDialog == 1 && !permissionRequestDenied) {
+                    AlertDialog(
+                        title = {
+                            Text(
+                                text = stringResource(R.string.permission_required),
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                        },
+                        text = {
+                            Text(
+                                text = stringResource(
+                                    R.string.permission_required_message,
+                                    permissions.map { it.split(".").last() }),
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    showPermissionDialog = 0 // hide the dialog is the user choose to grant permissions
+                                    positiveAction()
+                                }
+                            ) {
+                                Text(text = stringResource(R.string.grant_permission))
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(
+                                onClick = { showPermissionDialog = 2 }
+                            ) {
+                                Text(text = stringResource(R.string.cancel))
+                            }
+                        },
+                        onDismissRequest = { showPermissionDialog = 2 }
+                    )
+                } else if (showPermissionDialog == 2 || permissionRequestDenied) {
+                    if (!hasAllPermissions(permissions)) {
+                        AlertDialog(
+                            title = {
+                                Text(
+                                    text = stringResource(R.string.no_permission),
+                                    style = MaterialTheme.typography.titleMedium
+                                )
+                            },
+                            text = {
+                                Text(
+                                    text = stringResource(
+                                        if (permissionRequestDenied) R.string.no_permission_message_denied else R.string.no_permission_message_cancelled,
+                                        permissions.map { it.split(".").last() }),
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                            },
+                            confirmButton = {
+                                TextButton(
+                                    onClick = { finishAndRemoveTask() }
+                                ) {
+                                    Text(text = stringResource(R.string.ok))
+                                }
+                            },
+                            onDismissRequest = { finishAndRemoveTask() }
+                        )
+                    }
+                }
+            }
         }
     }
 
     fun ComponentActivity.runApp(afterAllPermissionGranted: () -> Unit) {
         // Ask for permission
+        var permissionRequestDenied = false
         requestPermissionLauncher =
             registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissionMap ->
+                // If the user has denied permission twice, this callback is called directly without showing grant permission window first
                 if (permissionMap.all { it.value }) {
                     Log.i(this::class.simpleName, "All permissions are granted!")
                     afterAllPermissionGranted()
                 } else {
                     val notGrantedPermission = permissionMap.filter { !it.value }.map { it.key }
-                    showPermissionRationale(notGrantedPermission) {
+                    showPermissionRationale(notGrantedPermission, permissionRequestDenied) {
                         requestPermissionLauncher.launch(notGrantedPermission.toTypedArray())
                     }
+                    permissionRequestDenied = true
                 }
             }
 
@@ -91,7 +160,8 @@ class PermissionAccessor @Inject constructor() {
         } else {
             val notGrantedPermission = getNotGrantedPermissions(permissionList)
             if (notGrantedPermission.all { shouldShowRequestPermissionRationale(it) }) {
-                showPermissionRationale(notGrantedPermission) {
+                showPermissionRationale(notGrantedPermission, permissionRequestDenied) {
+                    permissionRequestDenied = true
                     requestPermissionLauncher.launch(notGrantedPermission.toTypedArray())
                 }
             } else {

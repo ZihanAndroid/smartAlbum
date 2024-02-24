@@ -4,5 +4,16 @@
     <string name="albums">Albums</string>
     <string name="search">Search</string>
     <string name="label">Label</string>
+    <string name="add_label">Add Label</string>
     <string name="NavPopUpItem_NotDone">NotDone</string>
+    <string name="permission_required">Permission Required</string>
+    <string name="permission_required_message">This app cannot run without the following permissions:\n%s</string>
+    <string name="grant_permission">Grant Permission</string>
+    <string name="no_permission">No Permission</string>
+    <string name="no_permission_message_cancelled">The Permission:\n%s\nnot granted, the app will stop running.</string>
+    <string name="no_permission_message_denied">The Permission:\n%s\nnot granted, the app will stop running.\n\nPlease grant permission manually through system setting next time</string>
+    <string name="ok">OK</string>
+    <string name="fatal_error">Fatal Error</string>
+    <string name="fatal_error_message">Cannot access app scoped storage, failed to start the app</string>
+    <string name="cancel">Cancel</string>
 </resources>
