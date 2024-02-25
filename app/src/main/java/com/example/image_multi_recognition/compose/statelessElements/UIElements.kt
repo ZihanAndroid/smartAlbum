@@ -1,9 +1,11 @@
 package com.example.image_multi_recognition.compose.statelessElements
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Done
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -21,22 +23,23 @@ import com.example.image_multi_recognition.viewmodel.ImageLabelResult
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LabelSelectionElement(
-    imageLabelResult: ImageLabelResult,
-    onClick: (Boolean) -> Unit,
-    modifier: Modifier = Modifier
+    label: String,
+    initialSelected: Boolean = false,
+    modifier: Modifier = Modifier,
+    onClick: (String, Boolean) -> Unit
 ) {
-    var selected by rememberSaveable { mutableStateOf(false) }
+    var selected by rememberSaveable { mutableStateOf(initialSelected) }
 
     ElevatedFilterChip(
         // crop the padding set by minHeight(32.dp) inside SelectableChip() call of ElevatedFilterChip
         modifier = modifier.crop(vertical = 4.dp),
         onClick = {
             selected = !selected
-            onClick(selected)
+            onClick(label, selected)
         },
         label = {
             Text(
-                text = imageLabelResult.label,
+                text = label,
                 style = MaterialTheme.typography.labelMedium,
                 // color = colorResource(R.color.SeaGreen)
             )
@@ -46,7 +49,7 @@ fun LabelSelectionElement(
             if (selected) {
                 Icon(
                     imageVector = Icons.Filled.Done,
-                    contentDescription = "Selected ${imageLabelResult.imageId}",
+                    contentDescription = "Selected $label",
                     modifier = Modifier.size(FilterChipDefaults.IconSize),
                     tint = colorResource(R.color.LimeGreen)
                 )

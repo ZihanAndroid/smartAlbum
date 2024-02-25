@@ -9,7 +9,8 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
@@ -25,10 +26,11 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import coil.compose.AsyncImage
 import com.example.image_multi_recognition.R
 import com.example.image_multi_recognition.compose.statelessElements.ElevatedSmallIconButton
+import com.example.image_multi_recognition.compose.statelessElements.InputView
 import com.example.image_multi_recognition.compose.statelessElements.LabelSelectionElement
 import com.example.image_multi_recognition.compose.statelessElements.SingleImageView
-import com.example.image_multi_recognition.compose.statelessElements.crop
 import com.example.image_multi_recognition.db.ImageInfo
+import com.example.image_multi_recognition.db.ImageLabel
 import com.example.image_multi_recognition.util.LabelPlacingStrategy
 import com.example.image_multi_recognition.util.getCallSiteInfoFunc
 import com.example.image_multi_recognition.viewmodel.ImageLabelResult
@@ -40,7 +42,8 @@ fun SingleImageComposable(
     viewModel: SingleImageViewModel,
     modifier: Modifier = Modifier,
 ) {
-    Log.d(getCallSiteInfoFunc(), "currentThread: ${Thread.currentThread().id}: ${Thread.currentThread().name}")
+    Log.d(getCallSiteInfoFunc(), "Recomposition")
+    // Log.d(getCallSiteInfoFunc(), "currentThread: ${Thread.currentThread().id}: ${Thread.currentThread().name}")
     val pagingDataFlow by viewModel.pagingFlow.collectAsStateWithLifecycle()
     val pagingItems = pagingDataFlow.collectAsLazyPagingItems()
     val pagerState = rememberPagerState(
@@ -50,6 +53,11 @@ fun SingleImageComposable(
     )
     // if no label is detected, then we receive an empty list here,
     val imageLabelResult by viewModel.imageLabelFlow.collectAsStateWithLifecycle()
+    var addLabelClicked by rememberSaveable { mutableStateOf(false) }
+
+    val addedLabelList by viewModel.addedLabelListFlow.collectAsStateWithLifecycle()
+    // selectedLabelSet is stateless, the change of it does not need to trigger recomposition, so no need to use State
+    val selectedLabelSet = rememberSaveable { mutableSetOf<String>() }
 
     // Note if you use "LaunchedEffect{...}" it will run after the current recomposition
     // As a result, when switching to the next page, the previous rectangle shows in the new page then disappears.
@@ -58,17 +66,16 @@ fun SingleImageComposable(
         // the info in imageLabelResult has been shown in the previous screen,
         // we clear it so that when moving to the next page, the same imageLabelResult is not shown
         viewModel.clearPage(pagerState.currentPage)
+        selectedLabelSet.clear()
     }
 
     // a strange behavior, once I access "pagerState.pageCount" instead of "pagingItems.itemCount" here, it causes infinite recomposition
     // Log.d(getCallSiteInfoFunc(), "currentPage: ${pagerState.pageCount}")
     Log.d(getCallSiteInfoFunc(), "currentPage: ${pagingItems.itemCount}")
 
-    var addLabelClicked by rememberSaveable{ mutableStateOf(false) }
-
     Box(
         modifier = modifier.fillMaxSize()
-    ){
+    ) {
         SingleImageView(
             //title = "${pagerState.currentPage}/${pagerState.pageCount}",
             title = "${pagerState.currentPage + 1}/${pagingItems.itemCount}",
@@ -105,41 +112,85 @@ fun SingleImageComposable(
                     SingleImagePage(
                         imageInfo = imageInfo,
                         imageLabelResult = imageLabelResult,
-                        viewModel.imageSize,
-                        onLabelClick = {},
-                        onLabelDone = {}
+                        addedLabelList = addedLabelList,
+                        originalImageSize = viewModel.imageSize,
+                        onLabelClick = { label, selected ->
+                            if (selected) selectedLabelSet.add(label)
+                            else selectedLabelSet.remove(label)
+                        },
+                        onLabelDone = {
+                            with(mutableListOf<ImageLabel>()) {
+                                addedLabelList.forEach { label ->
+                                    add(ImageLabel(imageInfo.id, label))
+                                }
+                                selectedLabelSet.forEach { label ->
+                                    add(ImageLabel(imageInfo.id, label))
+                                }
+                                if (isNotEmpty()) {
+                                    viewModel.insertImageLabel(this)
+                                }
+                            }
+                        },
+                        onLabelAddingClick = { addLabelClicked = true },
+                        onAddedLabelClick = { label, selected ->
+                            // deselecting an added label makes it disappear
+                            if (!selected) {
+                                viewModel.setAddedLabelList(addedLabelList - label)
+                            }
+                        }
                     )
                 }
             }
         }
-        if(addLabelClicked){
-
+        if (addLabelClicked) {
+            InputView(
+                userAddedLabelList = addedLabelList,
+                onDismiss = { addLabelClicked = false },
+                onConfirm = { userSelectedLabelList ->
+                    addLabelClicked = false
+                    viewModel.setAddedLabelList(userSelectedLabelList)
+                },
+                onTextChange = { prefix ->
+                    viewModel.getLabelListByPrefix(prefix)
+                }
+            )
         }
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SingleImagePage(
     imageInfo: ImageInfo,
     imageLabelResult: List<ImageLabelResult>,
+    addedLabelList: List<String>,
     originalImageSize: Pair<Int, Int>,
     modifier: Modifier = Modifier,
-    onLabelClick: (Boolean) -> Unit,
+    onLabelClick: (String, Boolean) -> Unit,
     onLabelDone: () -> Unit,
+    onLabelAddingClick: () -> Unit,
+    onAddedLabelClick: (String, Boolean) -> Unit,
 ) {
+    Log.d(getCallSiteInfoFunc(), "Recomposition")
     //(if (++addedLabel > maximumCount) false else true)
     // add it.label.isNotEmpty() to filter out ImageLabelResult.EmptyResultList
-    val partImageLabelResult = imageLabelResult.filter { it.rect != null && it.label.isNotEmpty() }
+    // if imageLabelResult.clear() is called, remember its size can make sure the change can be captured here
+    val partImageLabelResult = remember(imageLabelResult, imageLabelResult.size) {
+        imageLabelResult.filter { it.rect != null && it.label.isNotEmpty() }
+    }
     Log.d(getCallSiteInfoFunc(), "partImageLabelResult: $partImageLabelResult")
     // remove duplication: "it !in partImageLabelResult"
-    val partLabels = setOf(*partImageLabelResult.map { it.label }.toTypedArray())
-    val wholeImageLabelResult =
+    val partLabels = remember(imageLabelResult, imageLabelResult.size) {
+        setOf(*partImageLabelResult.map { it.label }.toTypedArray())
+    }
+    val wholeImageLabelResult = remember(imageLabelResult, imageLabelResult.size) {
         imageLabelResult.filter { it.rect == null && it.label.isNotEmpty() && it.label !in partLabels }
+    }
     Log.d(getCallSiteInfoFunc(), "wholeImageLabelResult: $wholeImageLabelResult")
     ConstraintLayout(
         modifier = modifier.fillMaxSize()
     ) {
-        val (imageRef, labelRowRef, editRowRef, noLabelRef) = createRefs()
+        val (imageRef, labelRowRef, addedLabelRowRef, editRowRef, noLabelRef) = createRefs()
         CustomImageLayout(
             imageInfo = imageInfo,
             originalWidth = originalImageSize.first,
@@ -159,26 +210,44 @@ fun SingleImagePage(
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 modifier = Modifier.constrainAs(labelRowRef) {
                     bottom.linkTo(imageRef.top)
+                    start.linkTo(parent.start)
                 }
             ) {
-                wholeImageLabelResult.forEach {
-                    LabelSelectionElement(
-                        imageLabelResult = it,
-                        onClick = onLabelClick
-                    )
+                wholeImageLabelResult.forEach { labelResult ->
+                    LabelSelectionElement(label = labelResult.label, onClick = onLabelClick)
+                }
+            }
+            if (addedLabelList.isNotEmpty()) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier.constrainAs(addedLabelRowRef) {
+                        top.linkTo(imageRef.bottom)
+                        start.linkTo(parent.start)
+                    }
+                ) {
+                    addedLabelList.forEach { label ->
+                        // add a key here to get a smother visual effect when unselecting a label
+                        key(label) {
+                            LabelSelectionElement(
+                                label = label,
+                                initialSelected = true,
+                                onClick = onAddedLabelClick
+                            )
+                        }
+                    }
                 }
             }
             Row(
                 modifier = Modifier.constrainAs(editRowRef) {
                     end.linkTo(parent.end)
-                    top.linkTo(imageRef.bottom)
+                    bottom.linkTo(imageRef.top)
                 },
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 ElevatedSmallIconButton(
                     imageVector = Icons.Filled.Add,
                     contentDescription = "Add labels",
-                    onClick = {},
+                    onClick = onLabelAddingClick,
                 )
                 ElevatedSmallIconButton(
                     imageVector = Icons.Filled.Done,
@@ -208,7 +277,7 @@ fun CustomImageLayout(
     originalWidth: Int,
     originalHeight: Int,
     imageLabelList: List<ImageLabelResult>,
-    onLabelClick: (Boolean) -> Unit,
+    onLabelClick: (String, Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Log.d(getCallSiteInfoFunc(), "Recomposition")
@@ -231,7 +300,7 @@ fun CustomImageLayout(
     }
     val labels = @Composable {
         imageLabelList.forEach { imageLabelResult ->
-            LabelSelectionElement(imageLabelResult, onLabelClick)
+            LabelSelectionElement(imageLabelResult.label, onClick = onLabelClick)
         }
     }
     // custom layout handle pixel instead of dp

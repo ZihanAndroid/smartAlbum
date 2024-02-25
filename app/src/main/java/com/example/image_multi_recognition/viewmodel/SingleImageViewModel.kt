@@ -8,10 +8,9 @@ import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import com.example.image_multi_recognition.db.ImageInfo
+import com.example.image_multi_recognition.db.LabelInfo
 import com.example.image_multi_recognition.repository.ImageRepository
-import com.example.image_multi_recognition.util.ExifHelper
-import com.example.image_multi_recognition.util.getCallSiteInfo
-import com.example.image_multi_recognition.util.getCallSiteInfoFunc
+import com.example.image_multi_recognition.util.*
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.label.ImageLabel
 import com.google.mlkit.vision.label.ImageLabeler
@@ -55,9 +54,56 @@ class SingleImageViewModel @Inject constructor(
     private var imageLabelList = mutableListOf<ImageLabelResult>()
     private var finishedLabelingTask = 0
     private var labelAdded = 0
+    private var _addedLabelListFlow = MutableStateFlow<MutableList<String>>(mutableListOf())
+    val addedLabelListFlow: StateFlow<List<String>>
+        get() = _addedLabelListFlow
+
+    // For InputView
+    // ordered by label name first, then its count
+    private var orderedLabelList: List<LabelInfo> = emptyList()
+
+    // Assume that "prefix" is lowercase
+    private fun getRangeByPrefix(prefix: String): Pair<Int, Int> {
+        val comparator = Comparator<LabelInfo> { prefixElement, labelInfo ->
+            val lowercaseElement = prefixElement.label
+            val lowercaseLabel = labelInfo.label.lowercase()
+            // prefix match, ignore case
+            if (lowercaseElement.length <= lowercaseLabel.length
+                && lowercaseElement == lowercaseLabel.substring(0, lowercaseElement.length)
+            ) {
+                0
+            } else {
+                lowercaseElement.compareTo(lowercaseLabel)
+            }
+        }
+        return orderedLabelList.binarySearchLowerBoundIndex(
+            element = LabelInfo(prefix, 0), comparator = comparator
+        ) to orderedLabelList.binarySearchUpperBoundIndex(
+            element = LabelInfo(prefix, 0), comparator = comparator
+        )
+    }
+
+    fun getLabelListByPrefix(prefix: String): List<LabelInfo> {
+        if(prefix.isEmpty()) return emptyList()
+        return with(getRangeByPrefix(prefix.lowercase())) {
+            if (first != -1 && second != -1 && first <= second) {
+                Log.d(getCallSiteInfoFunc(), "found: ($first, $second)")
+                orderedLabelList.subList(first, second+1)
+            } else {
+                Log.w(getCallSiteInfoFunc(), "no reasonable index found: ($first, $second)")
+                emptyList()
+            }
+        }.apply {
+            Log.d(getCallSiteInfoFunc(), "obtained popup labels: $this")
+        }
+    }
 
     init {
         setPagingFlow(album, initialKey)
+        viewModelScope.launch {
+            orderedLabelList = repository.getAllOrderedLabelList()
+            Log.d(getCallSiteInfoFunc(), "initial popup labels: ${orderedLabelList.map { it.label }}")
+        }
     }
 
     private fun setPagingFlow(album: String, initialKey: Int) {
@@ -170,7 +216,8 @@ class SingleImageViewModel @Inject constructor(
 
     private fun checkLabelingTaskCompletion(requiredTaskCount: Int, currentPageWhenRunning: Int) {
         if (currentPage == currentPageWhenRunning && requiredTaskCount == finishedLabelingTask) {
-            _imageLabelFlow.value = if(imageLabelList.isEmpty()) ImageLabelResult.EmptyResultList.toMutableList() else imageLabelList
+            _imageLabelFlow.value =
+                if (imageLabelList.isEmpty()) ImageLabelResult.EmptyResultList.toMutableList() else imageLabelList
             Log.d(getCallSiteInfoFunc(), "recognized label list: $imageLabelList")
         }
     }
@@ -179,6 +226,7 @@ class SingleImageViewModel @Inject constructor(
     fun clearPage(nextPage: Int) {
         // clear list does not change the reference, so the recomposition will be triggered by this "clearRectList()"
         _imageLabelFlow.value.clear()
+        _addedLabelListFlow.value.clear()
         requestSent = false
         currentPage = nextPage
         finishedLabelingTask = 0
@@ -186,16 +234,27 @@ class SingleImageViewModel @Inject constructor(
         imageLabelList = mutableListOf()
         labelAdded = 0
     }
+
+    fun setAddedLabelList(labelList: List<String>) {
+        _addedLabelListFlow.value = labelList.toMutableList()
+    }
+
+    fun insertImageLabel(imageLabelList: List<com.example.image_multi_recognition.db.ImageLabel>) {
+        viewModelScope.launch {
+            repository.insertImageLabel(imageLabelList)
+        }
+    }
 }
 
 data class ImageLabelResult(
     val imageId: Long,
     val rect: Rect?,    // when rect is null, it means that the label is for the whole image, not a part of the image
     val label: String
-){
-    companion object{
+) {
+    companion object {
         // a special object to identify an empty labeling result from the initial empty list
         val EmptyResultList = listOf(ImageLabelResult(-1, null, ""))
-        fun isEmptyResult(resultList: List<ImageLabelResult>) = resultList.size == 1 && resultList[0] == EmptyResultList[0]
+        fun isEmptyResult(resultList: List<ImageLabelResult>) =
+            resultList.size == 1 && resultList[0] == EmptyResultList[0]
     }
 }

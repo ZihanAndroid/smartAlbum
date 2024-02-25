@@ -2,9 +2,7 @@ package com.example.image_multi_recognition.db
 
 import android.media.Image
 import androidx.paging.PagingSource
-import androidx.room.ColumnInfo
-import androidx.room.Dao
-import androidx.room.Query
+import androidx.room.*
 import com.example.image_multi_recognition.DefaultConfiguration
 
 @Dao

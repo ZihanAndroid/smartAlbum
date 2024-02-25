@@ -4,7 +4,8 @@
     <string name="albums">Albums</string>
     <string name="search">Search</string>
     <string name="label">Label</string>
-    <string name="add_label">Add Label</string>
+    <string name="add_label">Add label (%d at most)</string>
+    <string name="no_more_label">No more label</string>
     <string name="NavPopUpItem_NotDone">NotDone</string>
     <string name="permission_required">Permission Required</string>
     <string name="permission_required_message">This app cannot run without the following permissions:\n%s</string>

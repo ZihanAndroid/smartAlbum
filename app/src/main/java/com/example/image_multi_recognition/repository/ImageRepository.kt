@@ -18,6 +18,7 @@ import com.example.image_multi_recognition.util.AlbumPathDecoder
 import com.example.image_multi_recognition.util.ExifHelper
 import com.example.image_multi_recognition.util.getCallSiteInfo
 import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.objects.DetectedObject.Label
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import java.io.File
@@ -109,6 +110,12 @@ class ImageRepository @Inject constructor(
 
     suspend fun updateImageInfo(vararg imageInfo: ImageInfo) {
         imageInfoDao.update(*imageInfo)
+    }
+
+    suspend fun getAllOrderedLabelList(): List<LabelInfo> = imageLabelDao.getAllOrderedLabels()
+
+    suspend fun insertImageLabel(imageLabelList: List<ImageLabel>){
+        imageLabelDao.insert(*imageLabelList.toTypedArray())
     }
 
     // Proto DataStore

@@ -3,7 +3,7 @@ package com.example.image_multi_recognition.db
 import androidx.room.*
 
 interface BaseDao<T>{
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insert(vararg value: T): List<Long>
 
     @Update

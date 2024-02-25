@@ -26,10 +26,10 @@ fun ImagePagerView(
     onImageClick: (Int) -> Unit,  // user wants to view a selected image
     modifier: Modifier = Modifier,
     availableScreenWidth: Int, // need this for layout
-    onSendThumbnailRequest: (File, ImageInfo)->Unit
+    onSendThumbnailRequest: (File, ImageInfo) -> Unit
 ) {
+    Log.d(getCallSiteInfoFunc(), "Recomposition")
     val lazyGridState = rememberLazyGridState()
-    Log.d(getCallSiteInfoFunc(), "1, recomposition here")
 
     LazyVerticalGrid(
         columns = GridCells.Fixed(DefaultConfiguration.IMAGE_PER_ROW),
@@ -80,15 +80,18 @@ fun ImagePagerView(
                         )
                     }
 
-                    is UiModel.Item -> PagingItemImage(
-                        imageInfo = pageItem.imageInfo,
-                        onImageClick = { onImageClick(pageItem.originalIndex)},
-                        availableScreenWidth = availableScreenWidth,
-                        onSendThumbnailRequest = onSendThumbnailRequest
-                    )
+                    is UiModel.Item ->
+                        key(pageItem.imageInfo.id) {
+                            PagingItemImage(
+                                imageInfo = pageItem.imageInfo,
+                                onImageClick = { onImageClick(pageItem.originalIndex) },
+                                availableScreenWidth = availableScreenWidth,
+                                onSendThumbnailRequest = onSendThumbnailRequest
+                            )
+                        }
                 }
             }
-            
+
         }
         // Bad implementation! Do not use LazyColumn + FlowRow with a "prevItemList",
         // It is slower and difficult to set "prevItemList" correctly due to recomposition
@@ -154,7 +157,7 @@ private fun PagingItemImage(
     imageInfo: ImageInfo,
     onImageClick: () -> Unit,
     availableScreenWidth: Int,
-    onSendThumbnailRequest: (File, ImageInfo)->Unit
+    onSendThumbnailRequest: (File, ImageInfo) -> Unit
 ) {
     val imageSize = remember(availableScreenWidth) {
         (availableScreenWidth - (DefaultConfiguration.IMAGE_PER_ROW - 1) * DefaultConfiguration.IMAGE_INTERVAL) / DefaultConfiguration.IMAGE_PER_ROW
