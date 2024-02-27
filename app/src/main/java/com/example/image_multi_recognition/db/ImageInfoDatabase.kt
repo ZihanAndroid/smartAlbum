@@ -4,14 +4,14 @@ import android.graphics.Rect
 import androidx.room.*
 
 @Database(
-    entities = [ImageInfo::class, ImageLabel::class, ImageBound::class],
-    version = 1
+    entities = [ImageInfo::class, ImageLabel::class],
+    version = 2
 )
 @TypeConverters(value = [RectConverter::class])
 abstract class ImageInfoDatabase : RoomDatabase(){
     abstract fun getImageInfoDao(): ImageInfoDao
     abstract fun getImageLabelDao(): ImageLabelDao
-    abstract fun getImageBoundDao(): ImageBoundDao
+    // abstract fun getImageBoundDao(): ImageBoundDao
 }
 
 class RectConverter {

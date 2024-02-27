@@ -75,21 +75,24 @@ data class ImageInfo(
 data class ImageLabel(
     @ColumnInfo(name = "id") val id: Long,
     @ColumnInfo(name = "label") val label: String,
+    // the "rect" value is based on original_image_width and original_image_height of the image file
+    // If rect is null, it means that the rect is for whole image labels or user-added labels
+    @ColumnInfo(name = "rect") val rect: Rect?,
 )
 
 // ImageInfo:ImageBound, one to many
-@Entity(
-    tableName = "IMAGE_BOUNDS",
-    foreignKeys = [ForeignKey(
-        entity = ImageInfo::class,
-        parentColumns = ["id"],
-        childColumns = ["id"],
-        onDelete = ForeignKey.CASCADE,
-        onUpdate = ForeignKey.CASCADE
-    )],
-    primaryKeys = ["id", "rect"]
-)
-data class ImageBound(
-    @ColumnInfo(name = "id") val id: Long,
-    @ColumnInfo(name = "rect") val rect: Rect,
-)
+//@Entity(
+//    tableName = "IMAGE_BOUNDS",
+//    foreignKeys = [ForeignKey(
+//        entity = ImageInfo::class,
+//        parentColumns = ["id"],
+//        childColumns = ["id"],
+//        onDelete = ForeignKey.CASCADE,
+//        onUpdate = ForeignKey.CASCADE
+//    )],
+//    primaryKeys = ["id", "rect"]
+//)
+//data class ImageBound(
+//    @ColumnInfo(name = "id") val id: Long,
+//    @ColumnInfo(name = "rect") val rect: Rect,
+//)

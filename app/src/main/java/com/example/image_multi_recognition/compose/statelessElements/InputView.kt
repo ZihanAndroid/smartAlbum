@@ -13,6 +13,8 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.platform.LocalConfiguration
@@ -51,6 +53,8 @@ fun InputView(
 
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
+    val textFieldFocusRequester = remember { FocusRequester() }
+
     val onLabelAdded: (String) -> Unit = remember {
         { inputString ->
             with(inputString.trim()) {
@@ -65,6 +69,10 @@ fun InputView(
                 }
             }
         }
+    }
+
+    LaunchedEffect(Unit){
+        textFieldFocusRequester.requestFocus()
     }
 
     Box(
@@ -107,6 +115,7 @@ fun InputView(
                             input = it
                             dropDownItemList = onTextChange(it)
                         },
+                        // enabled = userAddedLabelSet.size < maxAllowedLabelCount,
                         label = {
                             Text(
                                 text = if (maxAllowedLabelCount > userAddedLabelSet.size) {
@@ -118,12 +127,12 @@ fun InputView(
                         },
                         modifier = Modifier.fillMaxWidth().onFocusChanged {
                             inputSelected = it.isFocused
-                        }.menuAnchor().onPlaced { },
+                        }.menuAnchor().focusRequester(textFieldFocusRequester),
                         trailingIcon = {
                             Icon(
                                 imageVector = Icons.Filled.Add,
                                 contentDescription = "addLabel",
-                                modifier = Modifier.clickable { onLabelAdded(input) }
+                                modifier = Modifier.size(28.dp).clickable { onLabelAdded(input) }
                             )
                         }
                     )
@@ -160,7 +169,6 @@ fun InputView(
                                     },
                                     onClick = {
                                         onLabelAdded(dropDownItemList[index].label)
-
                                     },
                                     modifier = Modifier.height(dropDownItemHeight.dp)
                                 )

@@ -1,11 +1,9 @@
 package com.example.image_multi_recognition.compose.statelessElements
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Done
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -18,15 +16,14 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.unit.dp
 import com.example.image_multi_recognition.R
-import com.example.image_multi_recognition.viewmodel.ImageLabelResult
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LabelSelectionElement(
     label: String,
-    initialSelected: Boolean = false,
     modifier: Modifier = Modifier,
-    onClick: (String, Boolean) -> Unit
+    initialSelected: Boolean = false,
+    onClick: (String, Boolean) -> Unit = {_, _ ->},
 ) {
     var selected by rememberSaveable { mutableStateOf(initialSelected) }
 

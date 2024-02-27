@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import com.example.image_multi_recognition.compose.TestComposable
 import com.example.image_multi_recognition.compose.navigation.Home
 import com.example.image_multi_recognition.permission.PermissionAccessor
 import com.example.image_multi_recognition.ui.theme.Image_multi_recognitionTheme
@@ -73,6 +74,7 @@ class MainActivity : ComponentActivity() {
                     // A surface container using the 'background' color from the theme
                     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                         Home()
+                        // TestComposable()
                     }
                 }
             }

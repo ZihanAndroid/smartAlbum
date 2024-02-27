@@ -3,16 +3,12 @@ package com.example.image_multi_recognition.compose.navigation
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavController
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.example.image_multi_recognition.compose.view.AlbumComposable
 import com.example.image_multi_recognition.compose.view.PhotoComposable
 import com.example.image_multi_recognition.compose.view.SingleImageComposable
-import com.example.image_multi_recognition.viewmodel.PhotoViewModel
-import com.example.image_multi_recognition.viewmodel.SingleImageViewModel
 
 @Composable
 fun NavigationGraph(

@@ -1,8 +1,6 @@
 package com.example.image_multi_recognition.viewmodel
 
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import com.example.image_multi_recognition.db.ImageBound
 import com.example.image_multi_recognition.repository.ImageRepository
 import com.google.mlkit.vision.label.ImageLabeler
 import com.google.mlkit.vision.objects.ObjectDetector
@@ -10,7 +8,6 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 
@@ -21,7 +18,6 @@ class ImageLabelingViewModel @Inject constructor(
     //private val glideRequestBuilder: RequestBuilder<Bitmap>,
     private val repository: ImageRepository
 ) : ViewModel() {
-    private val detectedObjectsFlow = MutableSharedFlow<List<ImageBound>>()
 
     private val _labelingDoneFlow = MutableStateFlow(true)
     val labelingDoneFlow: StateFlow<Boolean>

@@ -35,31 +35,24 @@ class SingleImageViewModel @Inject constructor(
     // get navigation arguments
     val album: String = savedStateHandle.get<String>("album")!!
     val initialKey: Int = savedStateHandle.get<Int>("initialKey")!!
+    private val controlledLabelingRunner = ControlledRunner<Unit>()
 
     private val _pagingFlow: MutableStateFlow<Flow<PagingData<ImageInfo>>> = MutableStateFlow(emptyFlow())
     val pagingFlow: StateFlow<Flow<PagingData<ImageInfo>>>
         get() = _pagingFlow
 
-    //    private val _rectListFlow = MutableStateFlow<MutableList<Rect>>(mutableListOf())
-//    val rectListFlow: StateFlow<List<Rect>>
-//        get() = _rectListFlow
+    private val _imageLabelStateFlow = MutableStateFlow(ImageLabelLists())
+    val imageLabelStateFlow: StateFlow<ImageLabelLists>
+        get() = _imageLabelStateFlow
+
+    var labelingStart = false
+    private var currentPage: Int = initialKey
+    private var partImageLabelList = mutableListOf<ImageLabelResult>()
+    private var wholeImageLabelList = mutableListOf<ImageLabelResult>()
+    private var finishedLabelingTask = 0
     var imageSize: Pair<Int, Int> = Pair(0, 0)
 
-    private val _imageLabelFlow = MutableStateFlow<MutableList<ImageLabelResult>>(mutableListOf())
-    val imageLabelFlow: StateFlow<List<ImageLabelResult>>
-        get() = _imageLabelFlow
-    private var requestSent = false
-
-    private var currentPage: Int = initialKey
-    private var imageLabelList = mutableListOf<ImageLabelResult>()
-    private var finishedLabelingTask = 0
-    private var labelAdded = 0
-    private var _addedLabelListFlow = MutableStateFlow<MutableList<String>>(mutableListOf())
-    val addedLabelListFlow: StateFlow<List<String>>
-        get() = _addedLabelListFlow
-
-    // For InputView
-    // ordered by label name first, then its count
+    // For InputView, ordered by label name first, then its count
     private var orderedLabelList: List<LabelInfo> = emptyList()
 
     // Assume that "prefix" is lowercase
@@ -84,11 +77,11 @@ class SingleImageViewModel @Inject constructor(
     }
 
     fun getLabelListByPrefix(prefix: String): List<LabelInfo> {
-        if(prefix.isEmpty()) return emptyList()
+        if (prefix.isEmpty()) return emptyList()
         return with(getRangeByPrefix(prefix.lowercase())) {
             if (first != -1 && second != -1 && first <= second) {
                 Log.d(getCallSiteInfoFunc(), "found: ($first, $second)")
-                orderedLabelList.subList(first, second+1)
+                orderedLabelList.subList(first, second + 1)
             } else {
                 Log.w(getCallSiteInfoFunc(), "no reasonable index found: ($first, $second)")
                 emptyList()
@@ -116,51 +109,53 @@ class SingleImageViewModel @Inject constructor(
     // instead, you should avoid doing something when you know the task is not needed in the callback
     fun detectAndLabelImage(imageInfo: ImageInfo) {
         // handle the request only once for each page
-        if (requestSent) return
-        requestSent = true
+        if (labelingStart) return
+        labelingStart = true
         viewModelScope.launch {
-            val currentPageWhenRunning = currentPage
-            val imageHandled = withContext(Dispatchers.IO) {
-                repository.getInputImage(imageInfo.fullImageFile)
-            } ?: return@launch
-            Log.d(
-                getCallSiteInfo(),
-                "image size for object detection: (width: ${imageHandled.width}, height: ${imageHandled.height})"
-            )
-            // the imageSize used by object detection may different from the size of the image displayed in CustomLayout
-            imageSize = imageHandled.width to imageHandled.height
+            controlledLabelingRunner.joinPreviousOrRun {
+                val currentPageWhenRunning = currentPage
+                val imageHandled = withContext(Dispatchers.IO) {
+                    repository.getInputImage(imageInfo.fullImageFile)
+                } ?: return@joinPreviousOrRun
+                Log.d(
+                    getCallSiteInfo(),
+                    "image size for object detection: (width: ${imageHandled.width}, height: ${imageHandled.height})"
+                )
+                // the imageSize used by object detection may different from the size of the image displayed in CustomLayout
+                imageSize = imageHandled.width to imageHandled.height
 
-            objectDetector.process(imageHandled)
-                .addOnSuccessListener { detectedObjects ->
-                    // onSuccessListener can be called anytime in the main thread,
-                    // but the good thing is that the main thread is a single thread, everything in it is sequential
-                    Log.d(
-                        getCallSiteInfo(),
-                        "Detected object bounds: ${detectedObjects.joinToString { it.boundingBox.toString() }}"
-                    )
-                    // Note that the OnSuccessListener runs in the UI main thread!
-                    Log.d(
-                        getCallSiteInfoFunc(),
-                        "currentThread: ${Thread.currentThread().id}: ${Thread.currentThread().name}"
-                    )
-                    // change state to trigger recomposition
-                    val detectedRectList = detectedObjects.map { it.boundingBox }.toMutableList()
-                    // if the user has already swiped to the next page, we just ignore the result
-                    if (currentPageWhenRunning == currentPage) {
-                        // _rectListFlow.value = detectedRectList
-                        val rootRect = Rect()   // a rect for the whole image, we also label the whole image
-                        detectedRectList.add(rootRect)
-                        // image labeling
-                        labelingImage(imageInfo, imageHandled, detectedRectList, rootRect, currentPageWhenRunning)
-                    } else {
+                objectDetector.process(imageHandled)
+                    .addOnSuccessListener { detectedObjects ->
+                        // onSuccessListener can be called anytime in the main thread,
+                        // but the good thing is that the main thread is a single thread, everything in it is sequential
+                        Log.d(
+                            getCallSiteInfo(),
+                            "Detected object bounds: ${detectedObjects.joinToString { it.boundingBox.toString() }}"
+                        )
+                        // Note that the OnSuccessListener runs in the UI main thread!
                         Log.d(
                             getCallSiteInfoFunc(),
-                            "current task is canceled, user moved from Page:$currentPageWhenRunning to Page:$currentPage"
+                            "currentThread: ${Thread.currentThread().id}: ${Thread.currentThread().name}"
                         )
+                        // change state to trigger recomposition
+                        val detectedRectList = detectedObjects.map { it.boundingBox }.toMutableList()
+                        // if the user has already swiped to the next page, we just ignore the result
+                        if (currentPageWhenRunning == currentPage) {
+                            // _rectListFlow.value = detectedRectList
+                            val rootRect = Rect()   // a rect for the whole image, we also label the whole image
+                            detectedRectList.add(rootRect)
+                            // image labeling
+                            labelingImage(imageInfo, imageHandled, detectedRectList, rootRect, currentPageWhenRunning)
+                        } else {
+                            Log.d(
+                                getCallSiteInfoFunc(),
+                                "current task is canceled, user moved from Page:$currentPageWhenRunning to Page:$currentPage"
+                            )
+                        }
+                    }.addOnFailureListener { e ->
+                        Log.e(getCallSiteInfo(), e.stackTraceToString())
                     }
-                }.addOnFailureListener { e ->
-                    Log.e(getCallSiteInfo(), e.stackTraceToString())
-                }
+            }
         }
     }
 
@@ -188,12 +183,13 @@ class SingleImageViewModel @Inject constructor(
                         Log.d(getCallSiteInfoFunc(), "recognized label: $labelList")
                         if (rect != rootRect) {
                             labelList.filter { it.confidence >= 0.6 }.maxBy { it.confidence }.let { label: ImageLabel ->
-                                imageLabelList.add(ImageLabelResult(imageInfo.id, rect, label.text))
+                                partImageLabelList.add(ImageLabelResult(imageInfo.id, rect, label.text))
                             }
                         } else {
+                            // set maximum 2 whole image labels
                             labelList.filter { it.confidence >= 0.6 }.sortedBy { it.confidence }.reversed()
                                 .subList(0, if (labelList.size > 1) 2 else labelList.size).forEach { label ->
-                                    imageLabelList.add(ImageLabelResult(imageInfo.id, null, label.text))
+                                    wholeImageLabelList.add(ImageLabelResult(imageInfo.id, rootRect, label.text))
                                 }
                         }
                     } else {
@@ -216,45 +212,88 @@ class SingleImageViewModel @Inject constructor(
 
     private fun checkLabelingTaskCompletion(requiredTaskCount: Int, currentPageWhenRunning: Int) {
         if (currentPage == currentPageWhenRunning && requiredTaskCount == finishedLabelingTask) {
-            _imageLabelFlow.value =
-                if (imageLabelList.isEmpty()) ImageLabelResult.EmptyResultList.toMutableList() else imageLabelList
-            Log.d(getCallSiteInfoFunc(), "recognized label list: $imageLabelList")
+            // Bad implementation, MutableStateFlow compares the new value with the old one by "equals()" method, not by reference.
+            // When you set _imageLabelStateFlow.value.partImageLabelList and _imageLabelStateFlow.value.wholeImageLabelList
+            // you have already changed the value stored in _imageLabelStateFlow,
+            // then you set the same _imageLabelStateFlow.value.copy() (which has the same lists) to _imageLabelStateFlow.value.
+            // And equals() methods of data class compares the property of the instances, not the instance reference
+            //      _imageLabelStateFlow.value.partImageLabelList = partImageLabelList
+            //      _imageLabelStateFlow.value.wholeImageLabelList = wholeImageLabelList
+            //      _imageLabelStateFlow.value = _imageLabelStateFlow.value.copy()
+
+            // The following two conditions must be fulfilled to make MutableStateFlow emit a new value:
+            // (1) reference change to the MutableStateFlow.value
+            // (2) the changed value is not equal to the previous one by standard of "equals()" method
+
+            // change reference to trigger recomposition
+            val labelSet = setOf(*partImageLabelList.map { it.label }.toTypedArray())
+            _imageLabelStateFlow.value = _imageLabelStateFlow.value.copy(
+                partImageLabelList = partImageLabelList,
+                // deduplication of whole image labels
+                wholeImageLabelList = wholeImageLabelList.filter { it.label !in labelSet }
+            )
+            Log.d(getCallSiteInfoFunc(), "recognized part image label list: $partImageLabelList")
+            Log.d(getCallSiteInfoFunc(), "recognized whole image label list: $wholeImageLabelList")
         }
     }
 
     // clearPage does not change states
     fun clearPage(nextPage: Int) {
         // clear list does not change the reference, so the recomposition will be triggered by this "clearRectList()"
-        _imageLabelFlow.value.clear()
-        _addedLabelListFlow.value.clear()
-        requestSent = false
+        _imageLabelStateFlow.value = ImageLabelLists()
+        // _addedLabelListFlow.value.clear()
+        labelingStart = false
         currentPage = nextPage
         finishedLabelingTask = 0
         // create a new list to change the reference (so that recomposition can be triggered when you run "_imageLabelFlow.value = imageLabelList")
-        imageLabelList = mutableListOf()
-        labelAdded = 0
+        partImageLabelList = mutableListOf()
+        wholeImageLabelList = mutableListOf()
     }
 
-    fun setAddedLabelList(labelList: List<String>) {
-        _addedLabelListFlow.value = labelList.toMutableList()
+    // reset _imageLabelFlow to start recomposition
+    fun resetImageLabelFlow(
+        partImageLabelResult: List<ImageLabelResult>?,
+        wholeImageLabelResult: List<ImageLabelResult>?,
+        addedLabelList: List<String>?,
+        labelingDone: Boolean
+    ) {
+        _imageLabelStateFlow.value = _imageLabelStateFlow.value.copy(
+            partImageLabelList = partImageLabelResult,
+            wholeImageLabelList = wholeImageLabelResult,
+            addedLabelList = addedLabelList,
+            labelingDone = labelingDone
+        )
     }
 
-    fun insertImageLabel(imageLabelList: List<com.example.image_multi_recognition.db.ImageLabel>) {
+    fun setAddedLabelList(labelList: List<String>?) {
+        // _addedLabelListFlow.value = labelList.toMutableList()
+        _imageLabelStateFlow.value = _imageLabelStateFlow.value.copy(
+            addedLabelList = labelList
+        )
+    }
+
+    fun updateLabelAndResetOrderedList(imageLabels: List<com.example.image_multi_recognition.db.ImageLabel>) {
         viewModelScope.launch {
-            repository.insertImageLabel(imageLabelList)
+            orderedLabelList = repository.updateImageLabelAndGetAllOrderedLabelList(imageLabels)
+            Log.d(getCallSiteInfoFunc(), "reset popup labels: ${orderedLabelList.map { it.label }}")
         }
     }
 }
 
 data class ImageLabelResult(
     val imageId: Long,
-    val rect: Rect?,    // when rect is null, it means that the label is for the whole image, not a part of the image
+    val rect: Rect?,
     val label: String
-) {
-    companion object {
-        // a special object to identify an empty labeling result from the initial empty list
-        val EmptyResultList = listOf(ImageLabelResult(-1, null, ""))
-        fun isEmptyResult(resultList: List<ImageLabelResult>) =
-            resultList.size == 1 && resultList[0] == EmptyResultList[0]
-    }
-}
+)
+
+// You should never use a MutableList inside a State like data class (e.g.: ImageLabelState)
+// If you do so, then when you add data into the MutableList, the reference of the MutableList does not change,
+// so the new value may not reflect to the screen.
+// Instead, using List instead of MutableList makes sure
+// that the change to the list is always achieved by change list reference
+data class ImageLabelLists(
+    var partImageLabelList: List<ImageLabelResult>? = null,
+    var wholeImageLabelList: List<ImageLabelResult>? = null,
+    var addedLabelList: List<String>? = null,
+    var labelingDone: Boolean = false
+)

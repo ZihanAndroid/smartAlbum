@@ -1,7 +1,6 @@
 package com.example.image_multi_recognition.repository
 
 import android.content.Context
-import android.graphics.Rect
 import android.graphics.drawable.Drawable
 import android.util.Log
 import androidx.core.net.toUri
@@ -18,7 +17,6 @@ import com.example.image_multi_recognition.util.AlbumPathDecoder
 import com.example.image_multi_recognition.util.ExifHelper
 import com.example.image_multi_recognition.util.getCallSiteInfo
 import com.google.mlkit.vision.common.InputImage
-import com.google.mlkit.vision.objects.DetectedObject.Label
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import java.io.File
@@ -30,49 +28,49 @@ class ImageRepository @Inject constructor(
     private val database: ImageInfoDatabase,
     private val imageLabelDao: ImageLabelDao,
     private val imageInfoDao: ImageInfoDao,
-    private val imageBoundDao: ImageBoundDao,
+    // private val imageBoundDao: ImageBoundDao,
     @ApplicationContext private val context: Context
 ) {
-    suspend fun registerUnLabeledImage(
-        album: String,
-        path: String,
-        imageBounds: List<ImageBound>,
-        timestamp: Long
-    ): Boolean {
-        if (imageBounds.isEmpty()) {
-            Log.e(getCallSiteInfo(), "An empty imageBounds list is passed")
-            return false
-        }
-        return database.withTransaction {
-            imageInfoDao.insert(
-                ImageInfo(
-                    id = imageBounds[0].id,
-                    album = album,
-                    path = path,
-                    labeled = false,
-                    timestamp = timestamp
-                )
-            )
-            imageBoundDao.insert(*imageBounds.toTypedArray())
-            true
-        }
-    }
+//    suspend fun registerUnLabeledImage(
+//        album: String,
+//        path: String,
+//        imageBounds: List<ImageBound>,
+//        timestamp: Long
+//    ): Boolean {
+//        if (imageBounds.isEmpty()) {
+//            Log.e(getCallSiteInfo(), "An empty imageBounds list is passed")
+//            return false
+//        }
+//        return database.withTransaction {
+//            imageInfoDao.insert(
+//                ImageInfo(
+//                    id = imageBounds[0].id,
+//                    album = album,
+//                    path = path,
+//                    labeled = false,
+//                    timestamp = timestamp
+//                )
+//            )
+//            imageBoundDao.insert(*imageBounds.toTypedArray())
+//            true
+//        }
+//    }
 
-    suspend fun registerLabeledImage(imageLabels: List<ImageLabel>): Boolean {
-        if (imageLabels.isEmpty()) {
-            Log.e(getCallSiteInfo(), "An empty imageLabels list is passed")
-            return false
-        }
-        return database.withTransaction {
-            imageLabels[0].id.let { id ->
-                imageInfoDao.setLabeled(id, true)
-                imageLabelDao.insert(*imageLabels.toTypedArray())
-                imageBoundDao.deleteById(id) > 0
-            }
-        }
-    }
+//    suspend fun registerLabeledImage(imageLabels: List<ImageLabel>): Boolean {
+//        if (imageLabels.isEmpty()) {
+//            Log.e(getCallSiteInfo(), "An empty imageLabels list is passed")
+//            return false
+//        }
+//        return database.withTransaction {
+//            imageLabels[0].id.let { id ->
+//                imageInfoDao.setLabeled(id, true)
+//                imageLabelDao.insert(*imageLabels.toTypedArray())
+//                imageBoundDao.deleteById(id) > 0
+//            }
+//        }
+//    }
 
-    suspend fun getBoundsFromId(id: Long): List<Rect> = imageBoundDao.selectById(id)
+    // suspend fun getBoundsFromId(id: Long): List<Rect> = imageBoundDao.selectById(id)
 
     suspend fun getAllImageOfAlbum(album: String): List<ImageIdPath> = imageInfoDao.getAllImageOfAlbum(album)
 
@@ -114,9 +112,13 @@ class ImageRepository @Inject constructor(
 
     suspend fun getAllOrderedLabelList(): List<LabelInfo> = imageLabelDao.getAllOrderedLabels()
 
-    suspend fun insertImageLabel(imageLabelList: List<ImageLabel>){
-        imageLabelDao.insert(*imageLabelList.toTypedArray())
-    }
+    suspend fun updateImageLabelAndGetAllOrderedLabelList(imageLabelList: List<ImageLabel>) =
+        database.withTransaction {
+            imageLabelDao.deleteById(imageLabelList.first().id)
+            imageLabelDao.insert(*imageLabelList.toTypedArray())
+            getAllOrderedLabelList()
+        }
+
 
     // Proto DataStore
     fun getImagePagingFlow(album: String, initialKey: Int? = null): Flow<PagingData<ImageInfo>> = Pager(

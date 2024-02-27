@@ -2,7 +2,6 @@ package com.example.image_multi_recognition
 
 import android.content.Context
 import androidx.room.Room
-import com.example.image_multi_recognition.db.ImageBoundDao
 import com.example.image_multi_recognition.db.ImageInfoDao
 import com.example.image_multi_recognition.db.ImageInfoDatabase
 import com.example.image_multi_recognition.db.ImageLabelDao
@@ -81,11 +80,11 @@ object DataBaseModule{
         database: ImageInfoDatabase
     ): ImageInfoDao = database.getImageInfoDao()
 
-    @Provides
-    @Singleton
-    fun provideImageBoundDao(
-        database: ImageInfoDatabase
-    ): ImageBoundDao = database.getImageBoundDao()
+//    @Provides
+//    @Singleton
+//    fun provideImageBoundDao(
+//        database: ImageInfoDatabase
+//    ): ImageBoundDao = database.getImageBoundDao()
 
     @Provides
     @Singleton

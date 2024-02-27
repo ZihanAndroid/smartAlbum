@@ -15,6 +15,12 @@ interface ImageLabelDao : BaseDao<ImageLabel>{
         ORDER BY label COLLATE NOCASE ASC, count DESC
     """)
     suspend fun getAllOrderedLabels(): List<LabelInfo>
+
+    @Query("""
+        DELETE FROM image_labels
+        WHERE id = :id
+    """)
+    suspend fun deleteById(id: Long)
 }
 
 data class LabelInfo(
