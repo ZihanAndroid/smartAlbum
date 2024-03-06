@@ -1,10 +1,15 @@
 package com.example.image_multi_recognition
 
 import android.content.Context
+import android.util.Log
+import androidx.datastore.core.DataStore
+import androidx.datastore.core.DataStoreFactory
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
+import androidx.datastore.dataStoreFile
 import androidx.room.Room
-import com.example.image_multi_recognition.db.ImageInfoDao
-import com.example.image_multi_recognition.db.ImageInfoDatabase
-import com.example.image_multi_recognition.db.ImageLabelDao
+import com.example.image_multi_recognition.dataStore.AppDataSerializer
+import com.example.image_multi_recognition.db.*
+import com.example.image_multi_recognition.util.getCallSiteInfoFunc
 import com.google.mlkit.vision.label.ImageLabeler
 import com.google.mlkit.vision.label.ImageLabeling
 import com.google.mlkit.vision.label.defaults.ImageLabelerOptions
@@ -18,14 +23,18 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
-object DefaultConfiguration{
+object DefaultConfiguration {
     const val PAGE_SIZE = 80
-    const val IMAGE_INFO_BATCH_SIZE = 100
+    const val DEFAULT_THUMBNAIL_SIZE = 160
+
     // SQLITE_MAX_VARIABLE_NUMBER in SQLite is 999 by default, set "DB_BATCH_SIZE" to a value smaller than that
     const val DB_BATCH_SIZE = 950
 
     const val IMAGE_PER_ROW = 4
+    const val ALBUM_PER_ROW = 2
     const val IMAGE_INTERVAL = 4
+    const val ALBUM_INTERVAL = 8
+    const val APP_DATASTORE = "APP_DATASTORE"
 }
 
 @Module
@@ -62,7 +71,7 @@ object ImageModules {
 
 @Module
 @InstallIn(SingletonComponent::class)
-object DataBaseModule{
+object DataBaseModule {
     @Provides
     @Singleton
     fun provideRepoDatabase(
@@ -80,15 +89,34 @@ object DataBaseModule{
         database: ImageInfoDatabase
     ): ImageInfoDao = database.getImageInfoDao()
 
-//    @Provides
-//    @Singleton
-//    fun provideImageBoundDao(
-//        database: ImageInfoDatabase
-//    ): ImageBoundDao = database.getImageBoundDao()
+    @Provides
+    @Singleton
+    fun provideAlbumInfoDao(
+        database: ImageInfoDatabase
+    ): AlbumInfoDao = database.getAlbumInfoDao()
 
     @Provides
     @Singleton
     fun provideImageLabelDao(
         database: ImageInfoDatabase
     ): ImageLabelDao = database.getImageLabelDao()
+}
+
+@Module
+@InstallIn(SingletonComponent::class)
+object DataStoreModule {
+    @Provides
+    @Singleton
+    fun provideProtoDataStore(
+        @ApplicationContext context: Context,
+        serializer: AppDataSerializer
+    ): DataStore<AppData> =
+        DataStoreFactory.create(
+            serializer = serializer,
+            produceFile = { context.dataStoreFile(DefaultConfiguration.APP_DATASTORE) },
+            corruptionHandler = ReplaceFileCorruptionHandler { corruptionException ->
+                Log.e(getCallSiteInfoFunc(), corruptionException.stackTraceToString())
+                AppData.getDefaultInstance()
+            }
+        )
 }

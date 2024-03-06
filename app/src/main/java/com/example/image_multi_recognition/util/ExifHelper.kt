@@ -3,7 +3,9 @@ package com.example.image_multi_recognition.util
 import android.graphics.Bitmap
 import android.graphics.Rect
 import android.util.Log
+import android.util.Size
 import androidx.exifinterface.media.ExifInterface
+import com.example.image_multi_recognition.DefaultConfiguration
 import com.example.image_multi_recognition.compose.navigation.Destination
 import java.io.File
 import java.time.Instant
@@ -20,17 +22,47 @@ object ExifHelper {
         LocalDateTime.ofInstant(Instant.ofEpochMilli(timestamp), zoneId)
 
     // the format for is "yyyy:MM:dd hh:mm:ss", but Java's Timestamp for sql requires "yyyy-mm-dd hh:mm:ss"
-    fun getImageCreatedTime(file: File): String? = ExifInterface(file).getAttribute(ExifInterface.TAG_DATETIME)?.let {
-        //Log.d(getCallSiteInfo(), "converted image created time: $this")
-        dbTimestampFormatter.format(androidTimestampFormatter.parse(it))
+    fun getImageCreatedTime(file: File): String? {
+        return ExifInterface(file).getAttribute(ExifInterface.TAG_DATETIME)?.let {
+            //Log.d(getCallSiteInfo(), "converted image created time: $this")
+            dbTimestampFormatter.format(androidTimestampFormatter.parse(it))
+        }
     }
 
+//    fun getImageSize(file: File): Size {
+//        return try {
+//            val width = ExifInterface(file).getAttributeInt(
+//                ExifInterface.TAG_IMAGE_WIDTH,
+//                DefaultConfiguration.DEFAULT_THUMBNAIL_SIZE
+//            )
+//            val length = ExifInterface(file).getAttributeInt(
+//                ExifInterface.TAG_IMAGE_WIDTH,
+//                DefaultConfiguration.DEFAULT_THUMBNAIL_SIZE
+//            )
+//            return Size(
+//                DefaultConfiguration.DEFAULT_THUMBNAIL_SIZE,
+//                (DefaultConfiguration.DEFAULT_THUMBNAIL_SIZE.toFloat() * length / width).toInt()
+//            )
+//        } catch (e: Throwable) {
+//            Log.e(getCallSiteInfoFunc(), e.stackTraceToString())
+//            Size(DefaultConfiguration.DEFAULT_THUMBNAIL_SIZE, DefaultConfiguration.DEFAULT_THUMBNAIL_SIZE)
+//        }
+//    }
+
     fun getImageRotationDegree(file: File): Int =
-        when (ExifInterface(file).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)) {
-            ExifInterface.ORIENTATION_ROTATE_90 -> 90
-            ExifInterface.ORIENTATION_ROTATE_180 -> 180
-            ExifInterface.ORIENTATION_ROTATE_270 -> 270
-            else -> 0
+        try {
+            when (ExifInterface(file).getAttributeInt(
+                ExifInterface.TAG_ORIENTATION,
+                ExifInterface.ORIENTATION_NORMAL
+            )) {
+                ExifInterface.ORIENTATION_ROTATE_90 -> 90
+                ExifInterface.ORIENTATION_ROTATE_180 -> 180
+                ExifInterface.ORIENTATION_ROTATE_270 -> 270
+                else -> 0
+            }
+        } catch (e: Throwable) {
+            Log.e(getCallSiteInfoFunc(), e.stackTraceToString())
+            0
         }
 
     fun buildDestinationFromRoute(navRouteWithArgument: String?): Destination? =
@@ -38,7 +70,7 @@ object ExifHelper {
             Destination.valueOf(navRouteWithArgument.split("/")[0])
         }
 
-    fun cropBitmap(bitmap: Bitmap, rect: Rect): Bitmap{
+    fun cropBitmap(bitmap: Bitmap, rect: Rect): Bitmap {
         return Bitmap.createBitmap(bitmap, rect.left, rect.top, rect.width(), rect.height())
     }
 }

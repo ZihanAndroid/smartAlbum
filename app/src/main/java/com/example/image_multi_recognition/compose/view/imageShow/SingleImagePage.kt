@@ -146,8 +146,8 @@ fun SingleImagePageLabelingDone(
     originalImageSize: Pair<Int, Int>,
     partImageLabelResult: List<ImageLabelResult>?,
     otherImageLabelResult: List<ImageLabelResult>?,
-    showHintText: Boolean = true,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    showHintText: Boolean = true
 ) {
     ConstraintLayout(
         modifier = modifier
@@ -166,7 +166,10 @@ fun SingleImagePageLabelingDone(
             },
             labels = @Composable {
                 partImageLabelResult?.forEach { imageLabelResult ->
-                    LabelSelectionElement(label = imageLabelResult.label)
+                    LabelSelectionElement(
+                        label = imageLabelResult.label,
+                        initialSelected = true,
+                    )
                 }
             },
             modifier = Modifier.constrainAs(imageRef) {
@@ -174,7 +177,8 @@ fun SingleImagePageLabelingDone(
                 bottom.linkTo(parent.bottom)
                 start.linkTo(parent.start)
                 end.linkTo(parent.end)
-            }
+            },
+            placingStrategyWithCache = true
         )
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -186,6 +190,7 @@ fun SingleImagePageLabelingDone(
             otherImageLabelResult?.forEach { imageLabelResult ->
                 LabelSelectionElement(
                     label = imageLabelResult.label,
+                    initialSelected = true,
                 )
             }
         }

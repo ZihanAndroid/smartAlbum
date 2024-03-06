@@ -60,7 +60,8 @@ object LabelPlacingStrategy {
                 4 -> PlacingResult(curRect.left, curRect.top, 4)
                 else -> throw RuntimeException("Unexpected value obtained!")   // should never be here
             } to rectToIndexMap[curRect]
-        }.sortedBy { it.second }.map { it.first }   // sort the result according to the index of curRect in the original rectList
+        }.sortedBy { it.second }
+            .map { it.first }   // sort the result according to the index of curRect in the original rectList
     }
 
     // make the whole label inside the boundary of rect
@@ -151,3 +152,24 @@ data class PlacingResult(
     val y: Int,
     val quadrant: Int
 )
+
+// Note the result from LabelPlacingStrategy is based on the original rects;
+// However, the selected labels and original labels are different (only part of the labels would be selected by the user),
+// As a result, if the same LabelPlacingStrategy applies, the position of the same label before and after labeling may change.
+// To avoid the problem, cache the previous labeling result and use it at the appropriate time
+object CachedLabelPlacingStrategy {
+    private val labelRectMap = mutableMapOf<String, PlacingResult>()
+
+    // if rectList is null, then returning the previous result
+    fun placeLabels(labelList: List<String>, rectList: List<Rect>? = null): List<PlacingResult> {
+        if (!rectList.isNullOrEmpty()) assert(labelList.size == rectList.size)
+        if (!rectList.isNullOrEmpty()) {
+            with(LabelPlacingStrategy.placeLabels(rectList).mapIndexed { index, placingResult ->
+                labelList[index] to placingResult
+            }){
+                labelRectMap.putAll(this)
+            }
+        }
+        return labelList.map { labelRectMap[it]!! }
+    }
+}

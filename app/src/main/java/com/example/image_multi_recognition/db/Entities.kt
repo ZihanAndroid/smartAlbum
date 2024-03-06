@@ -3,24 +3,35 @@ package com.example.image_multi_recognition.db
 import android.graphics.Bitmap
 import android.graphics.Rect
 import android.util.Log
+import android.util.Size
 import androidx.room.*
 import com.example.image_multi_recognition.util.AlbumPathDecoder
 import com.example.image_multi_recognition.util.ExifHelper
 import com.example.image_multi_recognition.util.ScopedThumbNailStorage
 import com.example.image_multi_recognition.util.getCallSiteInfo
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 
 @Entity(
     tableName = "IMAGE_INFO",
-    indices = [Index(value = ["album", "path"], unique = true)]
+    foreignKeys = [ForeignKey(
+        entity = AlbumInfo::class,
+        parentColumns = ["album"],
+        childColumns = ["album"],
+        onDelete = ForeignKey.CASCADE,
+        onUpdate = ForeignKey.CASCADE
+    )],
+    indices = [Index(value = ["album"])]
 )
 data class ImageInfo(
     @PrimaryKey(autoGenerate = true) @ColumnInfo(name = "id") var id: Long = 0,
     @ColumnInfo(name = "path") val path: String, // relative path
-    @ColumnInfo(name = "album") val album: String,  // directory, also used as album
+    @ColumnInfo(name = "album") val album: Long,  // directory, also used as album
     @ColumnInfo(name = "labeled") var labeled: Boolean,
+    // @ColumnInfo(name = "albumId") val albumId: Long,
     @ColumnInfo(name = "time_created") val timestamp: Long,
     // cache thumbnail's path instead of thumbnail itself
     // https://developer.android.com/topic/performance/sqlite-performance-best-practices#store-small
@@ -32,7 +43,10 @@ data class ImageInfo(
 
     @Ignore
     val thumbnailFile: File =
-        File(ScopedThumbNailStorage.imageStorage, "${album.replace("/", "-")}${path.replace("/", "_")}")
+        File(ScopedThumbNailStorage.imageStorage, "${album}_${path.replace("/", "_")}")
+
+//    @Ignore
+//    val thumbnailSize: Size = ExifHelper.getImageSize(fullImageFile)
 
     val rotationDegree: Int
         get() = ExifHelper.getImageRotationDegree(fullImageFile)
@@ -41,14 +55,18 @@ data class ImageInfo(
         get() = thumbnailFile.exists() && thumbnailFile.length() > 0
 
     // under each directory, we put the thumbnails into app's scoped external storage (not shared storage)
+    // Not main-thread safe
     fun setImageCache(bitmap: Bitmap) {
         try {
-            if(!thumbnailFile.exists() || thumbnailFile.length() == 0L) {
+            if (!thumbnailFile.exists() || thumbnailFile.length() == 0L) {
                 FileOutputStream(thumbnailFile).use { outputStream ->
                     if (!bitmap.compress(Bitmap.CompressFormat.JPEG, 10, outputStream)) {
                         throw IOException("Failed to compress bitmap!")
                     }
-                    Log.d(getCallSiteInfo(), "Thumbnail size: ${String.format("%.f", thumbnailFile.length() / 1024.0)}KB")
+                    Log.d(
+                        getCallSiteInfo(),
+                        "Thumbnail size: ${String.format("%.f", thumbnailFile.length() / 1024.0)}KB"
+                    )
                 }
             }
         } catch (e: IOException) {
@@ -80,19 +98,11 @@ data class ImageLabel(
     @ColumnInfo(name = "rect") val rect: Rect?,
 )
 
-// ImageInfo:ImageBound, one to many
-//@Entity(
-//    tableName = "IMAGE_BOUNDS",
-//    foreignKeys = [ForeignKey(
-//        entity = ImageInfo::class,
-//        parentColumns = ["id"],
-//        childColumns = ["id"],
-//        onDelete = ForeignKey.CASCADE,
-//        onUpdate = ForeignKey.CASCADE
-//    )],
-//    primaryKeys = ["id", "rect"]
-//)
-//data class ImageBound(
-//    @ColumnInfo(name = "id") val id: Long,
-//    @ColumnInfo(name = "rect") val rect: Rect,
-//)
+@Entity(
+    tableName = "ALBUM_INFO",
+)
+data class AlbumInfo(
+    @PrimaryKey(autoGenerate = true) @ColumnInfo(name = "album") var album: Long = 0,
+    // @PrimaryKey @ColumnInfo(name = "album") val album: String,  // album name, it may equal to the directory name or not
+    @ColumnInfo(name = "path") val path: String, // absolute path
+)

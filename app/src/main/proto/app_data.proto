@@ -1,0 +1,8 @@
+syntax = "proto3";
+
+option java_package="com.example.image_multi_recognition";
+option java_multiple_files = true;
+
+message AppData{
+  string mediaStoreVersion = 1;
+}

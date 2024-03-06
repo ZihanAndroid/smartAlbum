@@ -14,6 +14,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -22,9 +24,14 @@ import androidx.navigation.compose.rememberNavController
 import com.example.image_multi_recognition.R
 import com.example.image_multi_recognition.util.ExifHelper
 import com.example.image_multi_recognition.util.getCallSiteInfoFunc
+import com.example.image_multi_recognition.viewmodel.PhotoViewModel
 
 @Composable
-fun Home(modifier: Modifier = Modifier) {
+fun Home(
+    modifier: Modifier = Modifier,
+    photoViewModel: PhotoViewModel
+) {
+
     val navController = rememberNavController()
     val snackBarHostState = remember { SnackbarHostState() }
     var contentShownBySnackBar by remember { mutableStateOf("") }
@@ -53,16 +60,19 @@ fun Home(modifier: Modifier = Modifier) {
                     navController = navController,
                     items = Destination.entries.filter { it.isRootDestination }
                 )
-            }
+            },
+            modifier = modifier
         ) { suggestedPadding ->
             NavigationGraph(
                 navController = navController,
-                modifier = Modifier.padding(suggestedPadding)
+                modifier = Modifier.padding(suggestedPadding),
+                photoViewModel = photoViewModel
             )
         }
     } else {
         NavigationGraph(
             navController = navController,
+            photoViewModel = photoViewModel
         )
     }
 

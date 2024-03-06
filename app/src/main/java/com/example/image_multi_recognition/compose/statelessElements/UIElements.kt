@@ -23,7 +23,7 @@ fun LabelSelectionElement(
     label: String,
     modifier: Modifier = Modifier,
     initialSelected: Boolean = false,
-    onClick: (String, Boolean) -> Unit = {_, _ ->},
+    onClick: ((String, Boolean) -> Unit)? = null,
 ) {
     var selected by rememberSaveable { mutableStateOf(initialSelected) }
 
@@ -31,8 +31,11 @@ fun LabelSelectionElement(
         // crop the padding set by minHeight(32.dp) inside SelectableChip() call of ElevatedFilterChip
         modifier = modifier.crop(vertical = 4.dp),
         onClick = {
-            selected = !selected
-            onClick(label, selected)
+            // do not change selected when onclick is null (keep it as initialSelected)
+            onClick?.let {
+                selected = !selected
+                it.invoke(label, selected)
+            }
         },
         label = {
             Text(
@@ -51,6 +54,26 @@ fun LabelSelectionElement(
                     tint = colorResource(R.color.LimeGreen)
                 )
             }
+        }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun LabelElement(
+    label: String,
+    modifier: Modifier = Modifier,
+) {
+    ElevatedSuggestionChip(
+        // crop the padding set by minHeight(32.dp) inside SelectableChip() call of ElevatedFilterChip
+        //modifier = modifier.crop(vertical = 4.dp),
+        onClick = {},
+        label = {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                // color = colorResource(R.color.SeaGreen)
+            )
         }
     )
 }

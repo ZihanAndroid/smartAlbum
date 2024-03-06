@@ -33,9 +33,10 @@ class SingleImageViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle  // this parameter is set by hiltViewModel() automatically
 ) : ViewModel() {
     // get navigation arguments
-    val album: String = savedStateHandle.get<String>("album")!!
+    val album: Long = savedStateHandle.get<Long>("album")!!
     val initialKey: Int = savedStateHandle.get<Int>("initialKey")!!
     private val controlledLabelingRunner = ControlledRunner<Unit>()
+    private val controlledLabelingDoneRunner = ControlledRunner<Unit>()
 
     private val _pagingFlow: MutableStateFlow<Flow<PagingData<ImageInfo>>> = MutableStateFlow(emptyFlow())
     val pagingFlow: StateFlow<Flow<PagingData<ImageInfo>>>
@@ -47,10 +48,15 @@ class SingleImageViewModel @Inject constructor(
 
     var labelingStart = false
     private var currentPage: Int = initialKey
-    private var partImageLabelList = mutableListOf<ImageLabelResult>()
+
+    // label: confidence
+    private var partImageLabelConfidenceMap = mutableMapOf<String, Float>()
+    private var partImageLabelMap = mutableMapOf<String, ImageLabelResult>()
     private var wholeImageLabelList = mutableListOf<ImageLabelResult>()
     private var finishedLabelingTask = 0
     var imageSize: Pair<Int, Int> = Pair(0, 0)
+    // selectedLabelSet is stateless, the change of it does not need to trigger recomposition, so no need to use State
+    var selectedLabelSet = mutableSetOf<String>()
 
     // For InputView, ordered by label name first, then its count
     private var orderedLabelList: List<LabelInfo> = emptyList()
@@ -99,7 +105,7 @@ class SingleImageViewModel @Inject constructor(
         }
     }
 
-    private fun setPagingFlow(album: String, initialKey: Int) {
+    private fun setPagingFlow(album: Long, initialKey: Int) {
         _pagingFlow.value = repository.getImagePagingFlow(album, initialKey).cachedIn(viewModelScope)
     }
 
@@ -109,8 +115,15 @@ class SingleImageViewModel @Inject constructor(
     // instead, you should avoid doing something when you know the task is not needed in the callback
     fun detectAndLabelImage(imageInfo: ImageInfo) {
         // handle the request only once for each page
+        Log.d(getCallSiteInfoFunc(), "labelingStart: $labelingStart")
         if (labelingStart) return
         labelingStart = true
+        // create a new list to change the reference (so that recomposition can be triggered when you run "_imageLabelFlow.value = imageLabelList")
+        partImageLabelMap = mutableMapOf()
+        wholeImageLabelList = mutableListOf()
+        partImageLabelConfidenceMap.clear()
+        selectedLabelSet.clear()
+
         viewModelScope.launch {
             controlledLabelingRunner.joinPreviousOrRun {
                 val currentPageWhenRunning = currentPage
@@ -183,14 +196,21 @@ class SingleImageViewModel @Inject constructor(
                         Log.d(getCallSiteInfoFunc(), "recognized label: $labelList")
                         if (rect != rootRect) {
                             labelList.filter { it.confidence >= 0.6 }.maxBy { it.confidence }.let { label: ImageLabel ->
-                                partImageLabelList.add(ImageLabelResult(imageInfo.id, rect, label.text))
+                                // deduplication, choose the label with maximum confidence
+                                if (partImageLabelConfidenceMap[label.text] == null || label.confidence > partImageLabelConfidenceMap[label.text]!!) {
+                                    partImageLabelConfidenceMap[label.text] = label.confidence
+                                    partImageLabelMap[label.text] = ImageLabelResult(imageInfo.id, rect, label.text)
+                                }
                             }
                         } else {
                             // set maximum 2 whole image labels
-                            labelList.filter { it.confidence >= 0.6 }.sortedBy { it.confidence }.reversed()
-                                .subList(0, if (labelList.size > 1) 2 else labelList.size).forEach { label ->
-                                    wholeImageLabelList.add(ImageLabelResult(imageInfo.id, rootRect, label.text))
+                            with(labelList.filter { it.confidence >= 0.7 }.sortedBy { it.confidence }.reversed()){
+                                if(isNotEmpty()){
+                                    subList(0, if (size > 1) 2 else size).forEach { label ->
+                                        wholeImageLabelList.add(ImageLabelResult(imageInfo.id, rootRect, label.text))
+                                    }
                                 }
+                            }
                         }
                     } else {
                         Log.d(getCallSiteInfoFunc(), "empty label for: $rect")
@@ -212,6 +232,7 @@ class SingleImageViewModel @Inject constructor(
 
     private fun checkLabelingTaskCompletion(requiredTaskCount: Int, currentPageWhenRunning: Int) {
         if (currentPage == currentPageWhenRunning && requiredTaskCount == finishedLabelingTask) {
+            finishedLabelingTask = 0
             // Bad implementation, MutableStateFlow compares the new value with the old one by "equals()" method, not by reference.
             // When you set _imageLabelStateFlow.value.partImageLabelList and _imageLabelStateFlow.value.wholeImageLabelList
             // you have already changed the value stored in _imageLabelStateFlow,
@@ -226,28 +247,25 @@ class SingleImageViewModel @Inject constructor(
             // (2) the changed value is not equal to the previous one by standard of "equals()" method
 
             // change reference to trigger recomposition
-            val labelSet = setOf(*partImageLabelList.map { it.label }.toTypedArray())
+            // val labelSet = setOf(*partImageLabelList.map { it.label }.toTypedArray())
             _imageLabelStateFlow.value = _imageLabelStateFlow.value.copy(
-                partImageLabelList = partImageLabelList,
+                partImageLabelList = partImageLabelMap.map { it.value },
                 // deduplication of whole image labels
-                wholeImageLabelList = wholeImageLabelList.filter { it.label !in labelSet }
+                wholeImageLabelList = wholeImageLabelList.filter { it.label !in partImageLabelMap.keys },
+                addedLabelList = null,
+                labelingDone = false
             )
-            Log.d(getCallSiteInfoFunc(), "recognized part image label list: $partImageLabelList")
+            Log.d(getCallSiteInfoFunc(), "recognized part image label list: ${partImageLabelMap.map { it.value }}")
             Log.d(getCallSiteInfoFunc(), "recognized whole image label list: $wholeImageLabelList")
         }
     }
 
     // clearPage does not change states
     fun clearPage(nextPage: Int) {
-        // clear list does not change the reference, so the recomposition will be triggered by this "clearRectList()"
         _imageLabelStateFlow.value = ImageLabelLists()
-        // _addedLabelListFlow.value.clear()
         labelingStart = false
         currentPage = nextPage
-        finishedLabelingTask = 0
-        // create a new list to change the reference (so that recomposition can be triggered when you run "_imageLabelFlow.value = imageLabelList")
-        partImageLabelList = mutableListOf()
-        wholeImageLabelList = mutableListOf()
+        selectedLabelSet.clear()
     }
 
     // reset _imageLabelFlow to start recomposition
@@ -274,8 +292,10 @@ class SingleImageViewModel @Inject constructor(
 
     fun updateLabelAndResetOrderedList(imageLabels: List<com.example.image_multi_recognition.db.ImageLabel>) {
         viewModelScope.launch {
-            orderedLabelList = repository.updateImageLabelAndGetAllOrderedLabelList(imageLabels)
-            Log.d(getCallSiteInfoFunc(), "reset popup labels: ${orderedLabelList.map { it.label }}")
+            controlledLabelingDoneRunner.joinPreviousOrRun {
+                orderedLabelList = repository.updateImageLabelAndGetAllOrderedLabelList(imageLabels)
+                Log.d(getCallSiteInfoFunc(), "reset popup labels: ${orderedLabelList.map { it.label }}")
+            }
         }
     }
 }

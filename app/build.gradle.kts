@@ -16,7 +16,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.image_multi_recognition"
-        minSdk = 27
+        minSdk = 29
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
@@ -127,7 +127,7 @@ dependencies {
     // Dependency injection: Hilt
     implementation("com.google.dagger:hilt-android:$hiltVersion")
     implementation("com.google.dagger:dagger:$daggerVersion")
-    implementation("androidx.hilt:hilt-navigation-compose:1.1.0")
+    implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
     ksp("com.google.dagger:dagger-compiler:$hiltVersion")
     ksp("com.google.dagger:hilt-android-compiler:$hiltVersion")
     // proto DataStore
@@ -155,8 +155,8 @@ dependencies {
     implementation("androidx.paging:paging-compose:$pagingVersion")
     testImplementation("androidx.paging:paging-common-ktx:$pagingVersion")
     // ml-kit
-    implementation("com.google.mlkit:object-detection:17.0.0")
-    implementation("com.google.mlkit:image-labeling:17.0.7")
+    implementation("com.google.mlkit:object-detection:17.0.1")
+    implementation("com.google.mlkit:image-labeling:17.0.8")
     // Glide for image
     // implementation("com.github.bumptech.glide:glide:$glideVersion")
     // ksp("com.github.bumptech.glide:compiler:$glideVersion")

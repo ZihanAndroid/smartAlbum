@@ -22,7 +22,7 @@ interface ImageInfoDao: BaseDao<ImageInfo> {
         FROM image_info
         WHERE album=:album
     """)
-    suspend fun getAllImageOfAlbum(album: String): List<ImageIdPath>
+    suspend fun getAllImageOfAlbum(album: Long): List<ImageIdPath>
 
     @Query("""
         DELETE FROM image_info
@@ -45,8 +45,26 @@ interface ImageInfoDao: BaseDao<ImageInfo> {
         WHERE album=:album
         ORDER BY time_created DESC
     """)
-    fun getImageShowPagingSourceForAlbum(album: String): PagingSource<Int, ImageInfo>
+    fun getImageShowPagingSourceForAlbum(album: Long): PagingSource<Int, ImageInfo>
+
+    @Query("""
+        SELECT i1.album as album_, i1.path as path_, i2.count as count_
+        FROM image_info as i1 join (
+            SELECT album, MAX(time_created) as latest_time, COUNT(album) as count
+            FROM image_info
+            GROUP BY album
+        ) as i2 on i1.album=i2.album and i1.time_created=i2.latest_time
+        GROUP BY album_, count_
+        HAVING path=MIN(path_)
+    """)
+    fun getAlbumWithLatestImagePagingSource(): PagingSource<Int, AlbumWithLatestImage>
 }
+
+data class AlbumWithLatestImage(
+    @ColumnInfo("album_") val album: Long,
+    @ColumnInfo("path_") val path: String,
+    @ColumnInfo("count_") val count: Int
+)
 
 data class ImageIdPath(
     @ColumnInfo("id") val id: Long,

@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.vectorResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.example.image_multi_recognition.R
 import com.example.image_multi_recognition.compose.statelessElements.InputView
@@ -34,6 +35,7 @@ import com.example.image_multi_recognition.viewmodel.SingleImageViewModel
 fun SingleImageComposable(
     viewModel: SingleImageViewModel,
     modifier: Modifier = Modifier,
+    onBackClick: ()->Unit
 ) {
     Log.d(getCallSiteInfoFunc(), "Recomposition")
     val pagingDataFlow by viewModel.pagingFlow.collectAsStateWithLifecycle()
@@ -47,9 +49,6 @@ fun SingleImageComposable(
     val imageLabelLists by viewModel.imageLabelStateFlow.collectAsStateWithLifecycle()
     var addLabelClicked by rememberSaveable { mutableStateOf(false) }
 
-    // selectedLabelSet is stateless, the change of it does not need to trigger recomposition, so no need to use State
-    val selectedLabelSet = rememberSaveable { mutableSetOf<String>() }
-
     // Note if you use "LaunchedEffect{...}" it will run after the current recomposition
     // As a result, when switching to the next page, the previous rectangle shows in the new page then disappears.
     // However, by using "remember(pagerState.currentPage){...}", we can clear imageLabelResult first.
@@ -57,7 +56,6 @@ fun SingleImageComposable(
         // the info in imageLabelResult has been shown in the previous screen,
         // we clear it so that when moving to the next page, the same imageLabelResult is not shown
         viewModel.clearPage(pagerState.currentPage)
-        selectedLabelSet.clear()
     }
 
     // a strange behavior, once I access "pagerState.pageCount" instead of "pagingItems.itemCount" here, it causes infinite recomposition
@@ -69,7 +67,7 @@ fun SingleImageComposable(
     ) {
         SingleImageView(
             title = "${pagerState.currentPage + 1}/${pagingItems.itemCount}",
-            onBack = {},
+            onBack = onBackClick,
             topRightIcons = listOf(
                 ImageVector.vectorResource(R.drawable.baseline_new_label_24) to "label",
                 ImageVector.vectorResource(R.drawable.baseline_rotate_right_24) to "rotate",
@@ -99,7 +97,6 @@ fun SingleImageComposable(
                 modifier = Modifier.padding(paddingValues),
             ) { itemIndex ->
                 pagingItems[itemIndex]?.let { imageInfo ->
-
                     if (!imageLabelLists.labelingDone) {
                         SingleImagePage(
                             imageInfo = imageInfo,
@@ -108,12 +105,12 @@ fun SingleImageComposable(
                             addedLabelList = imageLabelLists.addedLabelList,
                             originalImageSize = viewModel.imageSize,
                             onLabelClick = { label, selected ->
-                                if (selected) selectedLabelSet.add(label)
-                                else selectedLabelSet.remove(label)
+                                if (selected) viewModel.selectedLabelSet.add(label)
+                                else viewModel.selectedLabelSet.remove(label)
                             },
                             onLabelDone = {
                                 with(mutableListOf<ImageLabel>()) {
-                                    selectedLabelSet.forEach { label ->
+                                    viewModel.selectedLabelSet.forEach { label ->
                                         add(
                                             ImageLabel(
                                                 id = imageInfo.id,
@@ -124,7 +121,7 @@ fun SingleImageComposable(
                                     }
                                     imageLabelLists.addedLabelList?.forEach { label ->
                                         // deduplication
-                                        if (label !in selectedLabelSet) {
+                                        if (label !in viewModel.selectedLabelSet) {
                                             add(
                                                 ImageLabel(
                                                     id = imageInfo.id,
@@ -139,12 +136,12 @@ fun SingleImageComposable(
                                     }
                                 }
                                 // show selected labels
-                                Log.d(getCallSiteInfoFunc(), "selected labels: $selectedLabelSet")
+                                Log.d(getCallSiteInfoFunc(), "selected labels: ${viewModel.selectedLabelSet}")
                                 viewModel.resetImageLabelFlow(
-                                    partImageLabelResult = imageLabelLists.partImageLabelList?.filter { it.label in selectedLabelSet },
-                                    wholeImageLabelResult = imageLabelLists.wholeImageLabelList?.filter { it.label in selectedLabelSet }
+                                    partImageLabelResult = imageLabelLists.partImageLabelList?.filter { it.label in viewModel.selectedLabelSet },
+                                    wholeImageLabelResult = imageLabelLists.wholeImageLabelList?.filter { it.label in viewModel.selectedLabelSet }
                                         ?.toMutableList()?.apply {
-                                            imageLabelLists.addedLabelList?.filter { it !in selectedLabelSet }
+                                            imageLabelLists.addedLabelList?.filter { it !in viewModel.selectedLabelSet }
                                                 ?.map { label -> ImageLabelResult(imageInfo.id, null, label) }
                                                 .let { addedLabels ->
                                                     if (!addedLabels.isNullOrEmpty()) {
@@ -152,7 +149,7 @@ fun SingleImageComposable(
                                                     }
                                                 }
                                         },
-                                    addedLabelList = null,
+                                    addedLabelList = imageLabelLists.addedLabelList,
                                     labelingDone = true
                                 )
                                 // allow labeling again

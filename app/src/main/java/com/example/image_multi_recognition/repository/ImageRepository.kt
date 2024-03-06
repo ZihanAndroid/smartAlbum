@@ -2,8 +2,10 @@ package com.example.image_multi_recognition.repository
 
 import android.content.Context
 import android.graphics.drawable.Drawable
+import android.provider.MediaStore
 import android.util.Log
 import androidx.core.net.toUri
+import androidx.datastore.core.DataStore
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
@@ -11,26 +13,66 @@ import androidx.room.withTransaction
 import coil.ImageLoader
 import coil.imageLoader
 import coil.request.ImageRequest
+import com.example.image_multi_recognition.AppData
 import com.example.image_multi_recognition.DefaultConfiguration
 import com.example.image_multi_recognition.db.*
 import com.example.image_multi_recognition.util.AlbumPathDecoder
 import com.example.image_multi_recognition.util.ExifHelper
+import com.example.image_multi_recognition.util.MediaDirectoryFetcher
 import com.example.image_multi_recognition.util.getCallSiteInfo
 import com.google.mlkit.vision.common.InputImage
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import java.io.File
 import java.io.IOException
 import java.sql.Timestamp
 import javax.inject.Inject
 
 class ImageRepository @Inject constructor(
+    private val appDataStore: DataStore<AppData>,
     private val database: ImageInfoDatabase,
     private val imageLabelDao: ImageLabelDao,
     private val imageInfoDao: ImageInfoDao,
+    private val albumInfoDao: AlbumInfoDao,
     // private val imageBoundDao: ImageBoundDao,
     @ApplicationContext private val context: Context
 ) {
+    // val dataReadyFlow =
+
+    val mediaStoreVersionFlow: Flow<String> = appDataStore.data.catch { e ->
+        if (e is IOException) {
+            Log.e("DataStoreProtoRepository", "Error in fetching AppData:\n${e.stackTraceToString()}")
+            emit(AppData.getDefaultInstance())
+        } else {
+            throw e
+        }
+    }.map { it.mediaStoreVersion }.distinctUntilChanged()
+
+    // return newVersion if media stored is updated or empty string if not
+    fun checkMediaStoreUpdate(previousVersion: String): String {
+        return MediaStore.getVersion(context).let { newVersion ->
+            if (newVersion != previousVersion) {
+                newVersion
+            }else{
+                ""
+            }
+        }
+    }
+
+    suspend fun updateMediaStoreVersion(newVersion: String) {
+        appDataStore.updateData { currentData ->
+            currentData.toBuilder().setMediaStoreVersion(newVersion).build()
+        }
+    }
+
+    fun getAllImageDir(): List<File> = with(MediaDirectoryFetcher) {
+        context.getAllImageDir()
+    }
+
+    suspend fun getAllAlbumInfo(): List<AlbumInfo> = albumInfoDao.getAllAlbums()
 //    suspend fun registerUnLabeledImage(
 //        album: String,
 //        path: String,
@@ -71,15 +113,21 @@ class ImageRepository @Inject constructor(
 //    }
 
     // suspend fun getBoundsFromId(id: Long): List<Rect> = imageBoundDao.selectById(id)
+    suspend fun getAllImageOfAlbum(album: Long): List<ImageIdPath> = imageInfoDao.getAllImageOfAlbum(album)
 
-    suspend fun getAllImageOfAlbum(album: String): List<ImageIdPath> = imageInfoDao.getAllImageOfAlbum(album)
+    suspend fun deleteAndAddAlbums(deletedAlbums: List<AlbumInfo>, addedAlbums: List<AlbumInfo>): List<Long> {
+        return database.withTransaction {
+            albumInfoDao.delete(*deletedAlbums.toTypedArray())
+            albumInfoDao.insert(*addedAlbums.toTypedArray())
+        }
+    }
 
     suspend fun deleteAndAddImages(
         deletedIds: List<Long>,
         addedFilePaths: List<File>,
         //cachedImages: List<ByteArray>,
-        album: String
-    ): List<ImageInfo> {
+        album: Long
+    ): List<ImageInfo> = database.withTransaction {
         imageInfoDao.deleteById(*deletedIds.toLongArray())
         val addedImageInfo = addedFilePaths.map { file ->
             ImageInfo(
@@ -99,7 +147,7 @@ class ImageRepository @Inject constructor(
         imageInfoDao.insert(*addedImageInfo.toTypedArray()).forEachIndexed { index, id ->
             addedImageInfo[index].id = id
         }
-        return addedImageInfo
+        addedImageInfo
     }
 
     suspend fun insertImageInfo(vararg imageInfo: ImageInfo) {
@@ -109,6 +157,8 @@ class ImageRepository @Inject constructor(
     suspend fun updateImageInfo(vararg imageInfo: ImageInfo) {
         imageInfoDao.update(*imageInfo)
     }
+
+    suspend fun getAlbumByPath(path: String): Long? = albumInfoDao.getAlbumByPath(path)
 
     suspend fun getAllOrderedLabelList(): List<LabelInfo> = imageLabelDao.getAllOrderedLabels()
 
@@ -121,13 +171,21 @@ class ImageRepository @Inject constructor(
 
 
     // Proto DataStore
-    fun getImagePagingFlow(album: String, initialKey: Int? = null): Flow<PagingData<ImageInfo>> = Pager(
+    fun getImagePagingFlow(album: Long, initialKey: Int? = null): Flow<PagingData<ImageInfo>> = Pager(
         initialKey = initialKey,
         config = PagingConfig(
             pageSize = DefaultConfiguration.PAGE_SIZE,
             enablePlaceholders = true
         ),
         pagingSourceFactory = { imageInfoDao.getImageShowPagingSourceForAlbum(album) }
+    ).flow
+
+    fun getAlbumPagingFlow(): Flow<PagingData<AlbumWithLatestImage>> = Pager(
+        config = PagingConfig(
+            pageSize = DefaultConfiguration.PAGE_SIZE,
+            enablePlaceholders = true
+        ),
+        pagingSourceFactory = { imageInfoDao.getAlbumWithLatestImagePagingSource() }
     ).flow
 
     fun genImageRequest(file: File, onSuccess: (Drawable) -> Unit = {}): Pair<ImageLoader, ImageRequest> {
@@ -144,10 +202,19 @@ class ImageRepository @Inject constructor(
         return Pair(context.imageLoader, request)
     }
 
-    fun getInputImage(file: File): InputImage?{
-        return try{
+//    fun genThumbnail(file: File, imageInfo: ImageInfo) {
+//        try {
+//            // val bitmap = context.contentResolver.loadThumbnail(Uri.fromFile(file), imageInfo.thumbnailSize, null)
+//            // imageInfo.setImageCache(bitmap)
+//        } catch (e: IOException) {
+//            Log.e(getCallSiteInfo(), e.stackTraceToString())
+//        }
+//    }
+
+    fun getInputImage(file: File): InputImage? {
+        return try {
             InputImage.fromFilePath(context, file.toUri())
-        } catch(e: IOException){
+        } catch (e: IOException) {
             Log.e(getCallSiteInfo(), e.stackTraceToString())
             null
         }

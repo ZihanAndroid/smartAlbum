@@ -3,14 +3,12 @@ package com.example.image_multi_recognition.compose.statelessElements
 import android.util.Log
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.lazy.grid.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import androidx.paging.compose.LazyPagingItems
 import coil.compose.AsyncImage
@@ -25,11 +23,11 @@ fun ImagePagerView(
     pagingItems: LazyPagingItems<UiModel>,
     onImageClick: (Int) -> Unit,  // user wants to view a selected image
     modifier: Modifier = Modifier,
-    availableScreenWidth: Int, // need this for layout
     onSendThumbnailRequest: (File, ImageInfo) -> Unit
 ) {
     Log.d(getCallSiteInfoFunc(), "Recomposition")
     val lazyGridState = rememberLazyGridState()
+    val availableScreenWidth = LocalConfiguration.current.screenWidthDp
 
     LazyVerticalGrid(
         columns = GridCells.Fixed(DefaultConfiguration.IMAGE_PER_ROW),
@@ -63,7 +61,6 @@ fun ImagePagerView(
                         Column {
                             PageTitleYearMonth(pageItem.year, pageItem.month.toString())
                             PageTitleDay(
-                                pageItem.year,
                                 pageItem.month.toString(),
                                 pageItem.dayOfMonth,
                                 pageItem.dayOfWeek.toString()
@@ -73,7 +70,6 @@ fun ImagePagerView(
 
                     is UiModel.ItemHeaderDay -> {
                         PageTitleDay(
-                            pageItem.year,
                             pageItem.month.toString(),
                             pageItem.dayOfMonth,
                             pageItem.dayOfWeek.toString()
@@ -169,7 +165,7 @@ private fun PagingItemImage(
     } else {
         Log.d(getCallSiteInfoFunc(), "Loading image: ${imageInfo.path} from disk")
         // send cache request
-        // onSendThumbnailRequest(imageInfo.fullImageFile, imageInfo)
+        onSendThumbnailRequest(imageInfo.fullImageFile, imageInfo)
         imageInfo.fullImageFile
     }
     AsyncImage(
@@ -188,22 +184,21 @@ private fun PageTitleYearMonth(
 ) {
     Text(
         text = "$month $year",
-        modifier = modifier,
+        modifier = modifier.padding(top = 16.dp, bottom = 8.dp),
         style = MaterialTheme.typography.titleLarge
     )
 }
 
 @Composable
 private fun PageTitleDay(
-    year: Int,
     month: String,
     dayOfMonth: Int,
     dayOfWeek: String,
     modifier: Modifier = Modifier
 ) {
     Text(
-        text = "$dayOfWeek, $month $dayOfMonth, $year",
-        modifier = modifier,
+        text = "$dayOfWeek, $month $dayOfMonth",
+        modifier = modifier.padding(vertical = 8.dp),
         style = MaterialTheme.typography.titleMedium
     )
 }

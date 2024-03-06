@@ -15,7 +15,7 @@ import com.example.image_multi_recognition.R
 
 enum class Destination(
     val route: String,
-    val isRootDestination: Boolean = false,
+    val isRootDestination: Boolean = false, // the rootDestination shares the same top and bottom bar
     val compulsoryArguments: Map<String, NavType<*>>? = null,
     val optionalArgument: Map<String, NavType<*>>? = null,
     @StringRes val label: Int? = null,
@@ -26,7 +26,7 @@ enum class Destination(
         route = "PHOTO",
         label = R.string.photos,
         icon = R.drawable.baseline_photo_24,
-        isRootDestination = true
+        isRootDestination = true,
     ),
     ALBUM(
         route = "ALBUM",
@@ -49,9 +49,15 @@ enum class Destination(
 
     SINGLE_IMAGE(
         route = "SINGLE_IMAGE",
-        compulsoryArguments = mapOf("album" to NavType.StringType, "initialKey" to NavType.IntType),
+        compulsoryArguments = mapOf("album" to NavType.LongType, "initialKey" to NavType.IntType),
+        isRootDestination = false
+    ),
+    ALBUM_PHOTO(
+        route = "ALBUM_PHOTO",
+        compulsoryArguments = mapOf("album" to NavType.LongType),
         isRootDestination = false
     );
+
 
 
     val navRoute: String

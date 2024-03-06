@@ -48,6 +48,8 @@ class PermissionAccessor @Inject constructor() {
             if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.TIRAMISU) {
                 add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
             }
+        }.apply {
+            add(Manifest.permission.ACCESS_MEDIA_LOCATION)
         }
 
     private fun ComponentActivity.hasPermission(permission: String): Boolean {

@@ -5,17 +5,17 @@ import android.os.Environment
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.appcompat.app.AlertDialog
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import com.example.image_multi_recognition.compose.TestComposable
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.image_multi_recognition.compose.navigation.Home
 import com.example.image_multi_recognition.permission.PermissionAccessor
 import com.example.image_multi_recognition.ui.theme.Image_multi_recognitionTheme
 import com.example.image_multi_recognition.util.ScopedThumbNailStorage
 import com.example.image_multi_recognition.util.getCallSiteInfo
+import com.example.image_multi_recognition.util.getCallSiteInfoFunc
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
@@ -73,7 +73,7 @@ class MainActivity : ComponentActivity() {
                 Image_multi_recognitionTheme {
                     // A surface container using the 'background' color from the theme
                     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                        Home()
+                        Home(photoViewModel = viewModel())
                         // TestComposable()
                     }
                 }

@@ -1,6 +1,7 @@
 <resources>
     <string name="app_name">ImageSearch</string>
     <string name="photos">Photos</string>
+    <string name="sub_photos">Sub Photos</string>
     <string name="albums">Albums</string>
     <string name="search">Search</string>
     <string name="label">Label</string>
