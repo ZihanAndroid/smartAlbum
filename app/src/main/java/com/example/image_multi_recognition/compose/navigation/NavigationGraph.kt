@@ -10,10 +10,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.example.image_multi_recognition.DefaultConfiguration
-import com.example.image_multi_recognition.compose.view.AlbumComposable
-import com.example.image_multi_recognition.compose.view.AlbumPhotoComposable
-import com.example.image_multi_recognition.compose.view.PhotoComposable
-import com.example.image_multi_recognition.compose.view.SingleImageComposable
+import com.example.image_multi_recognition.compose.view.*
 import com.example.image_multi_recognition.util.getCallSiteInfoFunc
 import com.example.image_multi_recognition.viewmodel.PhotoViewModel
 import com.example.image_multi_recognition.viewmodel.SingleImageViewModel
@@ -36,16 +33,55 @@ fun NavigationGraph(
         ) {
             PhotoComposable(viewModel = photoViewModel) { originalIndex ->
                 Log.d(getCallSiteInfoFunc(), "Navigating to: ${Destination.SINGLE_IMAGE.navRoute}")
-                "${Destination.SINGLE_IMAGE.route}/${photoViewModel.currentAlbum}/$originalIndex".let { route ->
+                // set argument "label" to empty whitespace String
+                "${Destination.SINGLE_IMAGE.route}/${photoViewModel.currentAlbum}/ /$originalIndex".let { route ->
                     Log.d(getCallSiteInfoFunc(), "Navigation route: $route")
                     navController.navigate(route) {
-                        launchSingleTop = true
-                        popUpTo(navController.graph.findStartDestination().id) {
-                            saveState = true
-                        }
-                        restoreState = true
+//                        launchSingleTop = true
+//                        popUpTo(navController.graph.findStartDestination().id) {
+//                            saveState = true
+//                        }
+//                        restoreState = true
                     }
                 }
+            }
+        }
+        composable(
+            route = Destination.ALBUM.navRoute,
+        ) {
+            AlbumComposable(viewModel = hiltViewModel()) { album ->
+                "${Destination.ALBUM_PHOTO.route}/${album}".let { route ->
+                    navController.navigate(route) {
+
+                    }
+                }
+            }
+        }
+        composable(
+            route = Destination.SEARCH.navRoute
+        ) {
+            // PhotoComposable(navController = navController, viewModel = photoViewModel)
+            PhotoSearchComposable(viewModel = hiltViewModel()) { label ->
+                "${Destination.LABEL_PHOTO.route}/${label}".let { route ->
+                    navController.navigate(route) {
+                        // Not done yet!
+                    }
+                }
+            }
+        }
+        composable(
+            route = Destination.LABEL.navRoute,
+        ) {
+
+        }
+
+        composable(
+            route = Destination.SINGLE_IMAGE.navRoute,
+            arguments = Destination.SINGLE_IMAGE.arguments
+        ) {
+            // use hiltViewModel() to get a ViewModel whose lifecycle is scoped to the destination
+            SingleImageComposable(viewModel = hiltViewModel()) {
+                navController.popBackStack()
             }
         }
         // The same PhotoComposable for different route with different PhotoViewModel instance of different lifecycle
@@ -74,36 +110,22 @@ fun NavigationGraph(
             )
         }
         composable(
-            route = Destination.ALBUM.navRoute,
+            route = Destination.LABEL_PHOTO.navRoute,
+            arguments = Destination.LABEL_PHOTO.arguments
         ) {
-            AlbumComposable(viewModel = hiltViewModel()) { album ->
-                "${Destination.ALBUM_PHOTO.route}/${album}".let { route ->
-                    navController.navigate(route) {
-
+            LabelPhotoComposable(
+                viewModel = hiltViewModel(),
+                onImageClick = { originalIndex, label ->
+                    "${Destination.SINGLE_IMAGE.route}/-1/${label}/$originalIndex".let { route ->
+                        navController.navigate(route) {
+                            // Not Done yet
+                        }
                     }
+                },
+                onBack = {
+                    navController.popBackStack()
                 }
-            }
-        }
-        composable(
-            route = Destination.SEARCH.navRoute
-        ) {
-            // PhotoComposable(navController = navController, viewModel = photoViewModel)
-        }
-        composable(
-            route = Destination.LABEL.navRoute
-        ) {
-            AlbumComposable(viewModel = hiltViewModel()) { album ->
-
-            }
-        }
-        composable(
-            route = Destination.SINGLE_IMAGE.navRoute,
-            arguments = Destination.SINGLE_IMAGE.arguments
-        ) {
-            // use hiltViewModel() to get a ViewModel whose lifecycle is scoped to the destination
-            SingleImageComposable(viewModel = hiltViewModel()) {
-                navController.popBackStack()
-            }
+            )
         }
     }
 }

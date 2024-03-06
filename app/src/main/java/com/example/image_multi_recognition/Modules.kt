@@ -33,7 +33,7 @@ object DefaultConfiguration {
     const val IMAGE_PER_ROW = 4
     const val ALBUM_PER_ROW = 2
     const val IMAGE_INTERVAL = 4
-    const val ALBUM_INTERVAL = 8
+    const val ALBUM_INTERVAL = 10
     const val APP_DATASTORE = "APP_DATASTORE"
 }
 

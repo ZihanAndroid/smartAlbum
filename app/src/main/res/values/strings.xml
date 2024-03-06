@@ -21,4 +21,5 @@
     <string name="cancel">Cancel</string>
     <string name="labeling_done">Labeling done!</string>
     <string name="no_selected_label">No selected label!</string>
+    <string name="input_label">Input a Label</string>
 </resources>

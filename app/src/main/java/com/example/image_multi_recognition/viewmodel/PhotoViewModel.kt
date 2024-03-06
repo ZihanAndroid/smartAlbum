@@ -14,6 +14,7 @@ import com.example.image_multi_recognition.db.AlbumInfo
 import com.example.image_multi_recognition.db.ImageInfo
 import com.example.image_multi_recognition.repository.ImageRepository
 import com.example.image_multi_recognition.util.*
+import com.example.image_multi_recognition.viewmodel.basic.ImagePagingFlowSupport
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
@@ -28,12 +29,13 @@ import javax.inject.Inject
 open class PhotoViewModel @Inject constructor(
     private val repository: ImageRepository,
     savedStateHandle: SavedStateHandle,
-) : ViewModel() {
+) : ViewModel(), ImagePagingFlowSupport {
     val backgroundThreadPool = Executors.newCachedThreadPool()
 
     // photoDir should come from DataStore
     // val albums: List<String> = listOf(Environment.DIRECTORY_PICTURES)
     private var currentMediaStoreVersion: String? = null
+
     // for startDestination, the "album" is null by default
     var currentAlbum: Long? = savedStateHandle.get<Long>("album")
 
@@ -49,7 +51,7 @@ open class PhotoViewModel @Inject constructor(
         // check the argument of navigation route to decide on what purpose the PhotoViewModel is used
         // (on a first load when app is started or jumped from an album window)
         // We do the initialization only when the currentAlbum is null(in AlbumPhotoViewModel. the value is not null)
-        if(currentAlbum == null) {
+        if (currentAlbum == null) {
             Log.d(getCallSiteInfo(), "Null currentAlbum")
             viewModelScope.launch {
                 // DCIM
@@ -121,7 +123,7 @@ open class PhotoViewModel @Inject constructor(
                     }
                 }
             }
-        }else{
+        } else {
             // the viewModel is used for AlbumPhotoComposable
             setImagePagingFlow(currentAlbum!!)
         }
@@ -219,19 +221,7 @@ open class PhotoViewModel @Inject constructor(
     }
 
     fun requestThumbnail(file: File, imageInfo: ImageInfo) {
-        val (imageLoader, imageRequest) = repository.genImageRequest(
-            file = file,
-            onSuccess = { drawable ->
-                // Log.d(getCallSiteInfo(), "Current Thread: ${Thread.currentThread().name}")
-                Log.d(getCallSiteInfo(), "load image success: ${imageInfo.fullImageFile.absolutePath}")
-                backgroundThreadPool.submit {
-                    imageInfo.setImageCache(drawable.toBitmap())
-                }
-            },
-        )
-        if (!imageInfo.isThumbnailAvailable) imageLoader.enqueue(imageRequest)
-
-        //repository.genThumbnail(file, imageInfo)
+        repository.genImageRequest(file, imageInfo)
     }
 
 //    fun sendImageRequestForThumbnail(file: File, imageInfo: ImageInfo) {
@@ -243,41 +233,9 @@ open class PhotoViewModel @Inject constructor(
 //    }
 
     fun setImagePagingFlow(album: Long) {
-        var count = 0
-        val epochTime = LocalDateTime.ofInstant(Instant.EPOCH, ZoneId.of("UTC"))
         _pagingFlow.value = repository.getImagePagingFlow(album)
-            .map { pagingData ->
-                pagingData.map { UiModel.Item(it, ++count) }
-            }.map { pagingData ->
-                pagingData.insertSeparators { before, after ->
-                    if (after == null) null
-                    else {
-                        //Timestamp(before.imageInfo.timestamp)
-                        val timeBefore = before?.imageInfo?.timestamp?.let { ExifHelper.timestampToLocalDataTime(it) }
-                        val timeAfter = ExifHelper.timestampToLocalDataTime(after.imageInfo.timestamp)
-                        // For the first scan, before is null, after is not null; for the last scan, after is null, before is not null
-                        if (timeBefore == null || timeBefore.year != timeAfter.year || timeBefore.month != timeAfter.month) {
-                            if(timeAfter != epochTime) {    // exclude UTC time: 1970/1/1 ...
-                                UiModel.ItemHeaderYearMonth(
-                                    year = timeAfter.year,
-                                    month = timeAfter.month,
-                                    dayOfMonth = timeAfter.dayOfMonth,
-                                    dayOfWeek = timeAfter.dayOfWeek
-                                ).apply { Log.d(getCallSiteInfo(), "UiModel.ItemHeaderYearMonth is created: $this") }
-                            }else null
-                        } else if (timeBefore.dayOfMonth != timeAfter.dayOfMonth) {
-                            if(timeAfter != epochTime) {
-                                UiModel.ItemHeaderDay(
-                                    year = timeAfter.year,
-                                    month = timeAfter.month,
-                                    dayOfMonth = timeAfter.dayOfMonth,
-                                    dayOfWeek = timeAfter.dayOfWeek
-                                ).apply { Log.d(getCallSiteInfo(), "UiModel.ItemHeaderDay is created: $this") }
-                            }else null
-                        } else null
-                    }
-                }
-            }.cachedIn(viewModelScope)
+            .convertImageInfoPagingFlow()
+            .cachedIn(viewModelScope)
     }
 
     override fun onCleared() {

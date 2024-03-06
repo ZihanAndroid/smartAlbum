@@ -67,7 +67,7 @@ fun SingleImagePage(
                 bottom.linkTo(parent.bottom)
                 start.linkTo(parent.start)
                 end.linkTo(parent.end)
-            }.heightIn(max = (LocalConfiguration.current.screenHeightDp * 0.9).dp) // guarantee some space for labeling
+            }.heightIn(max = (LocalConfiguration.current.screenHeightDp * 0.7).dp) // guarantee some space for labeling
         )
         // null means that the user has not clicked the "label" button
         if (partImageLabelResult != null || wholeImageLabelResult != null) {

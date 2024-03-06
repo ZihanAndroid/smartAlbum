@@ -3,13 +3,11 @@ package com.example.image_multi_recognition.compose.view
 import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -18,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.colorResource
@@ -48,7 +47,7 @@ fun AlbumComposable(
     val albumPagingItems = viewModel.albumPagingFlow.collectAsLazyPagingItems()
     val gridState = rememberLazyGridState()
     LazyVerticalGrid(
-        modifier = modifier,
+        modifier = modifier.padding(horizontal = DefaultConfiguration.ALBUM_INTERVAL.dp),
         state = gridState,
         columns = GridCells.Fixed(DefaultConfiguration.ALBUM_PER_ROW),
         horizontalArrangement = Arrangement.spacedBy(DefaultConfiguration.ALBUM_INTERVAL.dp),
@@ -60,8 +59,14 @@ fun AlbumComposable(
             albumPagingItems[index]?.let { albumWithLatestImage ->
                 key(albumWithLatestImage.album) {
                     AlbumPagingItem(
-                        albumImage = albumWithLatestImage,
-                        sizeDp = ((LocalConfiguration.current.screenWidthDp - DefaultConfiguration.ALBUM_INTERVAL) / 2).dp,
+                        // albumImage = albumWithLatestImage,
+                        imagePath = File(
+                            AlbumPathDecoder.decode(albumWithLatestImage.album),
+                            albumWithLatestImage.path
+                        ),
+                        title = "${AlbumPathDecoder.decodeAlbumName(albumWithLatestImage.album)} (${albumWithLatestImage.count})",
+                        contentDescription = albumWithLatestImage.album.toString(),
+                        sizeDp = ((LocalConfiguration.current.screenWidthDp - DefaultConfiguration.ALBUM_INTERVAL * 3) / 2).dp,
                         onAlbumClick = { onAlbumClick(albumWithLatestImage.album) }
                     )
                 }
@@ -72,9 +77,11 @@ fun AlbumComposable(
 
 @Composable
 fun AlbumPagingItem(
-    albumImage: AlbumWithLatestImage,
+    imagePath: File,
+    title: String,
     sizeDp: Dp,
     modifier: Modifier = Modifier,
+    contentDescription: String = "",
     onAlbumClick: () -> Unit
 ) {
     Box(
@@ -82,14 +89,18 @@ fun AlbumPagingItem(
         modifier = modifier.size(sizeDp)
     ) {
         AsyncImage(
-            model = File(AlbumPathDecoder.decode(albumImage.album), albumImage.path),
-            contentDescription = albumImage.album.toString(),
+            model = imagePath,
+            contentDescription = contentDescription,
             contentScale = ContentScale.Crop,
-            modifier = Modifier.size(sizeDp).clickable { onAlbumClick() }
+            modifier = Modifier.size(sizeDp).clickable { onAlbumClick() }.clip(RoundedCornerShape(12.dp))
         )
-        Box(modifier = Modifier.fillMaxSize().background(colorResource(R.color.greyAlpha).copy(alpha = 0.7f)))
+        Box(
+            modifier = Modifier.fillMaxSize()
+                .clip(RoundedCornerShape(12.dp))
+                .background(colorResource(R.color.greyAlpha).copy(alpha = 0.7f))
+        )
         Text(
-            text = "${AlbumPathDecoder.decodeAlbumName(albumImage.album)} (${albumImage.count})",
+            text = title,
             style = MaterialTheme.typography.labelLarge.copy(fontSize = 16.sp),
             textAlign = TextAlign.Center
         )

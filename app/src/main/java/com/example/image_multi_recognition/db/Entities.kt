@@ -60,7 +60,7 @@ data class ImageInfo(
         try {
             if (!thumbnailFile.exists() || thumbnailFile.length() == 0L) {
                 FileOutputStream(thumbnailFile).use { outputStream ->
-                    if (!bitmap.compress(Bitmap.CompressFormat.JPEG, 10, outputStream)) {
+                    if (!bitmap.compress(Bitmap.CompressFormat.JPEG, 0, outputStream)) {
                         throw IOException("Failed to compress bitmap!")
                     }
                     Log.d(

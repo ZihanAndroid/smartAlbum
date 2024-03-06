@@ -49,12 +49,17 @@ enum class Destination(
 
     SINGLE_IMAGE(
         route = "SINGLE_IMAGE",
-        compulsoryArguments = mapOf("album" to NavType.LongType, "initialKey" to NavType.IntType),
+        compulsoryArguments = mapOf("album" to NavType.LongType, "label" to NavType.StringType, "initialKey" to NavType.IntType),
         isRootDestination = false
     ),
     ALBUM_PHOTO(
         route = "ALBUM_PHOTO",
         compulsoryArguments = mapOf("album" to NavType.LongType),
+        isRootDestination = false
+    ),
+    LABEL_PHOTO(
+        route = "LABEL_PHOTO",
+        compulsoryArguments = mapOf("label" to NavType.StringType),
         isRootDestination = false
     );
 

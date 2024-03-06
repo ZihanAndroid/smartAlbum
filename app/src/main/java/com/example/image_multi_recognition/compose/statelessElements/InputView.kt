@@ -17,22 +17,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.PopupProperties
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.image_multi_recognition.R
 import com.example.image_multi_recognition.db.LabelInfo
 import com.example.image_multi_recognition.util.capitalizeFirstChar
 import com.example.image_multi_recognition.util.getCallSiteInfoFunc
-import java.util.logging.Filter
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -137,7 +133,11 @@ fun InputView(
                             )
                         },
                         singleLine = true,
-                        keyboardActions = KeyboardActions(onDone = { onLabelAdded(input) })
+                        keyboardActions = KeyboardActions(onDone = { onLabelAdded(input) }),
+                        colors = TextFieldDefaults.colors(
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                            focusedContainerColor = MaterialTheme.colorScheme.surface
+                        )
                     )
                     if (dropDownItemList.isNotEmpty()) {
                         DropdownMenu(

@@ -11,6 +11,7 @@ import com.example.image_multi_recognition.db.ImageInfo
 import com.example.image_multi_recognition.db.LabelInfo
 import com.example.image_multi_recognition.repository.ImageRepository
 import com.example.image_multi_recognition.util.*
+import com.example.image_multi_recognition.viewmodel.basic.LabelSearchSupport
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.label.ImageLabel
 import com.google.mlkit.vision.label.ImageLabeler
@@ -31,10 +32,12 @@ class SingleImageViewModel @Inject constructor(
     private val objectDetector: ObjectDetector,
     private val imageLabeler: ImageLabeler,
     savedStateHandle: SavedStateHandle  // this parameter is set by hiltViewModel() automatically
-) : ViewModel() {
+) : ViewModel(), LabelSearchSupport {
     // get navigation arguments
-    val album: Long = savedStateHandle.get<Long>("album")!!
+    val album: Long? = savedStateHandle.get<Long>("album")
+    val label: String? = savedStateHandle.get<String>("label")
     val initialKey: Int = savedStateHandle.get<Int>("initialKey")!!
+
     private val controlledLabelingRunner = ControlledRunner<Unit>()
     private val controlledLabelingDoneRunner = ControlledRunner<Unit>()
 
@@ -59,46 +62,52 @@ class SingleImageViewModel @Inject constructor(
     var selectedLabelSet = mutableSetOf<String>()
 
     // For InputView, ordered by label name first, then its count
-    private var orderedLabelList: List<LabelInfo> = emptyList()
+    override var orderedLabelList: List<LabelInfo> = emptyList()
 
-    // Assume that "prefix" is lowercase
-    private fun getRangeByPrefix(prefix: String): Pair<Int, Int> {
-        val comparator = Comparator<LabelInfo> { prefixElement, labelInfo ->
-            val lowercaseElement = prefixElement.label
-            val lowercaseLabel = labelInfo.label.lowercase()
-            // prefix match, ignore case
-            if (lowercaseElement.length <= lowercaseLabel.length
-                && lowercaseElement == lowercaseLabel.substring(0, lowercaseElement.length)
-            ) {
-                0
-            } else {
-                lowercaseElement.compareTo(lowercaseLabel)
-            }
-        }
-        return orderedLabelList.binarySearchLowerBoundIndex(
-            element = LabelInfo(prefix, 0), comparator = comparator
-        ) to orderedLabelList.binarySearchUpperBoundIndex(
-            element = LabelInfo(prefix, 0), comparator = comparator
-        )
-    }
-
-    fun getLabelListByPrefix(prefix: String): List<LabelInfo> {
-        if (prefix.isEmpty()) return emptyList()
-        return with(getRangeByPrefix(prefix.lowercase())) {
-            if (first != -1 && second != -1 && first <= second) {
-                Log.d(getCallSiteInfoFunc(), "found: ($first, $second)")
-                orderedLabelList.subList(first, second + 1)
-            } else {
-                Log.w(getCallSiteInfoFunc(), "no reasonable index found: ($first, $second)")
-                emptyList()
-            }
-        }.apply {
-            Log.d(getCallSiteInfoFunc(), "obtained popup labels: $this")
-        }
-    }
+//    // Assume that "prefix" is lowercase
+//    private fun getRangeByPrefix(prefix: String): Pair<Int, Int> {
+//        val comparator = Comparator<LabelInfo> { prefixElement, labelInfo ->
+//            val lowercaseElement = prefixElement.label
+//            val lowercaseLabel = labelInfo.label.lowercase()
+//            // prefix match, ignore case
+//            if (lowercaseElement.length <= lowercaseLabel.length
+//                && lowercaseElement == lowercaseLabel.substring(0, lowercaseElement.length)
+//            ) {
+//                0
+//            } else {
+//                lowercaseElement.compareTo(lowercaseLabel)
+//            }
+//        }
+//        return orderedLabelList.binarySearchLowerBoundIndex(
+//            element = LabelInfo(prefix, 0), comparator = comparator
+//        ) to orderedLabelList.binarySearchUpperBoundIndex(
+//            element = LabelInfo(prefix, 0), comparator = comparator
+//        )
+//    }
+//
+//    fun getLabelListByPrefix(prefix: String): List<LabelInfo> {
+//        if (prefix.isEmpty()) return emptyList()
+//        return with(getRangeByPrefix(prefix.lowercase())) {
+//            if (first != -1 && second != -1 && first <= second) {
+//                Log.d(getCallSiteInfoFunc(), "found: ($first, $second)")
+//                orderedLabelList.subList(first, second + 1)
+//            } else {
+//                Log.w(getCallSiteInfoFunc(), "no reasonable index found: ($first, $second)")
+//                emptyList()
+//            }
+//        }.apply {
+//            Log.d(getCallSiteInfoFunc(), "obtained popup labels: $this")
+//        }
+//    }
 
     init {
-        setPagingFlow(album, initialKey)
+        if(album != null && album > 0) {
+            Log.d(getCallSiteInfo(), "Get argument album: $album")
+            setPagingFlow(album, initialKey)
+        }else{
+            assert(!label.isNullOrEmpty() && label.trim().isNotEmpty())
+            setLabelPagingFlow(label!!, initialKey)
+        }
         viewModelScope.launch {
             orderedLabelList = repository.getAllOrderedLabelList()
             Log.d(getCallSiteInfoFunc(), "initial popup labels: ${orderedLabelList.map { it.label }}")
@@ -107,6 +116,10 @@ class SingleImageViewModel @Inject constructor(
 
     private fun setPagingFlow(album: Long, initialKey: Int) {
         _pagingFlow.value = repository.getImagePagingFlow(album, initialKey).cachedIn(viewModelScope)
+    }
+
+    private fun setLabelPagingFlow(label: String, initialKey: Int){
+        _pagingFlow.value = repository.getImagePagingFlowByLabel(label, initialKey).cachedIn(viewModelScope)
     }
 
     // this method starts a relatively long-running task, if a user presses the "label" button first,

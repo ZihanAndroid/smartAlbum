@@ -48,6 +48,14 @@ interface ImageInfoDao: BaseDao<ImageInfo> {
     fun getImageShowPagingSourceForAlbum(album: Long): PagingSource<Int, ImageInfo>
 
     @Query("""
+        SELECT * 
+        FROM image_info i1 join image_labels i2 on i1.id=i2.id
+        WHERE i2.label=:label
+        ORDER BY time_created DESC
+    """)
+    fun getImagePagingSourceByLabel(label: String): PagingSource<Int, ImageInfo>
+
+    @Query("""
         SELECT i1.album as album_, i1.path as path_, i2.count as count_
         FROM image_info as i1 join (
             SELECT album, MAX(time_created) as latest_time, COUNT(album) as count
@@ -58,12 +66,38 @@ interface ImageInfoDao: BaseDao<ImageInfo> {
         HAVING path=MIN(path_)
     """)
     fun getAlbumWithLatestImagePagingSource(): PagingSource<Int, AlbumWithLatestImage>
+
+
+    @Query("""
+        WITH joined_table AS (
+            SELECT *
+            FROM image_labels join image_info on image_labels.id=image_info.id
+        )
+        SELECT j1.label as label_, j1.album as album_, j1.path as path_
+        FROM joined_table as j1 join (
+            SELECT t1.label, time_max, MAX(id) as id_max
+            FROM joined_table as t1 join (
+                SELECT label, MAX(time_created) as time_max
+                FROM joined_table
+                WHERE label LIKE :label
+                GROUP BY label
+            ) as t2 on t1.label=t2.label and t1.time_created=t2.time_max
+            GROUP by t1.label, t1.time_created
+        ) as j2 on j1.label=j2.label and j1.time_created=j2.time_max and j1.id=j2.id_max
+    """)
+    suspend fun getImagesByLabel(label: String): List<LabelWithLatestImage>
 }
 
 data class AlbumWithLatestImage(
     @ColumnInfo("album_") val album: Long,
     @ColumnInfo("path_") val path: String,
     @ColumnInfo("count_") val count: Int
+)
+
+data class LabelWithLatestImage(
+    @ColumnInfo("label_") val label: String,
+    @ColumnInfo("album_") val album: Long,
+    @ColumnInfo("path_") val path: String,
 )
 
 data class ImageIdPath(

@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.drawable.Drawable
 import android.provider.MediaStore
 import android.util.Log
+import androidx.core.graphics.drawable.toBitmap
 import androidx.core.net.toUri
 import androidx.datastore.core.DataStore
 import androidx.paging.Pager
@@ -29,6 +30,7 @@ import kotlinx.coroutines.flow.map
 import java.io.File
 import java.io.IOException
 import java.sql.Timestamp
+import java.util.concurrent.Executors
 import javax.inject.Inject
 
 class ImageRepository @Inject constructor(
@@ -41,6 +43,7 @@ class ImageRepository @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
     // val dataReadyFlow =
+    val backgroundThreadPool = Executors.newCachedThreadPool()
 
     val mediaStoreVersionFlow: Flow<String> = appDataStore.data.catch { e ->
         if (e is IOException) {
@@ -180,6 +183,15 @@ class ImageRepository @Inject constructor(
         pagingSourceFactory = { imageInfoDao.getImageShowPagingSourceForAlbum(album) }
     ).flow
 
+    fun getImagePagingFlowByLabel(label: String, initialKey: Int? = null): Flow<PagingData<ImageInfo>> = Pager(
+        initialKey = initialKey,
+        config = PagingConfig(
+            pageSize = DefaultConfiguration.PAGE_SIZE,
+            enablePlaceholders = true
+        ),
+        pagingSourceFactory = {imageInfoDao.getImagePagingSourceByLabel(label)}
+    ).flow
+
     fun getAlbumPagingFlow(): Flow<PagingData<AlbumWithLatestImage>> = Pager(
         config = PagingConfig(
             pageSize = DefaultConfiguration.PAGE_SIZE,
@@ -188,18 +200,23 @@ class ImageRepository @Inject constructor(
         pagingSourceFactory = { imageInfoDao.getAlbumWithLatestImagePagingSource() }
     ).flow
 
-    fun genImageRequest(file: File, onSuccess: (Drawable) -> Unit = {}): Pair<ImageLoader, ImageRequest> {
+    fun genImageRequest(file: File, imageInfo: ImageInfo) {
         val request = ImageRequest.Builder(context)
             .data(file)
             .crossfade(true)
             .target(
-                onSuccess = onSuccess,  // onSuccess is not a suspend function, it is assumed that Coil calls this callback from only one thread
+                onSuccess = { drawable ->
+                    // Log.d(getCallSiteInfo(), "Current Thread: ${Thread.currentThread().name}")
+                    Log.d(getCallSiteInfo(), "load image success: ${imageInfo.fullImageFile.absolutePath}")
+                    backgroundThreadPool.submit {
+                        imageInfo.setImageCache(drawable.toBitmap())
+                    }
+                },  // onSuccess is not a suspend function, it is assumed that Coil calls this callback from only one thread
                 onError = {
                     Log.e(getCallSiteInfo(), "Failed to load image from: ${file.absolutePath}")
                 }
             ).build()
-        //context.imageLoader.enqueue(request)
-        return Pair(context.imageLoader, request)
+        if (!imageInfo.isThumbnailAvailable) context.imageLoader.enqueue(request)
     }
 
 //    fun genThumbnail(file: File, imageInfo: ImageInfo) {
@@ -219,4 +236,7 @@ class ImageRepository @Inject constructor(
             null
         }
     }
+
+    // add "%" for fuzzy search
+    suspend fun getImagesByLabel(label: String) = imageInfoDao.getImagesByLabel("$label%")
 }
