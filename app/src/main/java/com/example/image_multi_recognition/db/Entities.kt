@@ -30,7 +30,7 @@ data class ImageInfo(
     @PrimaryKey(autoGenerate = true) @ColumnInfo(name = "id") var id: Long = 0,
     @ColumnInfo(name = "path") val path: String, // relative path
     @ColumnInfo(name = "album") val album: Long,  // directory, also used as album
-    @ColumnInfo(name = "labeled") var labeled: Boolean,
+    // @ColumnInfo(name = "labeled") var labeled: Boolean,
     // @ColumnInfo(name = "albumId") val albumId: Long,
     @ColumnInfo(name = "time_created") val timestamp: Long,
     // cache thumbnail's path instead of thumbnail itself
@@ -60,7 +60,7 @@ data class ImageInfo(
         try {
             if (!thumbnailFile.exists() || thumbnailFile.length() == 0L) {
                 FileOutputStream(thumbnailFile).use { outputStream ->
-                    if (!bitmap.compress(Bitmap.CompressFormat.JPEG, 0, outputStream)) {
+                    if (!bitmap.compress(Bitmap.CompressFormat.JPEG, 10, outputStream)) {
                         throw IOException("Failed to compress bitmap!")
                     }
                     Log.d(

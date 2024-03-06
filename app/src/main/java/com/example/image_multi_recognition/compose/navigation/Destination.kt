@@ -6,10 +6,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.res.stringResource
-import androidx.navigation.NamedNavArgument
-import androidx.navigation.NavArgument
-import androidx.navigation.NavType
-import androidx.navigation.navArgument
+import androidx.navigation.*
 import com.example.image_multi_recognition.R
 
 
@@ -31,7 +28,7 @@ enum class Destination(
     ALBUM(
         route = "ALBUM",
         label = R.string.albums,
-        icon = R.drawable.baseline_album_24,
+        icon = R.drawable.baseline_photo_album_24,
         isRootDestination = true
     ),
     SEARCH(
@@ -43,13 +40,20 @@ enum class Destination(
     LABEL(
         route = "LABEL",
         label = R.string.label,
-        icon = R.drawable.baseline_new_label_24,
+        icon = R.drawable.baseline_add_photo_alternate_24,
         isRootDestination = true
     ),
 
     SINGLE_IMAGE(
         route = "SINGLE_IMAGE",
-        compulsoryArguments = mapOf("album" to NavType.LongType, "label" to NavType.StringType, "initialKey" to NavType.IntType),
+        compulsoryArguments = mapOf(
+//            "album" to NavType.LongType,
+//            "label" to NavType.StringType,
+            // argumentType: 1 means "album", 2 means "label", 3 means "album with image not labeled"
+            "argumentType" to NavType.IntType,
+            "argumentValue" to NavType.StringType,
+            "initialKey" to NavType.IntType
+        ),
         isRootDestination = false
     ),
     ALBUM_PHOTO(
@@ -61,8 +65,12 @@ enum class Destination(
         route = "LABEL_PHOTO",
         compulsoryArguments = mapOf("label" to NavType.StringType),
         isRootDestination = false
+    ),
+    ALBUM_PHOTO_LABELING(
+        route = "ALBUM_PHOTO_LABELING",
+        compulsoryArguments = mapOf("album" to NavType.LongType),
+        isRootDestination = false
     );
-
 
 
     val navRoute: String
@@ -90,4 +98,16 @@ enum class Destination(
                 })
             }
         }
+
+    // the route of NavDestination contains arguments, return Destination without remove those arguments
+    companion object {
+        fun buildDestinationFromNav(navDestination: NavDestination?): Destination? =
+            navDestination?.route?.let {
+                Destination.valueOf(it.split("/")[0])
+            }
+    }
+
+    fun sameRouteAs(navDestination: NavDestination?): Boolean {
+        return buildDestinationFromNav(navDestination) == this
+    }
 }

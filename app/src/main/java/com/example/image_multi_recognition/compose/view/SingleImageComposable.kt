@@ -59,13 +59,13 @@ fun SingleImageComposable(
 
     // a strange behavior, once I access "pagerState.pageCount" instead of "pagingItems.itemCount" here, it causes infinite recomposition
     // Log.d(getCallSiteInfoFunc(), "currentPage: ${pagerState.pageCount}")
-    Log.d(getCallSiteInfoFunc(), "currentPage: ${pagingItems.itemCount}")
+    // Log.d(getCallSiteInfoFunc(), "currentPage: ${pagingItems.itemCount}")
 
     Box(
         modifier = modifier.fillMaxSize()
     ) {
         SingleImageView(
-            title = "${pagerState.currentPage + 1}/${pagingItems.itemCount}",
+            title = if(pagingItems.itemCount == 0) "" else "${pagerState.currentPage + 1}/${pagingItems.itemCount}",
             onBack = onBackClick,
             topRightIcons = listOf(
                 ImageVector.vectorResource(R.drawable.baseline_new_label_24) to "label",

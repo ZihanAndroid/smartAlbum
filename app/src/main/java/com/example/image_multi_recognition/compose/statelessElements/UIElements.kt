@@ -1,9 +1,11 @@
 package com.example.image_multi_recognition.compose.statelessElements
 
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Done
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -15,7 +17,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.image_multi_recognition.R
+import com.example.image_multi_recognition.util.AlbumPathDecoder
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -103,4 +107,40 @@ fun ElevatedSmallIconButton(
             tint = colorResource(R.color.LimeGreen)
         )
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TopAppBarForNotRootDestination(
+    title: String,
+    onBack: () -> Unit,
+    actions: @Composable RowScope.() -> Unit = {},
+) {
+    TopAppBar(
+        title = {
+            Text(
+//                text = AlbumPathDecoder.decodeAlbumName(viewModel.currentAlbum).let { albumName ->
+//                    if(albumName.length > 30){
+//                        albumName.substring(0, 30) + "..."
+//                    }else{
+//                        albumName
+//                    }
+//                },
+                text = if (title.length > 30) {
+                    title.substring(0, 30) + "..."
+                } else {
+                    title
+                },
+                style = MaterialTheme.typography.titleLarge.copy(fontSize = 18.sp)
+            )
+        },
+        navigationIcon = {
+            IconButton(
+                onClick = onBack
+            ) {
+                Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "back")
+            }
+        },
+        actions = actions
+    )
 }

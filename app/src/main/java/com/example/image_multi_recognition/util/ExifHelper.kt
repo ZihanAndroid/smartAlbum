@@ -65,11 +65,6 @@ object ExifHelper {
             0
         }
 
-    fun buildDestinationFromRoute(navRouteWithArgument: String?): Destination? =
-        navRouteWithArgument?.let {
-            Destination.valueOf(navRouteWithArgument.split("/")[0])
-        }
-
     fun cropBitmap(bitmap: Bitmap, rect: Rect): Bitmap {
         return Bitmap.createBitmap(bitmap, rect.left, rect.top, rect.width(), rect.height())
     }

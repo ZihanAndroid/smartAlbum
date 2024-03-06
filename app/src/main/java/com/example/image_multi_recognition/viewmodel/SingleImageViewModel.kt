@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
+import com.example.image_multi_recognition.DefaultConfiguration
 import com.example.image_multi_recognition.db.ImageInfo
 import com.example.image_multi_recognition.db.LabelInfo
 import com.example.image_multi_recognition.repository.ImageRepository
@@ -34,8 +35,8 @@ class SingleImageViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle  // this parameter is set by hiltViewModel() automatically
 ) : ViewModel(), LabelSearchSupport {
     // get navigation arguments
-    val album: Long? = savedStateHandle.get<Long>("album")
-    val label: String? = savedStateHandle.get<String>("label")
+    val argumentType: Int = savedStateHandle.get<Int>("argumentType")!!
+    val argumentValue: String = savedStateHandle.get<String>("argumentValue")!!
     val initialKey: Int = savedStateHandle.get<Int>("initialKey")!!
 
     private val controlledLabelingRunner = ControlledRunner<Unit>()
@@ -58,6 +59,7 @@ class SingleImageViewModel @Inject constructor(
     private var wholeImageLabelList = mutableListOf<ImageLabelResult>()
     private var finishedLabelingTask = 0
     var imageSize: Pair<Int, Int> = Pair(0, 0)
+
     // selectedLabelSet is stateless, the change of it does not need to trigger recomposition, so no need to use State
     var selectedLabelSet = mutableSetOf<String>()
 
@@ -101,12 +103,18 @@ class SingleImageViewModel @Inject constructor(
 //    }
 
     init {
-        if(album != null && album > 0) {
-            Log.d(getCallSiteInfo(), "Get argument album: $album")
-            setPagingFlow(album, initialKey)
-        }else{
-            assert(!label.isNullOrEmpty() && label.trim().isNotEmpty())
-            setLabelPagingFlow(label!!, initialKey)
+//        if (album != null && album > 0) {
+//            Log.d(getCallSiteInfo(), "Get argument album: $album")
+//            setPagingFlow(album, initialKey)
+//        } else {
+//            assert(!label.isNullOrEmpty() && label.trim().isNotEmpty())
+//            setLabelPagingFlow(label!!, initialKey)
+//        }
+        when (argumentType) {
+            1 -> setPagingFlow(argumentValue.toLong(), initialKey)
+            2 -> setLabelPagingFlow(argumentValue, initialKey)
+            3 -> setAlbumUnlabeledPagingFlow(argumentValue.toLong(), initialKey)
+            else -> throw RuntimeException("Unrecognized argument type: $argumentType")
         }
         viewModelScope.launch {
             orderedLabelList = repository.getAllOrderedLabelList()
@@ -118,8 +126,12 @@ class SingleImageViewModel @Inject constructor(
         _pagingFlow.value = repository.getImagePagingFlow(album, initialKey).cachedIn(viewModelScope)
     }
 
-    private fun setLabelPagingFlow(label: String, initialKey: Int){
+    private fun setLabelPagingFlow(label: String, initialKey: Int) {
         _pagingFlow.value = repository.getImagePagingFlowByLabel(label, initialKey).cachedIn(viewModelScope)
+    }
+
+    private fun setAlbumUnlabeledPagingFlow(album: Long, initialKey: Int) {
+        _pagingFlow.value = repository.getAlbumUnlabeledPagingFlow(album, initialKey).cachedIn(viewModelScope)
     }
 
     // this method starts a relatively long-running task, if a user presses the "label" button first,
@@ -217,8 +229,9 @@ class SingleImageViewModel @Inject constructor(
                             }
                         } else {
                             // set maximum 2 whole image labels
-                            with(labelList.filter { it.confidence >= 0.7 }.sortedBy { it.confidence }.reversed()){
-                                if(isNotEmpty()){
+                            with(labelList.filter { it.confidence >= DefaultConfiguration.ACCEPTED_CONFIDENCE }
+                                .sortedBy { it.confidence }.reversed()) {
+                                if (isNotEmpty()) {
                                     subList(0, if (size > 1) 2 else size).forEach { label ->
                                         wholeImageLabelList.add(ImageLabelResult(imageInfo.id, rootRect, label.text))
                                     }
@@ -235,7 +248,7 @@ class SingleImageViewModel @Inject constructor(
                     ++finishedLabelingTask
                     checkLabelingTaskCompletion(detectedRectList.size, currentPageWhenRunning)
                 }.addOnCanceledListener {
-                    Log.d(getCallSiteInfo(), "Labeling task is cancelled")
+                    Log.w(getCallSiteInfo(), "Labeling task is cancelled")
                     ++finishedLabelingTask
                     checkLabelingTaskCompletion(detectedRectList.size, currentPageWhenRunning)
                 }
@@ -258,9 +271,6 @@ class SingleImageViewModel @Inject constructor(
             // The following two conditions must be fulfilled to make MutableStateFlow emit a new value:
             // (1) reference change to the MutableStateFlow.value
             // (2) the changed value is not equal to the previous one by standard of "equals()" method
-
-            // change reference to trigger recomposition
-            // val labelSet = setOf(*partImageLabelList.map { it.label }.toTypedArray())
             _imageLabelStateFlow.value = _imageLabelStateFlow.value.copy(
                 partImageLabelList = partImageLabelMap.map { it.value },
                 // deduplication of whole image labels
@@ -323,7 +333,7 @@ data class ImageLabelResult(
 // If you do so, then when you add data into the MutableList, the reference of the MutableList does not change,
 // so the new value may not reflect to the screen.
 // Instead, using List instead of MutableList makes sure
-// that the change to the list is always achieved by change list reference
+// that the change to the list is always achieved by changing list reference
 data class ImageLabelLists(
     var partImageLabelList: List<ImageLabelResult>? = null,
     var wholeImageLabelList: List<ImageLabelResult>? = null,

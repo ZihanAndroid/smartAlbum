@@ -147,9 +147,8 @@ fun ImagePagerView(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun PagingItemImage(
+fun PagingItemImage(
     imageInfo: ImageInfo,
     onImageClick: () -> Unit,
     availableScreenWidth: Int,

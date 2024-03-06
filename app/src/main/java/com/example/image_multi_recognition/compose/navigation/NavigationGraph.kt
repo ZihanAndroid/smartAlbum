@@ -4,16 +4,13 @@ import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import com.example.image_multi_recognition.DefaultConfiguration
 import com.example.image_multi_recognition.compose.view.*
 import com.example.image_multi_recognition.util.getCallSiteInfoFunc
 import com.example.image_multi_recognition.viewmodel.PhotoViewModel
-import com.example.image_multi_recognition.viewmodel.SingleImageViewModel
 
 @Composable
 fun NavigationGraph(
@@ -31,10 +28,9 @@ fun NavigationGraph(
         composable(
             route = Destination.PHOTO.navRoute,
         ) {
-            PhotoComposable(viewModel = photoViewModel) { originalIndex ->
-                Log.d(getCallSiteInfoFunc(), "Navigating to: ${Destination.SINGLE_IMAGE.navRoute}")
+            PhotoComposable(viewModel = photoViewModel) { album, originalIndex ->
                 // set argument "label" to empty whitespace String
-                "${Destination.SINGLE_IMAGE.route}/${photoViewModel.currentAlbum}/ /$originalIndex".let { route ->
+                "${Destination.SINGLE_IMAGE.route}/1/${album}/$originalIndex".let { route ->
                     Log.d(getCallSiteInfoFunc(), "Navigation route: $route")
                     navController.navigate(route) {
 //                        launchSingleTop = true
@@ -72,7 +68,15 @@ fun NavigationGraph(
         composable(
             route = Destination.LABEL.navRoute,
         ) {
-
+            LabelingComposable(
+                viewModel = hiltViewModel(),
+            ) { albumId ->
+                "${Destination.ALBUM_PHOTO_LABELING}/${albumId}".let { route ->
+                    navController.navigate(route) {
+                        // Not done yet!
+                    }
+                }
+            }
         }
 
         composable(
@@ -96,15 +100,15 @@ fun NavigationGraph(
                 onBack = {
                     navController.popBackStack()
                 },
-                onImageClick = { route ->
-                    Log.d(getCallSiteInfoFunc(), "Navigating to: ${Destination.SINGLE_IMAGE.navRoute}")
-                    Log.d(getCallSiteInfoFunc(), "Navigation route: $route")
-                    navController.navigate(route) {
-                        launchSingleTop = true
-                        popUpTo(navController.graph.findStartDestination().id) {
-                            saveState = true
+                onImageClick = { album, originalIndex ->
+                    "${Destination.SINGLE_IMAGE.route}/1/${album}/$originalIndex".let { route ->
+                        navController.navigate(route) {
+                            launchSingleTop = true
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
+                            restoreState = true
                         }
-                        restoreState = true
                     }
                 }
             )
@@ -116,7 +120,25 @@ fun NavigationGraph(
             LabelPhotoComposable(
                 viewModel = hiltViewModel(),
                 onImageClick = { originalIndex, label ->
-                    "${Destination.SINGLE_IMAGE.route}/-1/${label}/$originalIndex".let { route ->
+                    "${Destination.SINGLE_IMAGE.route}/2/${label}/$originalIndex".let { route ->
+                        navController.navigate(route) {
+                            // Not Done yet
+                        }
+                    }
+                },
+                onBack = {
+                    navController.popBackStack()
+                }
+            )
+        }
+        composable(
+            route = Destination.ALBUM_PHOTO_LABELING.navRoute,
+            arguments = Destination.ALBUM_PHOTO_LABELING.arguments
+        ) {
+            AlbumPhotoLabelingComposable(
+                viewModel = hiltViewModel(),
+                onImageClick = { album, originalIndex ->
+                    "${Destination.SINGLE_IMAGE.route}/3/${album}/$originalIndex".let { route ->
                         navController.navigate(route) {
                             // Not Done yet
                         }

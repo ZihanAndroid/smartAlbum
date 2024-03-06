@@ -27,6 +27,16 @@ sealed class UiModel {
     ) : UiModel()
 }
 
+sealed class LabelUiModel {
+    data class Label(
+        val label: String
+    ) : LabelUiModel()
+
+    data class Item(
+        val imageInfo: ImageInfo
+    ) : LabelUiModel()
+}
+
 // Before user labeling
 data class ObjectDetectedImageData(
     val imageInfo: ImageInfo,

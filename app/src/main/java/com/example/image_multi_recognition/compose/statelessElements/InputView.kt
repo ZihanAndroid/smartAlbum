@@ -126,11 +126,11 @@ fun InputView(
                             inputSelected = it.isFocused
                         }.menuAnchor().focusRequester(textFieldFocusRequester),
                         trailingIcon = {
-                            Icon(
-                                imageVector = Icons.Filled.Add,
-                                contentDescription = "addLabel",
-                                modifier = Modifier.size(28.dp).clickable { onLabelAdded(input) }
-                            )
+                            IconButton(
+                                onClick = { onLabelAdded(input) }
+                            ) {
+                                Icon(imageVector = Icons.Filled.Add, contentDescription = "addLabel")
+                            }
                         },
                         singleLine = true,
                         keyboardActions = KeyboardActions(onDone = { onLabelAdded(input) }),

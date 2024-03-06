@@ -35,6 +35,8 @@ object DefaultConfiguration {
     const val IMAGE_INTERVAL = 4
     const val ALBUM_INTERVAL = 10
     const val APP_DATASTORE = "APP_DATASTORE"
+
+    const val ACCEPTED_CONFIDENCE = 0.7
 }
 
 @Module

@@ -24,24 +24,26 @@ import com.example.image_multi_recognition.viewmodel.PhotoViewModel
 fun PhotoComposable(
     modifier: Modifier = Modifier,
     viewModel: PhotoViewModel,
-    onImageClick: (Int) -> Unit   //Int: index of selected image in LazyPagingItems
+    onImageClick: (album: Long, originalIndex: Int) -> Unit   //Int: index of selected image in LazyPagingItems
 ) {
     //val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val pagingDataFlow by viewModel.pagingFlow.collectAsStateWithLifecycle()
     val pagingItems = pagingDataFlow.collectAsLazyPagingItems()
 
-    if(pagingItems.itemCount == 0){
+    if (pagingItems.itemCount == 0) {
         Box(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
-        ){
+        ) {
             CircularProgressIndicator(modifier = Modifier.size(36.dp))
         }
-    }else {
+    } else {
         ImagePagerView(
             modifier = modifier,
             pagingItems = pagingItems,
-            onImageClick = onImageClick,
+            onImageClick = { originalIndex ->
+                onImageClick(viewModel.currentAlbum!!, originalIndex)
+            },
             onSendThumbnailRequest = viewModel::requestThumbnail
         )
     }

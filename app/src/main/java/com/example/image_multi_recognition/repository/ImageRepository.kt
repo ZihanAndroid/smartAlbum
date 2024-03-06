@@ -10,6 +10,8 @@ import androidx.datastore.core.DataStore
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
+import androidx.paging.PagingSource
+import androidx.room.Query
 import androidx.room.withTransaction
 import coil.ImageLoader
 import coil.imageLoader
@@ -59,7 +61,7 @@ class ImageRepository @Inject constructor(
         return MediaStore.getVersion(context).let { newVersion ->
             if (newVersion != previousVersion) {
                 newVersion
-            }else{
+            } else {
                 ""
             }
         }
@@ -134,7 +136,6 @@ class ImageRepository @Inject constructor(
         imageInfoDao.deleteById(*deletedIds.toLongArray())
         val addedImageInfo = addedFilePaths.map { file ->
             ImageInfo(
-                labeled = false,
                 album = album,
                 path = file.absolutePath.removePrefix(AlbumPathDecoder.decode(album).absolutePath),
                 //cachedImage = cachedImages[index],
@@ -189,7 +190,16 @@ class ImageRepository @Inject constructor(
             pageSize = DefaultConfiguration.PAGE_SIZE,
             enablePlaceholders = true
         ),
-        pagingSourceFactory = {imageInfoDao.getImagePagingSourceByLabel(label)}
+        pagingSourceFactory = { imageInfoDao.getImagePagingSourceByLabel(label) }
+    ).flow
+
+    fun getAlbumUnlabeledPagingFlow(album: Long, initialKey: Int? = null): Flow<PagingData<ImageInfo>> = Pager(
+        initialKey = initialKey,
+        config = PagingConfig(
+            pageSize = DefaultConfiguration.PAGE_SIZE,
+            enablePlaceholders = true
+        ),
+        pagingSourceFactory = { imageInfoDao.getAlbumUnlabeledPagingSource(album) }
     ).flow
 
     fun getAlbumPagingFlow(): Flow<PagingData<AlbumWithLatestImage>> = Pager(
@@ -239,4 +249,17 @@ class ImageRepository @Inject constructor(
 
     // add "%" for fuzzy search
     suspend fun getImagesByLabel(label: String) = imageInfoDao.getImagesByLabel("$label%")
+
+    fun getUnlabeledAlbumPagerFlow(): Flow<PagingData<AlbumWithLatestImage>> = Pager(
+        config = PagingConfig(
+            pageSize = DefaultConfiguration.PAGE_SIZE,
+            enablePlaceholders = true
+        ),
+        pagingSourceFactory = { imageInfoDao.getUnlabeledAlbumWithLatestImage() }
+    ).flow
+
+    fun getAllUnlabeledImages(): Flow<List<ImageInfo>> = imageInfoDao.getAllUnlabeledImages()
+
+    fun getUnlabeledImagesByAlbum(album: Long): Flow<List<ImageInfo>> =
+        imageInfoDao.getUnlabeledImagesByAlbum(album)
 }

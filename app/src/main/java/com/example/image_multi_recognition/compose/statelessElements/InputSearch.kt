@@ -119,10 +119,9 @@ fun InputSearch(
                             }
                         },
                         onClick = {
-                            focusManager.clearFocus()
                             onSearchClick(dropDownItems[index].label)
-                            val label = dropDownItems[index].label
-                            inputText = label
+                            inputText = dropDownItems[index].label
+                            focusManager.clearFocus()
                         },
                         modifier = Modifier.height(dropDownItemHeight.dp)
                     )
