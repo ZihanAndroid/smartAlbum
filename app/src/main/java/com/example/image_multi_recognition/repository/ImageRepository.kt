@@ -1,7 +1,6 @@
 package com.example.image_multi_recognition.repository
 
 import android.content.Context
-import android.graphics.drawable.Drawable
 import android.provider.MediaStore
 import android.util.Log
 import androidx.core.graphics.drawable.toBitmap
@@ -10,10 +9,7 @@ import androidx.datastore.core.DataStore
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
-import androidx.paging.PagingSource
-import androidx.room.Query
 import androidx.room.withTransaction
-import coil.ImageLoader
 import coil.imageLoader
 import coil.request.ImageRequest
 import com.example.image_multi_recognition.AppData
@@ -258,8 +254,16 @@ class ImageRepository @Inject constructor(
         pagingSourceFactory = { imageInfoDao.getUnlabeledAlbumWithLatestImage() }
     ).flow
 
-    fun getAllUnlabeledImages(): Flow<List<ImageInfo>> = imageInfoDao.getAllUnlabeledImages()
+    fun getAllUnlabeledImages(): Flow<List<ImageInfo>> = imageInfoDao.getAllUnlabeledImages().distinctUntilChanged()
 
     fun getUnlabeledImagesByAlbum(album: Long): Flow<List<ImageInfo>> =
-        imageInfoDao.getUnlabeledImagesByAlbum(album)
+        imageInfoDao.getUnlabeledImagesByAlbum(album).distinctUntilChanged()
+
+    suspend fun insertImageLabels(imageLabels: List<ImageLabel>){
+        imageLabelDao.insert(*imageLabels.toTypedArray())
+    }
+
+    suspend fun removeImageLabelsByLabel(label: String, imageIds: List<Long>){
+        imageLabelDao.deleteByLabelAndIdList(label, *imageIds.toLongArray())
+    }
 }

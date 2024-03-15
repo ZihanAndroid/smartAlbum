@@ -8,7 +8,9 @@ import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import com.example.image_multi_recognition.DefaultConfiguration
 import com.example.image_multi_recognition.db.ImageInfo
+import com.example.image_multi_recognition.db.ImageLabel
 import com.example.image_multi_recognition.repository.ImageRepository
+import com.example.image_multi_recognition.util.ControlledRunner
 import com.example.image_multi_recognition.util.ExifHelper
 import com.example.image_multi_recognition.util.getCallSiteInfo
 import com.example.image_multi_recognition.util.toPagingSource
@@ -16,23 +18,20 @@ import com.example.image_multi_recognition.viewmodel.LabelUiModel
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.label.ImageLabeler
 import com.google.mlkit.vision.objects.ObjectDetector
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.internal.synchronized
 
-abstract class LabelingSupportViewModel (
+abstract class LabelingSupportViewModel(
     private val repository: ImageRepository,
     private val objectDetector: ObjectDetector,
     private val imageLabeler: ImageLabeler,
 ) : ViewModel() {
     // imageId: object count
     val imageObjectsMap: MutableMap<Long, Int> = mutableMapOf()
-    private val labelImagesMap: ConcurrentHashMap<String, MutableList<ImageInfo>> = ConcurrentHashMap()
+    val labelImagesMap: MutableMap<String, MutableSet<ImageInfo>> = mutableMapOf()
     val labelImagesFlow = Pager(
         initialKey = 0,
         config = PagingConfig(
@@ -43,11 +42,15 @@ abstract class LabelingSupportViewModel (
             labelImagesMap.toPagingSource(
                 itemsPerPage = 50,
                 keyMapper = { LabelUiModel.Label(it) },
-                valueMapper = { LabelUiModel.Item(it) }
+                valueMapper = { key, value ->
+                    LabelUiModel.Item(value, key)
+                }
             )
         }
     ).flow
+    val controlledRunner = ControlledRunner<Unit>()
 
+    private val rectMap = mutableMapOf<RectKey, Rect?>()
     private val _labelingStateFlow = MutableStateFlow(LabelingState(0, false))
     val labelingStateFlow: StateFlow<LabelingState>
         get() = _labelingStateFlow
@@ -60,13 +63,17 @@ abstract class LabelingSupportViewModel (
         get() = _scanPaused
     var scanCancelled: Boolean = false
 
+    private val _labelAdding: MutableStateFlow<Boolean?> = MutableStateFlow(null)
+    val labelAddingStateFlow: StateFlow<Boolean?>
+        get() = _labelAdding
+
     init {
         viewModelScope.launch {
             detectedObjectFlow.collect { detectedImage ->
-                if(scanCancelled){
+                if (scanCancelled) {
                     return@collect
-                }else{
-                    while(scanPaused.value){
+                } else {
+                    while (scanPaused.value) {
                         delay(1000)
                     }
                 }
@@ -83,7 +90,7 @@ abstract class LabelingSupportViewModel (
                     }?.let { inputImage ->
                         imageLabeler.process(inputImage)
                             .addOnSuccessListener { labelList ->
-                                if(scanCancelled){
+                                if (scanCancelled) {
                                     return@addOnSuccessListener
                                 }
                                 // runs in UI Main thread
@@ -91,13 +98,18 @@ abstract class LabelingSupportViewModel (
                                     labelList.maxBy { it.confidence }.let { label ->
                                         if (label.confidence > DefaultConfiguration.ACCEPTED_CONFIDENCE) {
                                             if (labelImagesMap[label.text] == null) {
-                                                labelImagesMap[label.text] = mutableListOf()
+                                                labelImagesMap[label.text] = mutableSetOf()
                                             }
                                             // deduplication
-                                            if(detectedImage.imageInfo !in labelImagesMap[label.text]!!){
+                                            if (detectedImage.imageInfo !in labelImagesMap[label.text]!!) {
                                                 labelImagesMap[label.text]!!.add(detectedImage.imageInfo)
+                                                rectMap[RectKey(detectedImage.imageInfo.id, label.text)] =
+                                                    detectedImage.rect
                                             }
-                                            Log.d(getCallSiteInfo(), "${detectedImage.imageInfo} is recognized as ${label.text}")
+                                            Log.d(
+                                                getCallSiteInfo(),
+                                                "${detectedImage.imageInfo} is recognized as ${label.text}"
+                                            )
                                         }
                                     }
                                 }
@@ -115,18 +127,18 @@ abstract class LabelingSupportViewModel (
         }
     }
 
-    fun scanImages(imageInfoList: List<ImageInfo>) {
+    open fun scanImages(imageInfoList: List<ImageInfo>) {
         resetLabeling()
         _scanPaused.value = false
         scanCancelled = false
         imageObjectsMap.putAll(imageInfoList.map { it.id to -1 })
         viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                imageInfoList.forEach { imageInfo ->
-                    if(scanCancelled){
+            imageInfoList.forEach { imageInfo ->
+                withContext(Dispatchers.IO) {
+                    if (scanCancelled) {
                         return@withContext
-                    }else{
-                        while(scanPaused.value){
+                    } else {
+                        while (scanPaused.value) {
                             delay(1000)
                             Log.d(getCallSiteInfo(), "paused here!")
                         }
@@ -139,7 +151,7 @@ abstract class LabelingSupportViewModel (
                     } else {
                         objectDetector.process(imageHandled)
                             .addOnSuccessListener { detectedObjList ->
-                                if(scanCancelled){
+                                if (scanCancelled) {
                                     return@addOnSuccessListener
                                 }
                                 imageObjectsMap[imageInfo.id] = detectedObjList.size + 1
@@ -152,7 +164,10 @@ abstract class LabelingSupportViewModel (
                                                 detectedObject.boundingBox
                                             )
                                         )
-                                        Log.d(getCallSiteInfo(), "Request is send for $imageInfo with ${detectedObject.boundingBox}")
+                                        Log.d(
+                                            getCallSiteInfo(),
+                                            "Request is send for $imageInfo with ${detectedObject.boundingBox}"
+                                        )
                                     }
                                     Log.d(getCallSiteInfo(), "Request is send for $imageInfo")
                                     detectedObjectFlow.emit(DetectedImage(imageInfo, imageHandled, null))
@@ -170,10 +185,29 @@ abstract class LabelingSupportViewModel (
         }
     }
 
-    fun reverseScanPaused(){
+    fun addSelectedImageLabel(labelImageMap: Map<String, List<Long>>) {
+        if(labelImageMap.isNotEmpty()) {
+            viewModelScope.launch {
+                controlledRunner.joinPreviousOrRun {
+                    _labelAdding.value = true
+                    repository.insertImageLabels(
+                        labelImageMap.flatMap { labelImages ->
+                            labelImages.value.map { imageId ->
+                                ImageLabel(imageId, labelImages.key, rectMap[RectKey(imageId, labelImages.key)])
+                            }
+                        }
+                    )
+                    _labelAdding.value = false
+                }
+            }
+        }
+    }
+
+    fun reverseScanPaused() {
         _scanPaused.value = !_scanPaused.value
     }
-    fun resumeScanPaused(){
+
+    fun resumeScanPaused() {
         _scanPaused.value = false
     }
 
@@ -189,16 +223,28 @@ abstract class LabelingSupportViewModel (
         }
     }
 
+    @OptIn(InternalCoroutinesApi::class)
     private fun imageObjectsMapRemoval(imageId: Long) {
-        imageObjectsMap.remove(imageId)
-        if (_labelingStateFlow.value.labeledImageCount == imageObjectsMap.size) {
-            _labelingStateFlow.value = _labelingStateFlow.value.copy(labelingDone = true)
+        // imageObjectsMap.remove(imageId)
+        synchronized(this) {
+            val prevLabeledImageCount = _labelingStateFlow.value.labeledImageCount
+            if (prevLabeledImageCount + 1 == imageObjectsMap.size) {
+                _labelingStateFlow.value =
+                    _labelingStateFlow.value.copy(labeledImageCount = prevLabeledImageCount + 1, labelingDone = true)
+            } else {
+                _labelingStateFlow.value = _labelingStateFlow.value.copy(labeledImageCount = prevLabeledImageCount + 1)
+            }
         }
+    }
+
+    fun resetLabelAdding(){
+        _labelAdding.value = null
     }
 
     private fun resetLabeling() {
         imageObjectsMap.clear()
         labelImagesMap.clear()
+        rectMap.clear()
         _labelingStateFlow.value.labeledImageCount = 0
         _labelingStateFlow.value.labelingDone = false
     }
@@ -208,6 +254,11 @@ data class DetectedImage(
     val imageInfo: ImageInfo,
     val inputImage: InputImage,
     val rect: Rect? // if Rect is null, it means label the whole image instead of part of it
+)
+
+data class RectKey(
+    val imageId: Long,
+    val label: String
 )
 
 data class LabelingState(

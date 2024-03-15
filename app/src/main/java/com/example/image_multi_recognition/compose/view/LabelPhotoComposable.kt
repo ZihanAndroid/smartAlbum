@@ -2,17 +2,24 @@ package com.example.image_multi_recognition.compose.view
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.vectorResource
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.collectAsLazyPagingItems
-import com.example.image_multi_recognition.compose.navigation.Destination
+import com.example.image_multi_recognition.R
 import com.example.image_multi_recognition.compose.statelessElements.ImagePagerView
 import com.example.image_multi_recognition.compose.statelessElements.TopAppBarForNotRootDestination
-import com.example.image_multi_recognition.util.AlbumPathDecoder
+import com.example.image_multi_recognition.util.MutableSetWithState
 import com.example.image_multi_recognition.viewmodel.LabelPhotoViewModel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -22,13 +29,93 @@ fun LabelPhotoComposable(
     onImageClick: (Int, String) -> Unit,
     onBack: () -> Unit
 ) {
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
     val pagingItems = viewModel.pagingFlow.collectAsLazyPagingItems()
 
+    val selectedImageIdSet = remember { MutableSetWithState<Long>() }
+    var selectionMode by rememberSaveable { mutableStateOf(false) }
+    val labelRemoving by viewModel.labelRemoving.collectAsStateWithLifecycle()
+
+    val waitForPreviousOperationString = stringResource(R.string.waiting_for_previous)
+    val labelRemovedString = stringResource(R.string.label_removed)
+    val deletedImageIds = rememberSaveable { mutableSetOf<Long>() }
+
+    LaunchedEffect(labelRemoving) {
+        if (labelRemoving == false) {
+            launch {
+                snackbarHostState.showSnackbar(labelRemovedString, duration = SnackbarDuration.Indefinite)
+            }.apply {
+                delay(1000)
+                cancel()
+            }
+        }
+    }
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBarForNotRootDestination(
-                title = viewModel.label,
-                onBack = onBack
+                title = if (!selectionMode) {
+                    viewModel.label
+                } else {
+                    selectedImageIdSet.version.value    // read State for recomposition when selectedImageIdSet is changed
+                    stringResource(R.string.removing, selectedImageIdSet.size)
+                },
+                onBack = onBack,
+                actions = {
+                    // check "labelRemoving" here to avoid calling "viewModel.removeLabels()" multiple times when user clicks button too fast
+                    if (selectionMode) {
+                        IconButton(
+                            onClick = {
+                                if (selectedImageIdSet.isNotEmpty()) {
+                                    selectedImageIdSet.toList().apply {
+                                        deletedImageIds.addAll(this)
+                                        viewModel.removeLabels(this){
+                                            // clear the selectedImageIdSet immediately after the deletion is completed
+                                            selectedImageIdSet.clear()
+                                        }
+                                    }
+                                }
+                                selectionMode = false
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Check,
+                                contentDescription = "confirm"
+                            )
+                        }
+                        IconButton(
+                            onClick = {
+                                selectedImageIdSet.clear()
+                                selectionMode = false
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Close,
+                                contentDescription = "cancel selection"
+                            )
+                        }
+                    } else {
+                        IconButton(
+                            onClick = {
+                                if (labelRemoving == null || labelRemoving == false) {
+                                    selectedImageIdSet.clear()
+                                    selectionMode = true
+                                } else if (labelRemoving == true) {
+                                    coroutineScope.launch {
+                                        snackbarHostState.showSnackbar(waitForPreviousOperationString)
+                                    }
+                                }
+                            }
+                        ) {
+                            Icon(
+                                imageVector = ImageVector.vectorResource(R.drawable.baseline_playlist_remove_24),
+                                contentDescription = "remove image"
+                            )
+                        }
+                    }
+                }
             )
         },
         modifier = modifier
@@ -39,7 +126,28 @@ fun LabelPhotoComposable(
             onImageClick = { originalIndex ->
                 onImageClick(originalIndex, viewModel.label)
             },
-            onSendThumbnailRequest = viewModel::requestThumbnail
+            onSendThumbnailRequest = viewModel::requestThumbnail,
+            selectionMode = selectionMode,
+            onSelect = {
+                if (selectedImageIdSet.contains(it)) {
+                    selectedImageIdSet -= it
+                } else {
+                    selectedImageIdSet += it
+                }
+            },
+            onLongPress = { imageId ->
+                if (!selectionMode && labelRemoving != true) selectionMode = true
+                if(labelRemoving != true) {
+                    if (imageId !in selectedImageIdSet) {
+                        selectedImageIdSet.add(imageId)
+                    } else {
+                        selectedImageIdSet.remove(imageId)
+                    }
+                }
+            },
+            enableLongPressAndDrag = true,
+            selectedImageIdSet = selectedImageIdSet,
+            deletedImageIds = deletedImageIds
         )
     }
 }

@@ -1,17 +1,15 @@
 package com.example.image_multi_recognition.compose.view
 
+import android.util.Log
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.TopAppBar
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
@@ -21,7 +19,10 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import com.example.image_multi_recognition.R
 import com.example.image_multi_recognition.compose.statelessElements.ImagePagerView
 import com.example.image_multi_recognition.compose.statelessElements.TopAppBarForNotRootDestination
+import com.example.image_multi_recognition.util.getCallSiteInfo
 import com.example.image_multi_recognition.viewmodel.AlbumPhotoLabelingViewModel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun AlbumPhotoLabelingComposable(
@@ -34,7 +35,38 @@ fun AlbumPhotoLabelingComposable(
     var labelingClicked by rememberSaveable { mutableStateOf(false) }
     val labelingState by viewModel.labelingStateFlow.collectAsStateWithLifecycle()
 
+    // imageSelectedStateHolder and labelSelectedStateHolder are updated for "labelingState" change
+    val imageSelectedStateHolder: Map<String, Map<Long, MutableState<Boolean>>> = remember(labelingState) {
+        // viewModel.labelImagesMap is the backing data of pagingItem from viewModel.labelImagesFlow
+        mapOf(*(viewModel.labelImagesMap.map { labelImages ->
+            labelImages.key to mapOf(*labelImages.value.map { imageInfo ->
+                imageInfo.id to mutableStateOf(true)
+            }.toTypedArray())
+        }.toTypedArray()))
+    }
+    val labelSelectedStateHolder: Map<String, MutableState<Boolean>> = remember(labelingState) {
+        mapOf(*(viewModel.labelImagesMap.map { it.key to mutableStateOf(true) }).toTypedArray())
+    }
+
+    val labelAdding by viewModel.labelAddingStateFlow.collectAsStateWithLifecycle()
+    val coroutineScope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val labelAddedString = stringResource(R.string.label_added)
+
+    LaunchedEffect(labelAdding){
+        if (labelAdding == false){
+            // https://stackoverflow.com/questions/71471679/jetpack-compose-scaffold-possible-to-override-the-standard-durations-of-snackbar
+            val job = launch {
+                snackbarHostState.showSnackbar(labelAddedString, duration = SnackbarDuration.Indefinite)
+            }
+            delay(1000)
+            job.cancel()
+            labelingClicked = false
+        }
+    }
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBarForNotRootDestination(
                 title = if (labelingClicked) {
@@ -48,16 +80,35 @@ fun AlbumPhotoLabelingComposable(
                 },
                 onBack = onBack,
                 actions = {
-                    IconButton(
-                        onClick = {
-                            viewModel.scanImages(imageInfoList)
-                            labelingClicked = true
+                    if (!labelingClicked) {
+                        IconButton(
+                            onClick = {
+                                viewModel.scanImages(imageInfoList)
+                                labelingClicked = true
+                            }
+                        ) {
+                            Icon(
+                                imageVector = ImageVector.vectorResource(R.drawable.baseline_new_label_24),
+                                contentDescription = "autoLabeling",
+                            )
                         }
-                    ) {
-                        Icon(
-                            imageVector = ImageVector.vectorResource(R.drawable.baseline_new_label_24),
-                            contentDescription = "autoLabeling",
-                        )
+                    } else {
+                        if (labelingState.labelingDone) {
+                            IconButton(
+                                onClick = {
+                                    coroutineScope.launch {
+                                        if(!viewModel.onLabelingConfirm(imageSelectedStateHolder)){
+                                            labelingClicked = false
+                                        }
+                                    }
+                                },
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Check,
+                                    contentDescription = "done",
+                                )
+                            }
+                        }
                     }
                 }
             )
@@ -67,7 +118,31 @@ fun AlbumPhotoLabelingComposable(
             if (labelingClicked) {
                 if (labelingState.labelingDone) {
                     val pagingItems = viewModel.labelImagesFlow.collectAsLazyPagingItems()
-                    ImageLabelingResultShow(pagingItems, modifier)
+                    Box(
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        ImageLabelingResultShow(
+                            pagingItemsEmpty = viewModel.labelImagesMap.isEmpty(),
+                            pagingItems = pagingItems,
+                            imageSelectedStateHolderParam = imageSelectedStateHolder,
+                            labelSelectedStateHolderParam = labelSelectedStateHolder
+                        )
+//                        if(labelAdding) {
+//                            Box(
+//                                modifier = Modifier.fillMaxSize().background(colorResource(R.color.greyAlpha).copy(alpha = 0.3f)),
+//                                contentAlignment = Alignment.Center
+//                            ){
+//                                Row {
+//                                    CircularProgressIndicator()
+//                                    Text(
+//                                        text = "${stringResource(R.string.adding_image_labels)}...",
+//                                        style = MaterialTheme.typography.labelLarge
+//                                    )
+//                                }
+//                            }
+//                        }
+                    }
+
                 } else {
                     val scanPaused by viewModel.scanPaused.collectAsStateWithLifecycle()
                     LabelingOnProgress(

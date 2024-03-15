@@ -2,6 +2,7 @@ package com.example.image_multi_recognition.compose.view
 
 import android.util.Log
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -16,6 +17,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.vectorResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.collectAsLazyPagingItems
@@ -25,6 +27,7 @@ import com.example.image_multi_recognition.compose.statelessElements.SingleImage
 import com.example.image_multi_recognition.compose.view.imageShow.SingleImagePage
 import com.example.image_multi_recognition.compose.view.imageShow.SingleImagePageLabelingDone
 import com.example.image_multi_recognition.db.ImageLabel
+import com.example.image_multi_recognition.util.getCallSiteInfo
 import com.example.image_multi_recognition.util.getCallSiteInfoFunc
 import com.example.image_multi_recognition.viewmodel.ImageLabelResult
 import com.example.image_multi_recognition.viewmodel.SingleImageViewModel
@@ -93,7 +96,7 @@ fun SingleImageComposable(
         ) { paddingValues ->
             HorizontalPager(
                 state = pagerState,
-                modifier = Modifier.padding(paddingValues),
+                modifier = Modifier.padding(paddingValues)
             ) { itemIndex ->
                 pagingItems[itemIndex]?.let { imageInfo ->
                     if (!imageLabelLists.labelingDone) {

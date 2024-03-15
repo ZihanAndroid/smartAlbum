@@ -1,15 +1,20 @@
 package com.example.image_multi_recognition.compose.view.imageShow
 
 import android.util.Log
+import androidx.compose.foundation.gestures.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Done
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.key
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.stringResource
@@ -21,6 +26,7 @@ import com.example.image_multi_recognition.R
 import com.example.image_multi_recognition.compose.statelessElements.ElevatedSmallIconButton
 import com.example.image_multi_recognition.compose.statelessElements.LabelSelectionElement
 import com.example.image_multi_recognition.db.ImageInfo
+import com.example.image_multi_recognition.util.getCallSiteInfo
 import com.example.image_multi_recognition.util.getCallSiteInfoFunc
 import com.example.image_multi_recognition.viewmodel.ImageLabelResult
 
@@ -38,6 +44,9 @@ fun SingleImagePage(
     onLabelAddingClick: () -> Unit,
     onAddedLabelClick: (String, Boolean) -> Unit,
 ) {
+    var zoom by remember { mutableStateOf(1f) }
+    var offset by remember { mutableStateOf(Offset.Zero) }
+
     Log.d(getCallSiteInfoFunc(), "Recomposition")
     ConstraintLayout(
         modifier = modifier
@@ -51,7 +60,46 @@ fun SingleImagePage(
                 Log.d(getCallSiteInfoFunc(), "AsyncImage() is called")
                 AsyncImage(
                     model = imageInfo.fullImageFile,
-                    contentDescription = imageInfo.id.toString()
+                    contentDescription = imageInfo.id.toString(),
+                    modifier = Modifier.fillMaxWidth()
+                        .clipToBounds()
+                        .pointerInput(Unit) {
+                            detectTapGestures(
+                                // double tap to zoom in or zoom out
+                                onDoubleTap = { tapOffset ->
+                                    zoom = if (zoom > 1f) 1f else 2f
+                                    offset = Offset(x = tapOffset.x * (1 - zoom), y = tapOffset.y * (1 - zoom))
+                                }
+                            )
+                        }.pointerInput(Unit) {
+                            // Note that you can access "size" inside the PointerInputScope to get the size of AsyncImage
+                            // you can use that "size" to restrict the boundary of offset.
+                            // Also note that the value centroid is corresponding to the coordinate of "size",
+                            // the pointer input region without the offset and zooming
+                            detectTransformGestures { centroid, pan, gestureZoom, _ ->
+                                Log.d(
+                                    getCallSiteInfo(),
+                                    "size: $size, centroid: [${centroid.x}, ${centroid.y}], pan: [${pan.x}, ${pan.y}]"
+                                )
+                                //val oldZoom = zoom
+                                zoom = (zoom * gestureZoom).coerceAtLeast(1f)
+                                // equation:
+                                // (centroid.x - offset.x) / zoom = (centroid.x - newOffset.x) / newZoom
+                                // Then we get "newOffset.x"
+                                offset = Offset(
+                                    x = (gestureZoom * (offset.x - centroid.x + pan.x) + centroid.x)
+                                        .coerceIn(size.width * (1 - zoom), 0f),
+                                    y = (gestureZoom * (offset.y - centroid.y + pan.y) + centroid.y)
+                                        .coerceIn(size.height * (1 - zoom), 0f)
+                                )
+                            }
+                        }.graphicsLayer {
+                        scaleX = zoom
+                        scaleY = zoom
+                        translationX = offset.x
+                        translationY = offset.y
+                        transformOrigin = TransformOrigin(0f, 0f)
+                    }
                 )
             },
             labels = @Composable {
@@ -194,7 +242,7 @@ fun SingleImagePageLabelingDone(
                 )
             }
         }
-        if(showHintText) {
+        if (showHintText) {
             Text(
                 text = if (partImageLabelResult.isNullOrEmpty() && otherImageLabelResult.isNullOrEmpty()) {
                     stringResource(R.string.no_selected_label)

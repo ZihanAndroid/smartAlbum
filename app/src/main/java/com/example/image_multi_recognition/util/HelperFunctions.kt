@@ -97,10 +97,10 @@ inline fun <reified T, reified R, reified U : Comparable<U>> List<T>.getDifferen
 //}
 
 
-fun <K : Comparable<K>, V : Any, U : Any> Map<K, List<V>>.toPagingSource(
+fun <K : Comparable<K>, V : Any, U : Any> Map<K, Collection<V>>.toPagingSource(
     itemsPerPage: Int,
     keyMapper: (K) -> U,
-    valueMapper: (V) -> U,
+    valueMapper: (K, V) -> U,
 ): PagingSource<Int, U> = object : PagingSource<Int, U>() {
     private var keyList = this@toPagingSource.keys.toList().sortedBy { it }
     private var prevKeyIndex: Int = 0
@@ -115,11 +115,11 @@ fun <K : Comparable<K>, V : Any, U : Any> Map<K, List<V>>.toPagingSource(
         return try {
             val convertedData = mutableListOf<U>()
             while (convertedData.size < params.loadSize && !done()) {
-                val valueList = this@toPagingSource[keyList[prevKeyIndex]]!!
+                val valueList = this@toPagingSource[keyList[prevKeyIndex]]!!.toList()
                 if (prevValueIndex == -1 && valueList.isNotEmpty()) {
                     convertedData.add(keyMapper(keyList[prevKeyIndex]))
                 } else {
-                    convertedData.add(valueMapper(valueList[prevValueIndex]))
+                    convertedData.add(valueMapper(keyList[prevKeyIndex], valueList[prevValueIndex]))
                 }
                 prevValueIndex++
                 if (prevValueIndex == valueList.size) {

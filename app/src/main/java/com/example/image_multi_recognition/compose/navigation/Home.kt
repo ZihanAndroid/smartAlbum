@@ -72,7 +72,8 @@ fun Home(
             NavigationGraph(
                 navController = navController,
                 modifier = Modifier.padding(suggestedPadding),
-                photoViewModel = photoViewModel
+                photoViewModel = photoViewModel,
+                rootSnackBarHostState = snackBarHostState
             )
         }
     } else {

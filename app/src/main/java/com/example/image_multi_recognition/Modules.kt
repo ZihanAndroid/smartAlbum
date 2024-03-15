@@ -37,6 +37,8 @@ object DefaultConfiguration {
     const val APP_DATASTORE = "APP_DATASTORE"
 
     const val ACCEPTED_CONFIDENCE = 0.7
+
+    const val DRAG_SCROLL_THRESHOLD = 60
 }
 
 @Module

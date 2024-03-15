@@ -1,6 +1,7 @@
 package com.example.image_multi_recognition.compose.navigation
 
 import android.util.Log
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -18,7 +19,8 @@ fun NavigationGraph(
     modifier: Modifier = Modifier,
     // Note the hiltViewModel() here does not within any destination,
     // it can be seen as the global ViewModel for the app which has the same lifecycle as the Activity does
-    photoViewModel: PhotoViewModel
+    photoViewModel: PhotoViewModel,
+    rootSnackBarHostState: SnackbarHostState? = null
 ) {
     NavHost(
         modifier = modifier,
@@ -70,6 +72,7 @@ fun NavigationGraph(
         ) {
             LabelingComposable(
                 viewModel = hiltViewModel(),
+                rootSnackBarHostState = rootSnackBarHostState!!
             ) { albumId ->
                 "${Destination.ALBUM_PHOTO_LABELING}/${albumId}".let { route ->
                     navController.navigate(route) {

@@ -33,7 +33,8 @@ sealed class LabelUiModel {
     ) : LabelUiModel()
 
     data class Item(
-        val imageInfo: ImageInfo
+        val imageInfo: ImageInfo,
+        val label: String
     ) : LabelUiModel()
 }
 

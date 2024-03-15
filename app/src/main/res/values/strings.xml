@@ -28,4 +28,9 @@
     <string name="labeling_result">Labeling Result</string>
     <string name="unlabeled_image_count">Unlabeled Image Count: %d</string>
     <string name="no_recognized_image">No recognized image</string>
+    <string name="adding_image_labels">Adding Image Labels</string>
+    <string name="waiting_for_previous">Waiting for the previous operation</string>
+    <string name="label_removed">Label removed!</string>
+    <string name="label_added">Label added!</string>
+    <string name="removing">Removing (%d selected)</string>
 </resources>
