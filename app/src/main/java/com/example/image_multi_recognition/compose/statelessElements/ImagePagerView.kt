@@ -1,12 +1,15 @@
 package com.example.image_multi_recognition.compose.statelessElements
 
 import android.util.Log
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDp
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.updateTransition
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -15,14 +18,18 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
@@ -47,9 +54,12 @@ fun ImagePagerView(
     modifier: Modifier = Modifier,
     onSendThumbnailRequest: (File, ImageInfo) -> Unit,
     selectionMode: Boolean = false,
-    onSelect: (Long) -> Unit = {},
+    onClickSelect: (Long) -> Unit = {},
     onLongPress: (Long) -> Unit = {},
-    enableLongPressAndDrag: Boolean = false,
+    enableLongPressAndDrag: Boolean = false, // enable drag selection
+    // we use MutableSetWithState<Long> instead of MutableSetWithState<ImageInfo>
+    // because ImageInfo may change like creating a new ImageInfo to change the "favorite" property
+    // but the id will not change
     selectedImageIdSet: MutableSetWithState<Long> = MutableSetWithState(),
     deletedImageIds: Set<Long> = emptySet()
 ) {
@@ -107,7 +117,17 @@ fun ImagePagerView(
                     keyTracked = { it > 0 } // if key < 0, then it calculates from hashcode of non-image item
                 )
             } else currentModifier
-        },
+        }.tapClick<Int>(
+            lazyGridState = lazyGridState,
+            onTap = { key ->
+                if (keyImageIdMap[key] !in selectedImageIdSet) {
+                    selectedImageIdSet.add(keyImageIdMap[key]!!)
+                } else {
+                    selectedImageIdSet.remove(keyImageIdMap[key])
+                }
+            },
+            keyTracked = { it > 0 }
+        ),
         state = lazyGridState
     ) {
         items(
@@ -178,12 +198,12 @@ fun ImagePagerView(
 
                             PagingItemImage(
                                 imageInfo = pageItem.imageInfo,
-                                onImageClick = {
-                                    if (selectionMode) {
-                                        onSelect(pageItem.imageInfo.id)
-                                    } else {
-                                        onImageClick(pageItem.originalIndex)
-                                    }
+                                onImageClick = if (selectionMode) {
+                                    // do not set click to image to avoid conflict(long press and click) between pointerInput in lazy grid and image
+                                    // onClickSelect(pageItem.imageInfo.id)
+                                    null
+                                } else {
+                                    { onImageClick(pageItem.originalIndex) }
                                 },
                                 onImageLongClick = if (enableLongPressAndDrag) {
                                     null
@@ -201,7 +221,7 @@ fun ImagePagerView(
 
         }
         // Bad implementation! Do not use LazyColumn + FlowRow with a "prevItemList",
-        // It is slower and difficult to set "prevItemList" correctly due to recomposition
+        // It is slower and more difficult to set "prevItemList" correctly due to recomposition
         //    LazyColumn(
         //        modifier = modifier,
         //        state = lazyListState
@@ -262,7 +282,7 @@ fun ImagePagerView(
 @Composable
 fun PagingItemImage(
     imageInfo: ImageInfo,
-    onImageClick: () -> Unit = {},
+    onImageClick: (() -> Unit)? = null,
     onImageLongClick: (() -> Unit)? = null,
     availableScreenWidth: Int,
     onSendThumbnailRequest: (File, ImageInfo) -> Unit,
@@ -284,10 +304,16 @@ fun PagingItemImage(
     }
     Box {
         val transition = updateTransition(selected, label = "image_${imageInfo.id}_selected")
-        val paddingValue by transition.animateDp(label = "image_padding") { selected ->
+        val paddingValue by transition.animateDp(
+            label = "image_padding",
+            transitionSpec = { spring(stiffness = Spring.StiffnessHigh) }
+        ) { selected ->
             if (selected) 6.dp else 0.dp
         }
-        val cornerValue by transition.animateDp(label = "image_corner") { selected ->
+        val cornerValue by transition.animateDp(
+            label = "image_corner",
+            transitionSpec = { spring(stiffness = Spring.StiffnessHigh) }
+        ) { selected ->
             if (selected) 6.dp else 0.dp
         }
 
@@ -295,14 +321,29 @@ fun PagingItemImage(
             model = imagePath,
             contentDescription = imageInfo.id.toString(),
             contentScale = ContentScale.Crop,
-            modifier = Modifier.size(imageSize.dp).combinedClickable(
-                onClick = onImageClick,
-                // when onImageLongClick is null, onLongClick is set to null, as its default value in combinedClickable()
-                onLongClick = onImageLongClick
-            ).padding(paddingValue).clip(RoundedCornerShape(cornerValue))
+            modifier = Modifier.size(imageSize.dp).let {
+                if (onImageClick != null) {
+                    it.combinedClickable(
+                        onClick = onImageClick,
+                        // when onImageLongClick is null, onLongClick is set to null, as its default value in combinedClickable()
+                        onLongClick = onImageLongClick
+                    )
+                } else it
+            }.padding(paddingValue).clip(RoundedCornerShape(cornerValue))
         )
         if (selectionMode) {
             ToggleIcon(selected)
+        }
+        if (imageInfo.favorite) {
+            // favoraite icon show be drawn after AsyncImage is shown
+            Icon(
+                imageVector = Icons.Filled.Favorite,
+                // Note the position of padding() and size() modifier, apply padding() first then size(), the size will not change
+                // while applying size() first then padding(), the size is changed by padding change
+                modifier = Modifier.align(Alignment.TopEnd).padding(4.dp + paddingValue).size(16.dp - paddingValue / 4),
+                contentDescription = "icon_${imageInfo.id}"
+
+            )
         }
     }
 }
@@ -316,15 +357,14 @@ fun ToggleIcon(selected: Boolean) {
             contentDescription = null,
             modifier = Modifier
                 .padding(4.dp)
-                .border(1.dp, colorResource(R.color.Ivory), CircleShape)
+                .border(1.dp, colorResource(R.color.colorAccent), CircleShape)
                 .size(20.dp)
                 .clip(CircleShape)
-                .background(colorResource(R.color.Ivory))
+                .background(colorResource(R.color.colorAccent))
         )
     } else {
         Icon(
             imageVector = ImageVector.vectorResource(R.drawable.baseline_radio_button_unchecked_24),
-            tint = colorResource(R.color.MintCream),
             contentDescription = null,
             modifier = Modifier.padding(4.dp)
         )

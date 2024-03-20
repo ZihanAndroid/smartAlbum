@@ -1,6 +1,7 @@
 package com.example.image_multi_recognition.util
 
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -33,7 +34,8 @@ fun <T : Any> Modifier.longPressAndDragSelection(
     onSelectionStart: (T) -> Unit,
     // in lazy grid, the UiModel may contain multiple kinds of items while we may only care about one of them,
     // like image item instead of title items, we can set "keyTracked()" for that
-    keyTracked: (T) -> Boolean = { true }
+    keyTracked: (T) -> Boolean = { true },
+    // Note the Long drag and press may conflict to onClick at some cases (after the LongPressAndDrag finished, the onClick event may also be triggered)
 ) = this.pointerInput(Unit) {
     var initialKey: T? = null
     var prevKey: T? = null
@@ -78,6 +80,20 @@ fun <T : Any> Modifier.longPressAndDragSelection(
             initialKey = null
         }
     )
+}
+
+fun <T : Any> Modifier.tapClick(
+    lazyGridState: LazyGridState,
+    onTap: (T) -> Unit,
+    keyTracked: (T) -> Boolean
+) = this.pointerInput(Unit) {
+    detectTapGestures { offset: Offset ->
+        keyAtOffset<T>(offset, lazyGridState)?.let { key ->
+            if(keyTracked(key)){
+                onTap(key)
+            }
+        }
+    }
 }
 
 // key: Int, assume key is consecutive

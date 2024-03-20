@@ -1,17 +1,13 @@
 package com.example.image_multi_recognition.viewmodel
 
-import android.graphics.Rect
-import androidx.compose.runtime.MutableState
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import com.example.image_multi_recognition.DefaultConfiguration
 import com.example.image_multi_recognition.db.ImageInfo
-import com.example.image_multi_recognition.db.ImageLabel
 import com.example.image_multi_recognition.repository.ImageRepository
 import com.example.image_multi_recognition.util.toPagingSource
 import com.example.image_multi_recognition.viewmodel.basic.ImagePagingFlowSupport
@@ -33,6 +29,8 @@ class AlbumPhotoLabelingViewModel @Inject constructor(
 ) : LabelingSupportViewModel(repository, objectDetector, imageLabeler), ImagePagingFlowSupport {
     val album = savedStateHandle.get<Long>("album")!!
 
+    override val imageIdOriginalIndexMap: MutableMap<Long, Int> = mutableMapOf()
+
     private val unlabeledImageInAlbumFlow = repository.getUnlabeledImagesByAlbum(album)
     val unlabeledImageInAlbumStateFlow: StateFlow<List<ImageInfo>> =
         unlabeledImageInAlbumFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), emptyList())
@@ -42,6 +40,7 @@ class AlbumPhotoLabelingViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
+            // convert the list to pagingSource
             unlabeledImageInAlbumStateFlow.collect { imageInfoList ->
                 _unlabeledImagePagingFlow.value = Pager(
                     config = PagingConfig(

@@ -5,7 +5,7 @@ import androidx.room.*
 
 @Database(
     entities = [ImageInfo::class, ImageLabel::class, AlbumInfo::class],
-    version = 2
+    version = 3
 )
 @TypeConverters(value = [RectConverter::class])
 abstract class ImageInfoDatabase : RoomDatabase(){

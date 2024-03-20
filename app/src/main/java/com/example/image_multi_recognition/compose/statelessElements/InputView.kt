@@ -92,9 +92,9 @@ fun InputView(
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.padding(top = 30.dp, bottom = 12.dp).wrapContentWidth().padding(horizontal = 24.dp)
+                modifier = Modifier.padding(top = 36.dp, bottom = 12.dp, start = 24.dp, end = 24.dp).fillMaxWidth()
             ) {
-                val maxDropDownMenuHeight = (LocalConfiguration.current.screenHeightDp * 0.3).toInt()
+                val maxDropDownMenuHeight = (LocalConfiguration.current.screenHeightDp * 0.32).toInt()
                 val offsetY = remember(dropDownItemList.size) {
                     // 16: there is vertical padding (16.dp) in Material 3 DropdownMenu, take it into consideration
                     if (dropDownItemList.size * dropDownItemHeight > maxDropDownMenuHeight) maxDropDownMenuHeight else dropDownItemList.size * dropDownItemHeight + 16
@@ -158,14 +158,23 @@ fun InputView(
                             repeat(dropDownItemList.size) { index ->
                                 DropdownMenuItem(
                                     text = {
-                                        Row {
+                                        Row(
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            modifier = Modifier.padding(12.dp).fillMaxWidth()
+                                        ) {
+                                            Row {
+                                                Text(
+                                                    text = dropDownItemList[index].label.substring(0, input.length),
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    color = colorResource(R.color.IndianRed)
+                                                )
+                                                Text(
+                                                    text = dropDownItemList[index].label.substring(input.length),
+                                                    style = MaterialTheme.typography.bodyMedium
+                                                )
+                                            }
                                             Text(
-                                                text = dropDownItemList[index].label.substring(0, input.length),
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                color = colorResource(R.color.IndianRed)
-                                            )
-                                            Text(
-                                                text = "${dropDownItemList[index].label.substring(input.length)}\t\t\t\t${dropDownItemList[index].count}",
+                                                text = "${dropDownItemList[index].count}",
                                                 style = MaterialTheme.typography.bodyMedium
                                             )
                                         }
@@ -206,31 +215,21 @@ fun InputView(
                 } else {
                     Spacer(modifier = Modifier.fillMaxWidth().height(48.dp))
                 }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp, alignment = Alignment.End)
-                ) {
-                    ElevatedButton(
-                        onClick = onDismiss
-                    ) {
-                        Text(text = stringResource(R.string.cancel), style = MaterialTheme.typography.labelLarge)
+
+                InputViewButtons(
+                    onDismiss = onDismiss,
+                    onConfirm = {
+                        onConfirm(with(userAddedLabelSet.toList()) {
+                            if (userAddedLabelSet.size < maxAllowedLabelCount && input.trim()
+                                    .isNotEmpty() && input !in userAddedLabelSet
+                            ) {
+                                this + input.trim().capitalizeFirstChar()
+                            } else {
+                                this
+                            }
+                        })
                     }
-                    ElevatedButton(
-                        onClick = {
-                            onConfirm(with(userAddedLabelSet.toList()) {
-                                if (userAddedLabelSet.size < maxAllowedLabelCount && input.trim()
-                                        .isNotEmpty() && input !in userAddedLabelSet
-                                ) {
-                                    this + input.trim().capitalizeFirstChar()
-                                } else {
-                                    this
-                                }
-                            })
-                        }
-                    ) {
-                        Text(text = "  ${stringResource(R.string.ok)}  ", style = MaterialTheme.typography.labelLarge)
-                    }
-                }
+                )
             }
         }
     }

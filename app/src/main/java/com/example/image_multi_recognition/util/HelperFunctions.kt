@@ -1,11 +1,13 @@
 package com.example.image_multi_recognition.util
 
-import android.content.Context
-import android.net.Uri
-import android.provider.MediaStore
 import android.util.Log
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHostState
 import androidx.paging.PagingSource
 import androidx.paging.PagingState
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 // Assume the List<T> is ordered by ascendant, return -1 if no element is found
 // "element" is passed as the first parameter of "comparator()"
@@ -158,7 +160,8 @@ fun <T : Any> List<T>.toPagingSource(itemsPerPage: Int): PagingSource<Int, T> = 
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, T> {
         val position = params.key ?: 0
         return try {
-            val indexEnd = if(index + params.loadSize > this@toPagingSource.size) this@toPagingSource.size else index + params.loadSize
+            val indexEnd =
+                if (index + params.loadSize > this@toPagingSource.size) this@toPagingSource.size else index + params.loadSize
             LoadResult.Page(
                 data = this@toPagingSource.subList(index, indexEnd),
                 prevKey = if (position == 0) null else position - 1,
@@ -178,6 +181,17 @@ fun <T : Any> List<T>.toPagingSource(itemsPerPage: Int): PagingSource<Int, T> = 
         return state.anchorPosition?.let { anchorPosition ->
             state.closestPageToPosition(anchorPosition)?.prevKey?.plus(1)
                 ?: state.closestPageToPosition(anchorPosition)?.nextKey?.minus(1)
+        }
+    }
+}
+
+suspend fun showSnackBar(snackbarHostState: SnackbarHostState, message: String, delayTimeMillis: Long = 1000) {
+    coroutineScope {
+        launch {
+            snackbarHostState.showSnackbar(message, duration = SnackbarDuration.Indefinite)
+        }.apply {
+            delay(delayTimeMillis)
+            cancel()
         }
     }
 }

@@ -27,12 +27,13 @@ import java.io.IOException
     indices = [Index(value = ["album"])]
 )
 data class ImageInfo(
-    @PrimaryKey(autoGenerate = true) @ColumnInfo(name = "id") var id: Long = 0,
-    @ColumnInfo(name = "path") val path: String, // relative path
+    @PrimaryKey(autoGenerate = true) @ColumnInfo(name = "id") val id: Long = 0,
+    @ColumnInfo(name = "path") val path: String, // image file name
     @ColumnInfo(name = "album") val album: Long,  // directory, also used as album
     // @ColumnInfo(name = "labeled") var labeled: Boolean,
     // @ColumnInfo(name = "albumId") val albumId: Long,
     @ColumnInfo(name = "time_created") val timestamp: Long,
+    @ColumnInfo(name="favorite") val favorite: Boolean = false
     // cache thumbnail's path instead of thumbnail itself
     // https://developer.android.com/topic/performance/sqlite-performance-best-practices#store-small
     // @ColumnInfo(name = "cached_image", typeAffinity = ColumnInfo.BLOB) var cachedImage: ByteArray = ByteArray(0)

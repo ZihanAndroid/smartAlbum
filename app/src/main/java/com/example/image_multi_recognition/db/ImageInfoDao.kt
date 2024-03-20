@@ -18,51 +18,52 @@ interface ImageInfoDao : BaseDao<ImageInfo> {
 //    """)
 //    suspend fun setLabeled(id: Long, labeled: Boolean)
 
-    @Query(
-        """
+    @Query("""
         SELECT id, path
         FROM image_info
-        WHERE album=:album"""
-    )
+        WHERE album=:album
+    """)
     suspend fun getAllImageOfAlbum(album: Long): List<ImageIdPath>
 
-    @Query(
-        """
+    @Query("""
         DELETE FROM image_info
-        WHERE id in (:id)"""
-    )
-    suspend fun _deleteById(id: List<Long>)
+        WHERE id in (:idList)
+    """)
+    suspend fun _deleteById(idList: List<Long>)
 
-    suspend fun deleteById(vararg id: Long) {
-        val idList = id.toList()
+    suspend fun deleteById(idList: List<Long>) {
         var index = 0
-        while (index < id.size) {
+        while (index < idList.size) {
             val nextIndex =
-                if (index + DefaultConfiguration.DB_BATCH_SIZE > id.size) id.size else index + DefaultConfiguration.DB_BATCH_SIZE
+                if (index + DefaultConfiguration.DB_BATCH_SIZE > idList.size) idList.size else index + DefaultConfiguration.DB_BATCH_SIZE
             _deleteById(idList.subList(index, nextIndex))
             index = nextIndex
         }
     }
 
-    @Query(
-        """
+    @Query("""
+        SELECT * FROM image_info
+        WHERE id in (:id)
+    """)
+    suspend fun getImageInfoByIds(vararg id: Long): List<ImageInfo>
+
+
+    @Query("""
         SELECT * FROM image_info
         WHERE album=:album
-        ORDER BY time_created DESC"""
-    )
+        ORDER BY time_created DESC
+    """)
     fun getImageShowPagingSourceForAlbum(album: Long): PagingSource<Int, ImageInfo>
 
-    @Query(
-        """
-        SELECT i1.id, path, album, time_created 
+    @Query("""
+        SELECT i1.id, path, album, time_created, i1.favorite 
         FROM image_info i1 join image_labels i2 on i1.id=i2.id
         WHERE i2.label=:label
-        ORDER BY time_created DESC"""
-    )
+        ORDER BY time_created DESC
+    """)
     fun getImagePagingSourceByLabel(label: String): PagingSource<Int, ImageInfo>
 
-    @Query(
-        """
+    @Query("""
         SELECT i1.album as album_, i1.path as path_, i2.count as count_
         FROM image_info as i1 join (
             SELECT album, MAX(time_created) as latest_time, COUNT(album) as count
@@ -71,12 +72,28 @@ interface ImageInfoDao : BaseDao<ImageInfo> {
         ) as i2 on i1.album=i2.album and i1.time_created=i2.latest_time
         GROUP BY album_, count_
         HAVING path=MAX(path_)
-    """
-    )
+    """)
     fun getAlbumWithLatestImagePagingSource(): PagingSource<Int, AlbumWithLatestImage>
 
-    @Query(
-        """
+    @Query("""
+        WITH album_with_latest_image as(
+            SELECT i1.album as album_, i1.path as path_, i2.count as count_
+            FROM image_info as i1 join (
+                SELECT album, MAX(time_created) as latest_time, COUNT(album) as count
+                FROM image_info
+                GROUP BY album
+            ) as i2 on i1.album=i2.album and i1.time_created=i2.latest_time
+            GROUP BY album_, count_
+            HAVING path=MAX(path_)
+        )
+        SELECT a1.album_, a1.count_, a1.path_, a2.path as album_path
+        FROM album_with_latest_image as a1 join album_info as a2
+            on a1.album_ = a2.album
+        WHERE a1.album_!=:excludedAlbum
+    """)
+    suspend fun getAlbumInfoWithLatestImage(excludedAlbum: Long): List<AlbumInfoWithLatestImage>
+
+    @Query("""
         WITH joined_table AS (
             SELECT *
             FROM image_labels join image_info on image_labels.id=image_info.id
@@ -92,12 +109,10 @@ interface ImageInfoDao : BaseDao<ImageInfo> {
             ) as t2 on t1.label=t2.label and t1.time_created=t2.time_max
             GROUP by t1.label, t1.time_created
         ) as j2 on j1.label=j2.label and j1.time_created=j2.time_max and j1.id=j2.id_max
-    """
-    )
+    """)
     suspend fun getImagesByLabel(label: String): List<LabelWithLatestImage>
 
-    @Query(
-        """
+    @Query("""
         WITH unlabeled AS(
             SELECT * FROM image_info
             WHERE NOT EXISTS (
@@ -113,47 +128,65 @@ interface ImageInfoDao : BaseDao<ImageInfo> {
         ) as i2 on i1.album=i2.album and i1.time_created=i2.latest_time
         GROUP BY album_, count_
         HAVING path=MAX(path_)
-    """
-    )
+    """)
     fun getUnlabeledAlbumWithLatestImage(): PagingSource<Int, AlbumWithLatestImage>
 
-    @Query(
-        """
+    @Query("""
         SELECT * FROM image_info
         WHERE NOT EXISTS (
             SELECT * FROM image_labels 
             WHERE image_info.id = image_labels.id
         ) 
-    """
-    )
+    """)
     fun getAllUnlabeledImages(): Flow<List<ImageInfo>>
 
-    @Query(
-        """
-        SELECT * FROM image_info
-        WHERE NOT EXISTS (
-            SELECT * FROM image_labels 
-            WHERE image_info.id = image_labels.id
-        ) and album=:album
-    """
-    )
-    fun getAlbumUnlabeledPagingSource(album: Long): PagingSource<Int, ImageInfo>
-
-    @Query(
-        """
+    @Query("""
         SELECT * FROM image_info
         WHERE NOT EXISTS (
             SELECT * FROM image_labels 
             WHERE image_info.id = image_labels.id
         ) and album=:album
         ORDER BY time_created DESC
-    """
-    )
+    """)
+    fun getAlbumUnlabeledPagingSource(album: Long): PagingSource<Int, ImageInfo>
+
+    @Query("""
+        SELECT * FROM image_info
+        WHERE NOT EXISTS (
+            SELECT * FROM image_labels 
+            WHERE image_info.id = image_labels.id
+        ) and album=:album
+        ORDER BY time_created DESC
+    """)
     fun getUnlabeledImagesByAlbum(album: Long): Flow<List<ImageInfo>>
+
+    @Query("""
+        UPDATE image_info
+        SET favorite= NOT favorite
+        WHERE id in (:idList)
+    """)
+    suspend fun _changeImageInfoFavorite(idList: List<Long>)
+
+    suspend fun changeImageInfoFavorite(idList: List<Long>){
+        var index = 0
+        while (index < idList.size) {
+            val nextIndex =
+                if (index + DefaultConfiguration.DB_BATCH_SIZE > idList.size) idList.size else index + DefaultConfiguration.DB_BATCH_SIZE
+            _changeImageInfoFavorite(idList.subList(index, nextIndex))
+            index = nextIndex
+        }
+    }
 }
 
 data class AlbumWithLatestImage(
     @ColumnInfo("album_") val album: Long,
+    @ColumnInfo("path_") val path: String,  // path for image
+    @ColumnInfo("count_") val count: Int
+)
+
+data class AlbumInfoWithLatestImage(
+    @ColumnInfo("album_") val album: Long,
+    @ColumnInfo("album_path") val albumPath: String,
     @ColumnInfo("path_") val path: String,
     @ColumnInfo("count_") val count: Int
 )
@@ -168,18 +201,3 @@ data class ImageIdPath(
     @ColumnInfo("id") val id: Long,
     @ColumnInfo("path") val path: String
 )
-
-//data class ImageShow(
-//    @ColumnInfo("id") val id: Long,
-//    @ColumnInfo(name = "labeled") val labeled: Boolean,
-//    @ColumnInfo(name = "time_created") val timestamp: Long,
-//    @ColumnInfo("cached_image") val cachedImage: ByteArray
-//)
-
-//data class CachedImage(
-//    @ColumnInfo("id") val id: Long,
-//    @ColumnInfo(name = "cached_image", typeAffinity = ColumnInfo.BLOB) val cachedImage: ByteArray = ByteArray(0)
-//)
-
-
-

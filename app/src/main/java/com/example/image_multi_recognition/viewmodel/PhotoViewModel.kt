@@ -1,27 +1,27 @@
 package com.example.image_multi_recognition.viewmodel
 
+import android.app.PendingIntent
 import android.os.Environment
 import android.util.Log
-import androidx.core.graphics.drawable.toBitmap
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
-import androidx.paging.insertSeparators
-import androidx.paging.map
 import com.example.image_multi_recognition.db.AlbumInfo
+import com.example.image_multi_recognition.db.AlbumInfoWithLatestImage
 import com.example.image_multi_recognition.db.ImageInfo
 import com.example.image_multi_recognition.repository.ImageRepository
 import com.example.image_multi_recognition.util.*
 import com.example.image_multi_recognition.viewmodel.basic.ImagePagingFlowSupport
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import java.io.File
-import java.time.Instant
-import java.time.LocalDateTime
-import java.time.ZoneId
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import javax.inject.Inject
 
@@ -30,7 +30,10 @@ open class PhotoViewModel @Inject constructor(
     private val repository: ImageRepository,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel(), ImagePagingFlowSupport {
-    val backgroundThreadPool = Executors.newCachedThreadPool()
+    private val backgroundThreadPool: ExecutorService = Executors.newCachedThreadPool()
+
+    // you should set pagingSourceChanged to "true" before you modify the DB tables that may affect the PagingFlow
+    override val imageIdOriginalIndexMap: MutableMap<Long, Int> = mutableMapOf()
 
     // photoDir should come from DataStore
     // val albums: List<String> = listOf(Environment.DIRECTORY_PICTURES)
@@ -242,4 +245,162 @@ open class PhotoViewModel @Inject constructor(
         super.onCleared()
         backgroundThreadPool.shutdownNow()
     }
+
+    // icons' operations
+    private val _deleteImagesStateFlow = MutableStateFlow<Boolean>(false)
+    val deleteImageStateFlow: StateFlow<Boolean>
+        get() = _deleteImagesStateFlow
+
+    private val _copyImagesStateFlow = MutableStateFlow<Boolean>(false)
+    val copyImageStateFlow: StateFlow<Boolean>
+        get() = _copyImagesStateFlow
+
+    private val _moveImagesStateFlow = MutableStateFlow<Boolean>(false)
+    val moveImageStateFlow: StateFlow<Boolean>
+        get() = _moveImagesStateFlow
+
+    private val _renameImagesStateFlow = MutableStateFlow<Boolean>(false)
+    val renameImageStateFlow: StateFlow<Boolean>
+        get() = _renameImagesStateFlow
+
+    private val _addFavoriteImagesStateFlow = MutableStateFlow<Boolean>(false)
+    val addFavoriteImageStateFlow: StateFlow<Boolean>
+        get() = _addFavoriteImagesStateFlow
+
+    fun resetDeleteImagesState() {
+        _deleteImagesStateFlow.value = false
+    }
+
+    fun resetMoveImagesState() {
+        _moveImagesStateFlow.value = false
+    }
+
+    private val _deletionPendingIntentFlow = MutableStateFlow<PendingIntent?>(null)
+    val deletionPendingIntentFlow
+        get() = _deletionPendingIntentFlow
+
+    private val _movePendingIntentFlow = MutableStateFlow<StorageHelper.MediaModifyRequest?>(null)
+    val movePendingIntentFlow
+        get() = _movePendingIntentFlow
+
+    lateinit var imageMoveRequest: ImageMoveRequest
+
+    // step1 for deleting images, ask user permission
+    fun requestImagesDeletion(imageIdList: List<Long>, onRequestFail: suspend () -> Unit) {
+        _deleteImagesStateFlow.value = true
+        viewModelScope.launch {
+            val imageInfoList = repository.getImageInfoById(imageIdList)
+            repository.getDeleteImagesRequest(imageInfoList).let { pendingIntent ->
+                if (pendingIntent == null) {
+                    Log.e(getCallSiteInfoFunc(), "PendingIntent is null!")
+                    _deleteImagesStateFlow.value = false
+                    onRequestFail()
+                } else {
+                    _deletionPendingIntentFlow.value = pendingIntent
+                }
+            }
+        }
+    }
+
+    // step2 for deleting images
+    fun deleteImages(imageIdList: List<Long>, onComplete: suspend () -> Unit) {
+        viewModelScope.launch {
+            repository.deleteImagesById(imageIdList)
+            _deleteImagesStateFlow.value = false
+            onComplete()
+        }
+    }
+
+    // step1 for moving images, ask user permission
+    fun requestImagesMove(imageIdList: List<Long>, newAlbum: AlbumInfo, isAlbumNew: Boolean, onRequestFail: suspend () -> Unit) {
+        _moveImagesStateFlow.value = true
+        viewModelScope.launch {
+            val imageInfoList = repository.getImageInfoById(imageIdList)
+            repository.getMoveImageRequest(imageInfoList).let { mediaModifyRequest ->
+                if (mediaModifyRequest.pendingIntent == null) {
+                    Log.e(getCallSiteInfoFunc(), "PendingIntent is null!")
+                    _deleteImagesStateFlow.value = false
+                    onRequestFail()
+                } else {
+                    // cache parameters for the following moveImagesTo() call
+                    imageMoveRequest = ImageMoveRequest(newAlbum, isAlbumNew, mediaModifyRequest, imageInfoList)
+                    _movePendingIntentFlow.value = mediaModifyRequest
+                }
+            }
+        }
+    }
+
+    // step2 for moving images
+    // onComplete: accept a list of absolute paths for failed copy
+    fun moveImagesTo(onComplete: suspend (List<String>) -> Unit) {
+        viewModelScope.launch {
+            // copy images
+            val failedItems = repository.copyImageTo(
+                newAlbum = imageMoveRequest.newAlbum,
+                items = imageMoveRequest.request.mediaStoreItems,
+            )
+            // delete original images, since we have called "MediaStore.createWriteRequest()",
+            // we do not need to request permission here
+            if(failedItems.size != imageMoveRequest.request.mediaStoreItems.size) {
+                repository.deleteImageFiles(imageMoveRequest.request.mediaStoreItems.map { it.contentUri }
+                        - failedItems.map { it.contentUri }.toSet())
+                // modify album info in the database
+                if(imageMoveRequest.isAlbumNew){
+                    repository.insertAlbumInfo(imageMoveRequest.newAlbum)
+                }
+                repository.updateImageInfo(
+                    *imageMoveRequest.imageInfoList.map { it.copy(album = imageMoveRequest.newAlbum.album) }
+                        .toTypedArray()
+                )
+            }
+            _moveImagesStateFlow.value = false
+            onComplete(failedItems.map { it.absolutePath })
+        }
+    }
+
+    fun copyImagesTo(newAlbum: AlbumInfo, imageIdList: List<Long>) {
+        viewModelScope.launch {
+            _copyImagesStateFlow.value = true
+            delay(5000)
+            _copyImagesStateFlow.value = false
+        }
+    }
+
+    fun renameImage(imageId: Long) {
+        // change file name and modify path
+        viewModelScope.launch {
+            _renameImagesStateFlow.value = true
+            delay(5000)
+            _renameImagesStateFlow.value = false
+        }
+    }
+
+    fun changeFavoriteImages(imageIdList: List<Long>) {
+        viewModelScope.launch {
+            _addFavoriteImagesStateFlow.value = true
+            repository.changeImageInfoFavorite(imageIdList)
+            _addFavoriteImagesStateFlow.value = false
+        }
+    }
+
+    fun shareImages(imageIdList: List<Long>) {
+        Log.d(getCallSiteInfo(), "shareImages() is called")
+    }
+
+    val _albumListStateFlow: MutableStateFlow<List<AlbumInfoWithLatestImage>> = MutableStateFlow(emptyList())
+    val albumListStateFlow: StateFlow<List<AlbumInfoWithLatestImage>>
+        get() = _albumListStateFlow
+
+    fun setAlbumListStateFlow(excludedAlbum: Long) {
+        viewModelScope.launch {
+            _albumListStateFlow.value = repository.getAlbumInfoWithLatestImage(excludedAlbum)
+        }
+    }
+
+    data class ImageMoveRequest(
+        val newAlbum: AlbumInfo,
+        val isAlbumNew: Boolean,
+        val request: StorageHelper.MediaModifyRequest,
+        val imageInfoList: List<ImageInfo>
+    )
 }

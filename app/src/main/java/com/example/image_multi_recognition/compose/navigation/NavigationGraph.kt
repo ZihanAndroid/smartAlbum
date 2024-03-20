@@ -20,7 +20,8 @@ fun NavigationGraph(
     // Note the hiltViewModel() here does not within any destination,
     // it can be seen as the global ViewModel for the app which has the same lifecycle as the Activity does
     photoViewModel: PhotoViewModel,
-    rootSnackBarHostState: SnackbarHostState? = null
+    rootSnackBarHostState: SnackbarHostState,
+    onTopBottomBarHidden: (Boolean)->Unit
 ) {
     NavHost(
         modifier = modifier,
@@ -30,19 +31,24 @@ fun NavigationGraph(
         composable(
             route = Destination.PHOTO.navRoute,
         ) {
-            PhotoComposable(viewModel = photoViewModel) { album, originalIndex ->
-                // set argument "label" to empty whitespace String
-                "${Destination.SINGLE_IMAGE.route}/1/${album}/$originalIndex".let { route ->
-                    Log.d(getCallSiteInfoFunc(), "Navigation route: $route")
-                    navController.navigate(route) {
+            PhotoComposable(
+                viewModel = photoViewModel,
+                onImageClick = { album, originalIndex ->
+                    // set argument "label" to empty whitespace String
+                    "${Destination.SINGLE_IMAGE.route}/1/${album}/$originalIndex".let { route ->
+                        Log.d(getCallSiteInfoFunc(), "Navigation route: $route")
+                        navController.navigate(route) {
 //                        launchSingleTop = true
 //                        popUpTo(navController.graph.findStartDestination().id) {
 //                            saveState = true
 //                        }
 //                        restoreState = true
+                        }
                     }
-                }
-            }
+                },
+                onTopBottomBarHidden = onTopBottomBarHidden,
+                rootSnackBarHostState = rootSnackBarHostState
+            )
         }
         composable(
             route = Destination.ALBUM.navRoute,
@@ -72,7 +78,7 @@ fun NavigationGraph(
         ) {
             LabelingComposable(
                 viewModel = hiltViewModel(),
-                rootSnackBarHostState = rootSnackBarHostState!!
+                rootSnackBarHostState = rootSnackBarHostState
             ) { albumId ->
                 "${Destination.ALBUM_PHOTO_LABELING}/${albumId}".let { route ->
                     navController.navigate(route) {
@@ -98,7 +104,7 @@ fun NavigationGraph(
             arguments = Destination.ALBUM_PHOTO.arguments
         ) {
             // set all the parameters related to navigation in NavigationGraph
-            AlbumPhotoComposable(
+            PhotoComposable(
                 viewModel = hiltViewModel(),
                 onBack = {
                     navController.popBackStack()
@@ -106,14 +112,15 @@ fun NavigationGraph(
                 onImageClick = { album, originalIndex ->
                     "${Destination.SINGLE_IMAGE.route}/1/${album}/$originalIndex".let { route ->
                         navController.navigate(route) {
-                            launchSingleTop = true
-                            popUpTo(navController.graph.findStartDestination().id) {
-                                saveState = true
-                            }
-                            restoreState = true
+//                            launchSingleTop = true
+//                            popUpTo(navController.graph.findStartDestination().id) {
+//                                saveState = true
+//                            }
+//                            restoreState = true
                         }
                     }
-                }
+                },
+                customTopBar = true
             )
         }
         composable(

@@ -33,7 +33,7 @@ fun LabelPhotoComposable(
     val coroutineScope = rememberCoroutineScope()
     val pagingItems = viewModel.pagingFlow.collectAsLazyPagingItems()
 
-    val selectedImageIdSet = remember { MutableSetWithState<Long>() }
+    val selectedImageInfoSet = remember { MutableSetWithState<Long>() }
     var selectionMode by rememberSaveable { mutableStateOf(false) }
     val labelRemoving by viewModel.labelRemoving.collectAsStateWithLifecycle()
 
@@ -59,8 +59,8 @@ fun LabelPhotoComposable(
                 title = if (!selectionMode) {
                     viewModel.label
                 } else {
-                    selectedImageIdSet.version.value    // read State for recomposition when selectedImageIdSet is changed
-                    stringResource(R.string.removing, selectedImageIdSet.size)
+                    selectedImageInfoSet.version.value    // read State for recomposition when selectedImageIdSet is changed
+                    stringResource(R.string.removing, selectedImageInfoSet.size)
                 },
                 onBack = onBack,
                 actions = {
@@ -68,12 +68,12 @@ fun LabelPhotoComposable(
                     if (selectionMode) {
                         IconButton(
                             onClick = {
-                                if (selectedImageIdSet.isNotEmpty()) {
-                                    selectedImageIdSet.toList().apply {
+                                if (selectedImageInfoSet.isNotEmpty()) {
+                                    selectedImageInfoSet.map { it }.apply {
                                         deletedImageIds.addAll(this)
-                                        viewModel.removeLabels(this){
+                                        viewModel.removeLabels(this) {
                                             // clear the selectedImageIdSet immediately after the deletion is completed
-                                            selectedImageIdSet.clear()
+                                            selectedImageInfoSet.clear()
                                         }
                                     }
                                 }
@@ -87,7 +87,7 @@ fun LabelPhotoComposable(
                         }
                         IconButton(
                             onClick = {
-                                selectedImageIdSet.clear()
+                                selectedImageInfoSet.clear()
                                 selectionMode = false
                             }
                         ) {
@@ -100,7 +100,7 @@ fun LabelPhotoComposable(
                         IconButton(
                             onClick = {
                                 if (labelRemoving == null || labelRemoving == false) {
-                                    selectedImageIdSet.clear()
+                                    selectedImageInfoSet.clear()
                                     selectionMode = true
                                 } else if (labelRemoving == true) {
                                     coroutineScope.launch {
@@ -128,25 +128,25 @@ fun LabelPhotoComposable(
             },
             onSendThumbnailRequest = viewModel::requestThumbnail,
             selectionMode = selectionMode,
-            onSelect = {
-                if (selectedImageIdSet.contains(it)) {
-                    selectedImageIdSet -= it
+            onClickSelect = {
+                if (selectedImageInfoSet.contains(it)) {
+                    selectedImageInfoSet -= it
                 } else {
-                    selectedImageIdSet += it
+                    selectedImageInfoSet += it
                 }
             },
             onLongPress = { imageId ->
                 if (!selectionMode && labelRemoving != true) selectionMode = true
-                if(labelRemoving != true) {
-                    if (imageId !in selectedImageIdSet) {
-                        selectedImageIdSet.add(imageId)
+                if (labelRemoving != true) {
+                    if (imageId !in selectedImageInfoSet) {
+                        selectedImageInfoSet.add(imageId)
                     } else {
-                        selectedImageIdSet.remove(imageId)
+                        selectedImageInfoSet.remove(imageId)
                     }
                 }
             },
             enableLongPressAndDrag = true,
-            selectedImageIdSet = selectedImageIdSet,
+            selectedImageIdSet = selectedImageInfoSet,
             deletedImageIds = deletedImageIds
         )
     }

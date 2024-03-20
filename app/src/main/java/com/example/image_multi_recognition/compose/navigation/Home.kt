@@ -44,6 +44,8 @@ fun Home(
     val currentBackStack by navController.currentBackStackEntryAsState()
     val currentDestination = currentBackStack?.destination
     Log.d(getCallSiteInfoFunc(), "current destination: ${currentDestination?.route?.split("/")?.get(0)}")
+    // the child destination may want to hide the top and bottom bar
+    var topBottomBarHidden by rememberSaveable{ mutableStateOf(false) }
 
     // for Root destination, use Scaffold,
     // for non-root destination, avoid showing topBar and bottomBar here, (they are parts of destination composable, not part of Scaffold)
@@ -52,20 +54,24 @@ fun Home(
             snackbarHost = { SnackbarHost(snackBarHostState) },
             topBar = {
                 // show different topBar based on current destination
-                ScaffoldTopBar(
-                    destination = currentDestination,
-                    popUpItems = listOf(stringResource(R.string.NavPopUpItem_NotDone)),
-                    onPopUpItemClick = listOf(
-                        { contentShownBySnackBar = it }
+                if(!topBottomBarHidden) {
+                    ScaffoldTopBar(
+                        destination = currentDestination,
+                        popUpItems = listOf(stringResource(R.string.NavPopUpItem_NotDone)),
+                        onPopUpItemClick = listOf(
+                            { contentShownBySnackBar = it }
+                        )
                     )
-                )
+                }
             },
             bottomBar = {
-                ScaffoldBottomBar(
-                    navController = navController,
-                    items = Destination.entries.filter { it.isRootDestination },
-                    currentDestination = currentDestination
-                )
+                if(!topBottomBarHidden) {
+                    ScaffoldBottomBar(
+                        navController = navController,
+                        items = Destination.entries.filter { it.isRootDestination },
+                        currentDestination = currentDestination
+                    )
+                }
             },
             modifier = modifier
         ) { suggestedPadding ->
@@ -73,13 +79,16 @@ fun Home(
                 navController = navController,
                 modifier = Modifier.padding(suggestedPadding),
                 photoViewModel = photoViewModel,
-                rootSnackBarHostState = snackBarHostState
+                rootSnackBarHostState = snackBarHostState,
+                onTopBottomBarHidden = {topBottomBarHidden = it}
             )
         }
     } else {
         NavigationGraph(
             navController = navController,
-            photoViewModel = photoViewModel
+            photoViewModel = photoViewModel,
+            onTopBottomBarHidden = {topBottomBarHidden = it},
+            rootSnackBarHostState = snackBarHostState
         )
     }
 
@@ -105,7 +114,7 @@ fun ScaffoldTopBar(
         title = {
             Text(
                 text = stringResource(R.string.app_name),
-                style = MaterialTheme.typography.titleMedium.copy(fontSize = 20.sp),
+                style = MaterialTheme.typography.titleMedium,
             )
         },
         actions = {

@@ -22,6 +22,7 @@ class LabelPhotoViewModel @Inject constructor(
 ) : ViewModel(), ImagePagingFlowSupport {
     val label = savedStateHandle.get<String>("label") ?: ""
     val pagingFlow = repository.getImagePagingFlowByLabel(label).convertImageInfoPagingFlow().cachedIn(viewModelScope)
+    override val imageIdOriginalIndexMap: MutableMap<Long, Int> = mutableMapOf()
 
     private var _labelRemoving: MutableStateFlow<Boolean?> = MutableStateFlow(null)
     val labelRemoving: StateFlow<Boolean?>

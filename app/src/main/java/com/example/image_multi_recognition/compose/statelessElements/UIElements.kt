@@ -1,9 +1,9 @@
 package com.example.image_multi_recognition.compose.statelessElements
 
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.size
+import android.graphics.Paint.Align
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Done
@@ -13,13 +13,21 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.colorResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.constraintlayout.compose.ConstraintLayout
+import coil.compose.AsyncImage
 import com.example.image_multi_recognition.R
-import com.example.image_multi_recognition.util.AlbumPathDecoder
+import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -89,11 +97,7 @@ fun ElevatedSmallIconButton(
     contentDescription: String,
     onClick: () -> Unit, // return false if reaching the maximum number of allowed labels
     modifier: Modifier = Modifier,
-    maximumCount: Int = 2,
 ) {
-    //var addedLabel = rememberSaveable { 0 }
-    // (if (++addedLabel > maximumCount) false else true)
-
     ElevatedButton(
         modifier = modifier.crop(vertical = 4.dp).heightIn(24.dp),
         // crop the padding set by minHeight(32.dp) inside SelectableChip() call of ElevatedFilterChip
@@ -119,13 +123,6 @@ fun TopAppBarForNotRootDestination(
     TopAppBar(
         title = {
             Text(
-//                text = AlbumPathDecoder.decodeAlbumName(viewModel.currentAlbum).let { albumName ->
-//                    if(albumName.length > 30){
-//                        albumName.substring(0, 30) + "..."
-//                    }else{
-//                        albumName
-//                    }
-//                },
                 text = if (title.length > 30) {
                     title.substring(0, 30) + "..."
                 } else {
@@ -143,4 +140,48 @@ fun TopAppBarForNotRootDestination(
         },
         actions = actions
     )
+}
+
+@Composable
+fun ImageItemRow(
+    modifier: Modifier = Modifier,
+    albumName: String,
+    imageCount: Int,
+    albumAbsolutePath: String,
+    imageFilePath: String,
+    onClick: () -> Unit
+) {
+    val imageSize = (LocalConfiguration.current.screenWidthDp / 5).dp
+    Row(
+        modifier = modifier.fillMaxWidth().clickable { onClick() }
+    ) {
+        AsyncImage(
+            model = File(imageFilePath),
+            contentDescription = "albumImage_$albumName",
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.size(imageSize + 8.dp).padding(8.dp)
+                .clip(RoundedCornerShape(8.dp))
+        )
+        Column(
+            modifier = Modifier.height(imageSize + 8.dp),
+            verticalArrangement = Arrangement.SpaceEvenly
+        ) {
+            Text(
+                text = if (albumName.length > 30) albumName.substring(0, 30) + "..." else albumName,
+                style = MaterialTheme.typography.titleSmall,
+            )
+            Text(
+                text = "$imageCount ${stringResource(R.string.images)}",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.secondary
+            )
+            Text(
+                text = if (albumAbsolutePath.length > 40) {
+                    albumAbsolutePath.substring(0, 40) + "..."
+                } else albumAbsolutePath,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.secondary
+            )
+        }
+    }
 }

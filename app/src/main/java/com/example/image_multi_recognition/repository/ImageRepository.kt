@@ -1,6 +1,8 @@
 package com.example.image_multi_recognition.repository
 
+import android.app.PendingIntent
 import android.content.Context
+import android.net.Uri
 import android.provider.MediaStore
 import android.util.Log
 import androidx.core.graphics.drawable.toBitmap
@@ -15,16 +17,15 @@ import coil.request.ImageRequest
 import com.example.image_multi_recognition.AppData
 import com.example.image_multi_recognition.DefaultConfiguration
 import com.example.image_multi_recognition.db.*
-import com.example.image_multi_recognition.util.AlbumPathDecoder
-import com.example.image_multi_recognition.util.ExifHelper
-import com.example.image_multi_recognition.util.MediaDirectoryFetcher
-import com.example.image_multi_recognition.util.getCallSiteInfo
+import com.example.image_multi_recognition.util.*
 import com.google.mlkit.vision.common.InputImage
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
 import java.sql.Timestamp
@@ -129,7 +130,7 @@ class ImageRepository @Inject constructor(
         //cachedImages: List<ByteArray>,
         album: Long
     ): List<ImageInfo> = database.withTransaction {
-        imageInfoDao.deleteById(*deletedIds.toLongArray())
+        imageInfoDao.deleteById(deletedIds)
         val addedImageInfo = addedFilePaths.map { file ->
             ImageInfo(
                 album = album,
@@ -144,10 +145,18 @@ class ImageRepository @Inject constructor(
             )
         }
         // set auto-increment id
-        imageInfoDao.insert(*addedImageInfo.toTypedArray()).forEachIndexed { index, id ->
-            addedImageInfo[index].id = id
+        val ids = imageInfoDao.insert(*addedImageInfo.toTypedArray())
+        if (ids.size == addedImageInfo.size) {
+            addedImageInfo.mapIndexed { index, oldImageInfo ->
+                oldImageInfo.copy(id = ids[index])
+            }
+        } else {
+            Log.e(
+                getCallSiteInfo(),
+                "Image insertion failed!\nreturned ids: ${ids.joinToString()}\nImageInfo to add: ${addedImageInfo.joinToString()}"
+            )
+            emptyList()
         }
-        addedImageInfo
     }
 
     suspend fun insertImageInfo(vararg imageInfo: ImageInfo) {
@@ -158,6 +167,13 @@ class ImageRepository @Inject constructor(
         imageInfoDao.update(*imageInfo)
     }
 
+    suspend fun changeImageInfoFavorite(idList: List<Long>) {
+        imageInfoDao.changeImageInfoFavorite(idList)
+    }
+
+    suspend fun insertAlbumInfo(vararg albumInfo: AlbumInfo) {
+        albumInfoDao.insert(*albumInfo)
+    }
     suspend fun getAlbumByPath(path: String): Long? = albumInfoDao.getAlbumByPath(path)
 
     suspend fun getAllOrderedLabelList(): List<LabelInfo> = imageLabelDao.getAllOrderedLabels()
@@ -246,6 +262,8 @@ class ImageRepository @Inject constructor(
     // add "%" for fuzzy search
     suspend fun getImagesByLabel(label: String) = imageInfoDao.getImagesByLabel("$label%")
 
+    suspend fun getImageInfoById(ids: List<Long>) = imageInfoDao.getImageInfoByIds(*ids.toLongArray())
+
     fun getUnlabeledAlbumPagerFlow(): Flow<PagingData<AlbumWithLatestImage>> = Pager(
         config = PagingConfig(
             pageSize = DefaultConfiguration.PAGE_SIZE,
@@ -259,11 +277,60 @@ class ImageRepository @Inject constructor(
     fun getUnlabeledImagesByAlbum(album: Long): Flow<List<ImageInfo>> =
         imageInfoDao.getUnlabeledImagesByAlbum(album).distinctUntilChanged()
 
-    suspend fun insertImageLabels(imageLabels: List<ImageLabel>){
+    suspend fun insertImageLabels(imageLabels: List<ImageLabel>) {
         imageLabelDao.insert(*imageLabels.toTypedArray())
     }
 
-    suspend fun removeImageLabelsByLabel(label: String, imageIds: List<Long>){
+    suspend fun removeImageLabelsByLabel(label: String, imageIds: List<Long>) {
         imageLabelDao.deleteByLabelAndIdList(label, *imageIds.toLongArray())
+    }
+
+    suspend fun deleteImagesById(imageIds: List<Long>) {
+        imageInfoDao.deleteById(imageIds)
+    }
+
+    suspend fun getAlbumInfoWithLatestImage(excludedAlbum: Long): List<AlbumInfoWithLatestImage> {
+        return imageInfoDao.getAlbumInfoWithLatestImage(excludedAlbum).sortedBy { File(it.albumPath).name }
+    }
+
+    suspend fun getDeleteImagesRequest(imageInfoList: List<ImageInfo>): PendingIntent? {
+        return with(StorageHelper) {
+            context.requestImageFileDeletion(imageInfoList.map { it.fullImageFile.absolutePath })
+        }
+    }
+
+    suspend fun getMoveImageRequest(imageInfoList: List<ImageInfo>): StorageHelper.MediaModifyRequest {
+        return with(StorageHelper) {
+            context.requestImageFileModification(imageInfoList.map { it.fullImageFile.absolutePath })
+        }
+    }
+
+    // return a list indicate the images failed to copy, if all the copy succeeds, then the list is empty
+    suspend fun copyImageTo(
+        newAlbum: AlbumInfo,
+        items: List<StorageHelper.MediaStoreItem>
+    ): List<StorageHelper.MediaStoreItem> {
+        val failedItems = mutableListOf<StorageHelper.MediaStoreItem>()
+        with(StorageHelper) {
+            items.forEach { item ->
+                if (!context.copyImageToSharedStorage(
+                        newImage = File(newAlbum.path, File(item.absolutePath).name),
+                        imageMimeType = item.mimeType,
+                        fileFrom = File(item.absolutePath)
+                    )
+                ) {
+                    failedItems.add(item)
+                }
+            }
+        }
+        return failedItems
+    }
+
+    suspend fun deleteImageFiles(contentUris: List<Uri>) {
+        withContext(Dispatchers.IO) {
+            contentUris.forEach { uri ->
+                context.contentResolver.delete(uri, null)
+            }
+        }
     }
 }

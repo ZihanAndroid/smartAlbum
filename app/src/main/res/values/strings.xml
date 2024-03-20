@@ -33,4 +33,19 @@
     <string name="label_removed">Label removed!</string>
     <string name="label_added">Label added!</string>
     <string name="removing">Removing (%d selected)</string>
+    <string name="selected_count">%d selected</string>
+    <string name="move_to">Move to</string>
+    <string name="copy_to">Copy to</string>
+    <string name="rename">Rename</string>
+    <string name="operation_done">Operation Done!</string>
+    <string name="choose_album">Choose or Add an Album</string>
+    <string name="new_album">New Album</string>
+    <string name="album_name_exist">Album Name Exists</string>
+    <string name="album_name_empty">Album Name Empty</string>
+    <string name="album_name">Album Name</string>
+    <string name="images">images</string>
+    <string name="deletion_success">Deleted</string>
+    <string name="deletion_fail">Failed to delete</string>
+    <string name="move_success">Image moved</string>
+    <string name="move_fail">Failed to move images</string>
 </resources>
