@@ -23,7 +23,7 @@ sealed class UiModel {
 
     data class Item(
         val imageInfo: ImageInfo,
-        val originalIndex: Int,
+        // val originalIndex: Int,
     ) : UiModel()
 }
 

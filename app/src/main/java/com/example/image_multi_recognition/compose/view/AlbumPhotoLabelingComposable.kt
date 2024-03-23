@@ -1,6 +1,5 @@
 package com.example.image_multi_recognition.compose.view
 
-import android.util.Log
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,7 +18,6 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import com.example.image_multi_recognition.R
 import com.example.image_multi_recognition.compose.statelessElements.ImagePagerView
 import com.example.image_multi_recognition.compose.statelessElements.TopAppBarForNotRootDestination
-import com.example.image_multi_recognition.util.getCallSiteInfo
 import com.example.image_multi_recognition.viewmodel.AlbumPhotoLabelingViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -127,20 +125,6 @@ fun AlbumPhotoLabelingComposable(
                             imageSelectedStateHolderParam = imageSelectedStateHolder,
                             labelSelectedStateHolderParam = labelSelectedStateHolder
                         )
-//                        if(labelAdding) {
-//                            Box(
-//                                modifier = Modifier.fillMaxSize().background(colorResource(R.color.greyAlpha).copy(alpha = 0.3f)),
-//                                contentAlignment = Alignment.Center
-//                            ){
-//                                Row {
-//                                    CircularProgressIndicator()
-//                                    Text(
-//                                        text = "${stringResource(R.string.adding_image_labels)}...",
-//                                        style = MaterialTheme.typography.labelLarge
-//                                    )
-//                                }
-//                            }
-//                        }
                     }
 
                 } else {
@@ -164,8 +148,8 @@ fun AlbumPhotoLabelingComposable(
                 ImagePagerView(
                     modifier = modifier,
                     pagingItems = pagingItems,
-                    onImageClick = { originalIndex ->
-                        onImageClick(viewModel.album, originalIndex)
+                    onImageClick = { imageInfoId ->
+                        onImageClick(viewModel.album, viewModel.getValidOriginalIndexAfterDeletion(imageInfoId, emptySet()))
                     },
                     onSendThumbnailRequest = viewModel::requestThumbnail
                 )

@@ -2,6 +2,7 @@ package com.example.image_multi_recognition.util
 
 import android.app.PendingIntent
 import android.content.ContentUris
+import android.content.ContentValues
 import android.content.Context
 import android.media.MediaScannerConnection
 import android.net.Uri
@@ -21,7 +22,7 @@ object ScopedThumbNailStorage {
     lateinit var imageStorage: File
     const val dirName = ".thumbnailsOfApp"
 
-    //https://developer.android.com/training/data-storage/app-specific#external-verify-availability
+    // https://developer.android.com/training/data-storage/app-specific#external-verify-availability
     private fun isExternalStorageWritable(): Boolean {
         return Environment.getExternalStorageState() == Environment.MEDIA_MOUNTED
     }
@@ -91,11 +92,20 @@ object StorageHelper {
     }
 
     // imageMimeType: like "image/jpeg“
-    suspend fun Context.copyImageToSharedStorage(newImage: File, imageMimeType: String, fileFrom: File): Boolean {
+    suspend fun Context.copyImageToSharedStorage(
+        newImage: File,
+        imageMimeType: String,
+        fileFrom: File
+    ): ImageCopyError {
         // val type = Environment.DIRECTORY_PICTURES
         // shared storage root for a certain media type
         // val target = Environment.getExternalStoragePublicDirectory(type)
         // copy content into shared storage
+        // check filename, if filenames are the same, we do not override the orignial file
+        if (newImage.exists()) {
+            Log.w(getCallSiteInfo(), "Same file name: ${fileFrom.name}, copy aborted!")
+            return ImageCopyError.SAME_FILE_NAME
+        }
         return withContext(Dispatchers.IO) {
             try {
                 newImage.outputStream().use { outputStream ->
@@ -111,10 +121,11 @@ object StorageHelper {
                 ) { path, uri ->
                     Log.d(getCallSiteInfoFunc(), "newImage created in shared storage: $path || $uri")
                 }
-                true
-            }catch(e: Throwable){
+                ImageCopyError.NO_ERROR
+            } catch (e: Throwable) {
+                newImage.delete()
                 Log.e(getCallSiteInfo(), e.stackTraceToString())
-                false
+                ImageCopyError.IO_ERROR
             }
         }
     }
@@ -161,7 +172,7 @@ object StorageHelper {
 
     // Note you cannot just use File.toUri() for MediaStore access, because such uri does not have the corresponding permissions in MediaStore
     // To avoid such problem, use content uri instead of file uri
-    private suspend fun Context.getContentUriForImageFile(fileAbsolutePathList: List<String>): List<MediaStoreItem> {
+    suspend fun Context.getContentUriForImageFile(fileAbsolutePathList: List<String>): List<MediaStoreItem> {
         // search _ID(content uri) by DATA(file uri) by MediaStore
         val mediaStoreItems: MutableList<MediaStoreItem> = mutableListOf()
         val collection = MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
@@ -172,7 +183,7 @@ object StorageHelper {
         )
         val selection =
             "${MediaStore.Images.Media.DATA} in (${fileAbsolutePathList.joinToString(separator = ",") { "'$it'" }})"
-        //val selectionArgs = arrayOf()
+        // val selectionArgs = arrayOf()
         // val sortOrder = "${MediaStore.Images.Media.DATA} ASC"
 
         withContext(Dispatchers.IO) {
@@ -191,6 +202,49 @@ object StorageHelper {
             }
         }
         return mediaStoreItems
+    }
+
+    // return a map for absolutePath: mimeType
+    suspend fun Context.getMimeTypeForImageFile(fileAbsolutePathList: List<String>): Map<String, String> {
+        val resMap: MutableMap<String, String> = mutableMapOf()
+        val collection = MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
+        val projection = arrayOf(
+            MediaStore.Images.Media.DATA,
+            MediaStore.Images.Media.MIME_TYPE
+        )
+        val selection =
+            "${MediaStore.Images.Media.DATA} in (${fileAbsolutePathList.joinToString(separator = ",") { "'$it'" }})"
+
+        withContext(Dispatchers.IO) {
+            contentResolver.query(collection, projection, selection, null, null)?.use { cursor ->
+                val dataColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA)
+                val mimeColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.MIME_TYPE)
+                while (cursor.moveToNext()) {
+                    val data = cursor.getString(dataColumn)
+                    // https://developer.android.com/training/data-storage/shared/media#query-collection
+                    val mimeType: String = cursor.getString(mimeColumn)
+                    resMap[data] = mimeType
+                }
+            }
+        }
+        return resMap
+    }
+
+    // you should call `requestImageFileModification()` to gain user's permission before calling this method
+    suspend fun Context.updateImageFileName(absolutePath: String, newFileName: String): Boolean {
+        // get original contentUri
+        val collection = getContentUriForImageFile(listOf(absolutePath))
+        if (collection.isEmpty()) return false
+        // https://developer.android.com/training/data-storage/shared/media#update-item
+        val updatedValues = ContentValues().apply {
+            put(MediaStore.Images.Media.DISPLAY_NAME, newFileName)
+        }
+        // update the DISPLAY_NAME causes changes to the file name, you do not need to call File.renameTo(newFileName)
+        return withContext(Dispatchers.IO) {
+            val affectedRow = contentResolver.update(collection[0].contentUri, updatedValues, null, null)
+            Log.d(getCallSiteInfo(), "affected rows: $affectedRow")
+            affectedRow == 1
+        }
     }
 
     // if PendingIntent is null, it means somehow some images cannot be deleted
@@ -220,7 +274,6 @@ object StorageHelper {
             pendingIntent = if (mediaStoreItems.size == imagePathList.size) getImagesWriteRequest(mediaStoreItems.map { it.contentUri }) else null,
             mediaStoreItems = mediaStoreItems
         )
-
     }
 
     data class MediaModifyRequest(
@@ -233,5 +286,8 @@ object StorageHelper {
         val contentUri: Uri,
         val mimeType: String
     )
-}
 
+    enum class ImageCopyError {
+        NO_ERROR, SAME_FILE_NAME, IO_ERROR
+    }
+}

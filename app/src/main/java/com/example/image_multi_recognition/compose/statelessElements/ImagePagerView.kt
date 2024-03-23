@@ -36,6 +36,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.paging.compose.LazyPagingItems
 import coil.compose.AsyncImage
 import com.example.image_multi_recognition.DefaultConfiguration
@@ -50,7 +51,7 @@ import java.io.File
 @Composable
 fun ImagePagerView(
     pagingItems: LazyPagingItems<UiModel>,
-    onImageClick: (Int) -> Unit,  // user wants to view a selected image
+    onImageClick: (Long) -> Unit,  // user wants to view a selected image
     modifier: Modifier = Modifier,
     onSendThumbnailRequest: (File, ImageInfo) -> Unit,
     selectionMode: Boolean = false,
@@ -203,7 +204,7 @@ fun ImagePagerView(
                                     // onClickSelect(pageItem.imageInfo.id)
                                     null
                                 } else {
-                                    { onImageClick(pageItem.originalIndex) }
+                                    { onImageClick(pageItem.imageInfo.id) }
                                 },
                                 onImageLongClick = if (enableLongPressAndDrag) {
                                     null

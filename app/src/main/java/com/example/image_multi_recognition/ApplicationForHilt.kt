@@ -18,12 +18,12 @@ class ApplicationForHilt : Application(), ImageLoaderFactory {
                     .maxSizePercent(0.25)
                     .build()
             }
-//            .diskCache {  // we do not need diskCache here, because we do not load images through network in this app
-//                DiskCache.Builder()
-//                    .directory(this.cacheDir.resolve("image_cache"))
-//                    .maxSizePercent(0.02)
-//                    .build()
-//            }
+           // .diskCache {  // we do not need diskCache here, because we do not load images through network in this app
+           //     DiskCache.Builder()
+           //         .directory(this.cacheDir.resolve("image_cache"))
+           //         .maxSizePercent(0.02)
+           //         .build()
+           // }
             .build()
     }
 }

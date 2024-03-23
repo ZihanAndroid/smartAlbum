@@ -339,10 +339,6 @@ fun ImageLabelingResultShow(
                             PagingItemImage(
                                 imageInfo = item.imageInfo,
                                 onImageClick = { modifySelectedState(item.toImageIdAndLabel(), null) },
-//                                onImageLongClick = {
-//                                    selectedImageInfo = item.imageInfo
-//                                },
-
                                 availableScreenWidth = LocalConfiguration.current.screenWidthDp,
                                 onSendThumbnailRequest = { _, _ -> },
                                 selectionMode = true,

@@ -1,15 +1,9 @@
 package com.example.image_multi_recognition.compose.view.imageShow
 
 import android.util.Log
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.layout.Layout
-import androidx.compose.ui.unit.dp
 import com.example.image_multi_recognition.util.CachedLabelPlacingStrategy
 import com.example.image_multi_recognition.util.LabelPlacingStrategy
 import com.example.image_multi_recognition.util.getCallSiteInfoFunc
@@ -23,19 +17,30 @@ fun CustomImageLayout(
     modifier: Modifier = Modifier,
     placingStrategyWithCache: Boolean = false,
     image: @Composable () -> Unit,
-    labels: @Composable () -> Unit
+    labelDrawing: @Composable (String) -> Unit,
+    rectDrawing: @Composable () -> Unit,
 ) {
     Log.d(getCallSiteInfoFunc(), "Recomposition")
     Log.d(getCallSiteInfoFunc(), "ImageLabel list: $imageLabelList")
     val rectList = imageLabelList.map { it.rect!! }
     val rects = @Composable {
         rectList.forEach { _ ->
-            Box(
-                modifier = Modifier.background(Color.Transparent)
-                    .border(width = 2.dp, color = Color.Red),
-            )
+            rectDrawing()
         }
     }
+    val labels = @Composable {
+        imageLabelList.forEach { labelResult ->
+            labelDrawing(labelResult.label)
+        }
+    }
+    // val rects = @Composable {
+    //     rectList.forEach { _ ->
+    //         Box(
+    //             modifier = Modifier.background(Color.Transparent)
+    //                 .border(width = 2.dp, color = Color.Red),
+    //         )
+    //     }
+    // }
 
     // custom layout handle pixel instead of dp
     Layout(
@@ -79,12 +84,12 @@ fun CustomImageLayout(
                 )
             }
             if (labelPlaceables.isNotEmpty()) {
-                val places = if(!placingStrategyWithCache) {
+                val places = if (!placingStrategyWithCache) {
                     CachedLabelPlacingStrategy.placeLabels(
                         imageLabelList.map { it.label },
                         imageLabelList.map { it.rect!! }
                     )
-                }else{
+                } else {
                     CachedLabelPlacingStrategy.placeLabels(imageLabelList.map { it.label })
                 }
                 val convertedPlaces = LabelPlacingStrategy.convertPlacingResult(

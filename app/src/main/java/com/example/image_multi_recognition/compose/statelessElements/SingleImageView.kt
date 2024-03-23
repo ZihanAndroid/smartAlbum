@@ -8,7 +8,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -18,20 +20,23 @@ import androidx.compose.ui.unit.sp
 fun SingleImageView(
     title: String,
     modifier: Modifier = Modifier,
+    snackbarHostState: SnackbarHostState,
     onBack: () -> Unit,
-    topRightIcons: List<Pair<ImageVector, String>> = emptyList(),
+    topRightItems: List<SingleImageViewItem> = emptyList(),
     topRightOnClicks: List<() -> Unit> = emptyList(),
-    bottomIcons: List<Pair<ImageVector, String>> = emptyList(),
+    bottomItems: List<SingleImageViewItem> = emptyList(),
     bottomOnClicks: List<() -> Unit> = emptyList(),
     moreVertItems: List<String> = emptyList(),
     moreVertItemOnClicks: List<() -> Unit> = emptyList(),
     content: @Composable (PaddingValues) -> Unit = {},
 ) {
-    assert(topRightIcons.size == topRightOnClicks.size && bottomIcons.size == bottomOnClicks.size && moreVertItems.size == moreVertItemOnClicks.size)
+    assert(topRightItems.size == topRightOnClicks.size && bottomItems.size == bottomOnClicks.size && moreVertItems.size == moreVertItemOnClicks.size)
 
     var showMoreVertItems by rememberSaveable { mutableStateOf(false) }
+    val handledSnackbarHostState by rememberUpdatedState(snackbarHostState)
 
     Scaffold(
+        snackbarHost = { SnackbarHost(handledSnackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
@@ -49,11 +54,48 @@ fun SingleImageView(
                 },
                 actions = {
                     Row {
-                        topRightIcons.forEachIndexed { index, pair ->
+                        topRightItems.forEachIndexed { index, item ->
                             IconButton(
                                 onClick = topRightOnClicks[index]
                             ) {
-                                Icon(pair.first, pair.second)
+                                Icon(
+                                    imageVector = item.imageVector,
+                                    contentDescription = item.contentDescription,
+                                    modifier = item.modifier.size(22.dp),
+                                    tint = item.tint ?: LocalContentColor.current
+                                )
+                            }
+                        }
+                        if (moreVertItems.isNotEmpty()) {
+                            // Put the remaining icons into MoreVert icon
+                            Box {
+                                DropdownMenu(
+                                    expanded = showMoreVertItems,
+                                    onDismissRequest = { showMoreVertItems = false },
+                                    modifier = Modifier.crop(vertical = 8.dp)
+                                        .widthIn(min = (LocalConfiguration.current.screenWidthDp / 3).dp)
+                                ) {
+                                    moreVertItems.forEachIndexed { index, text ->
+                                        if (index > 0) Divider()
+                                        DropdownMenuItem(
+                                            onClick = {
+                                                showMoreVertItems = false
+                                                moreVertItemOnClicks[index]()
+                                            },
+                                            text = {
+                                                Text(
+                                                    text = text,
+                                                    style = MaterialTheme.typography.labelLarge
+                                                )
+                                            }
+                                        )
+                                    }
+                                }
+                                IconButton(
+                                    onClick = { showMoreVertItems = true }
+                                ) {
+                                    Icon(Icons.Default.MoreVert, "moreVert")
+                                }
                             }
                         }
                     }
@@ -65,42 +107,16 @@ fun SingleImageView(
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                bottomIcons.forEachIndexed { index, pair ->
+                bottomItems.forEachIndexed { index, item ->
                     IconButton(
                         onClick = bottomOnClicks[index]
                     ) {
-                        Icon(pair.first, pair.second)
-                    }
-                }
-                if (moreVertItems.size > 0) {
-                    // Put the remaining icons into MoreVert icon
-                    Box{
-                        DropdownMenu(
-                            expanded = showMoreVertItems,
-                            onDismissRequest = { showMoreVertItems = false },
-                        ) {
-                            moreVertItems.forEachIndexed { index, text ->
-                                if (index > 0) Divider()
-                                DropdownMenuItem(
-                                    onClick = {
-                                        showMoreVertItems = false
-                                        moreVertItemOnClicks[index]()
-                                    },
-                                    text = {
-                                        Text(
-                                            text = text,
-                                            style = MaterialTheme.typography.bodyMedium
-                                        )
-                                    },
-                                    modifier = Modifier.height(42.dp)
-                                )
-                            }
-                        }
-                        IconButton(
-                            onClick = { showMoreVertItems = true }
-                        ) {
-                            Icon(Icons.Default.MoreVert, "moreVert")
-                        }
+                        Icon(
+                            imageVector = item.imageVector,
+                            contentDescription = item.contentDescription,
+                            modifier = item.modifier,
+                            tint = item.tint ?: LocalContentColor.current
+                        )
                     }
                 }
             }
@@ -110,3 +126,11 @@ fun SingleImageView(
         content(it)
     }
 }
+
+data class SingleImageViewItem(
+    val imageVector: ImageVector,
+    val contentDescription: String,
+    // you can add some changing effect to the icon by providing a modifier
+    val modifier: Modifier = Modifier,
+    val tint: Color? = null
+)

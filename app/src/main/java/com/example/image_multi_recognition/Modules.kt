@@ -25,8 +25,6 @@ import javax.inject.Singleton
 
 object DefaultConfiguration {
     const val PAGE_SIZE = 80
-    const val DEFAULT_THUMBNAIL_SIZE = 160
-
     // SQLITE_MAX_VARIABLE_NUMBER in SQLite is 999 by default, set "DB_BATCH_SIZE" to a value smaller than that
     const val DB_BATCH_SIZE = 950
 

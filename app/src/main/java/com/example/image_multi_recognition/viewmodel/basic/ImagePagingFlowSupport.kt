@@ -18,6 +18,16 @@ import java.time.ZoneId
 interface ImagePagingFlowSupport {
     val imageIdOriginalIndexMap: MutableMap<Long, Int>
 
+    fun getValidOriginalIndexAfterDeletion(imageId: Long, deletedImageIds: Set<Long>): Int {
+        assert(imageId !in deletedImageIds)
+        val imageIdIndex = imageIdOriginalIndexMap[imageId]!!
+        var bias = 0
+        deletedImageIds.forEach { deletedImageId ->
+            if(imageIdOriginalIndexMap[deletedImageId]!! < imageIdIndex ) ++bias
+        }
+        return imageIdIndex-bias
+    }
+
     fun Flow<PagingData<ImageInfo>>.convertImageInfoPagingFlow(): Flow<PagingData<UiModel>> {
         var count = 0
         val epochTime = LocalDateTime.ofInstant(Instant.EPOCH, ZoneId.of("UTC"))
@@ -30,18 +40,18 @@ interface ImagePagingFlowSupport {
                 // Log.d(getCallSiteInfo(), "original index value: $count")
                 if (imageInfo.id !in imageIdOriginalIndexMap) {
                     // do not publish a new originalIndex for imageInfo that has been handled
-                    UiModel.Item(imageInfo, ++count).apply {
-                        imageIdOriginalIndexMap[this.imageInfo.id] = this.originalIndex
+                    UiModel.Item(imageInfo).apply {
+                        imageIdOriginalIndexMap[this.imageInfo.id] = ++count
                     }
                 } else {
-                    UiModel.Item(imageInfo, imageIdOriginalIndexMap[imageInfo.id]!!)
+                    UiModel.Item(imageInfo)
                 }
             }
         }.map { pagingData ->
             pagingData.insertSeparators { before, after ->
                 if (after == null) null
                 else {
-                    //Timestamp(before.imageInfo.timestamp)
+                    // Timestamp(before.imageInfo.timestamp)
                     val timeBefore = before?.imageInfo?.timestamp?.let { ExifHelper.timestampToLocalDataTime(it) }
                     val timeAfter = ExifHelper.timestampToLocalDataTime(after.imageInfo.timestamp)
                     // For the first scan, before is null, after is not null; for the last scan, after is null, before is not null

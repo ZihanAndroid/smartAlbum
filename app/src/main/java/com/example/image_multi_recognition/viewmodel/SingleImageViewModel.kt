@@ -12,6 +12,8 @@ import com.example.image_multi_recognition.db.ImageInfo
 import com.example.image_multi_recognition.db.LabelInfo
 import com.example.image_multi_recognition.repository.ImageRepository
 import com.example.image_multi_recognition.util.*
+import com.example.image_multi_recognition.viewmodel.basic.ImageFileOperationSupport
+import com.example.image_multi_recognition.viewmodel.basic.ImageFileOperationSupportViewModel
 import com.example.image_multi_recognition.viewmodel.basic.LabelSearchSupport
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.label.ImageLabel
@@ -25,6 +27,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 import javax.inject.Inject
 
 @HiltViewModel
@@ -32,12 +35,14 @@ class SingleImageViewModel @Inject constructor(
     private val repository: ImageRepository,
     private val objectDetector: ObjectDetector,
     private val imageLabeler: ImageLabeler,
+    imageFileOperationSupportViewModel: ImageFileOperationSupportViewModel,
     savedStateHandle: SavedStateHandle  // this parameter is set by hiltViewModel() automatically
-) : ViewModel(), LabelSearchSupport {
+) : ViewModel(), LabelSearchSupport, ImageFileOperationSupport by imageFileOperationSupportViewModel {
     // get navigation arguments
     val argumentType: Int = savedStateHandle.get<Int>("argumentType")!!
     val argumentValue: String = savedStateHandle.get<String>("argumentValue")!!
     val initialKey: Int = savedStateHandle.get<Int>("initialKey")!!
+    var currentAlbum: Long? = null
 
     private val controlledLabelingRunner = ControlledRunner<Unit>()
     private val controlledLabelingDoneRunner = ControlledRunner<Unit>()
@@ -66,54 +71,20 @@ class SingleImageViewModel @Inject constructor(
     // For InputView, ordered by label name first, then its count
     override var orderedLabelList: List<LabelInfo> = emptyList()
 
-//    // Assume that "prefix" is lowercase
-//    private fun getRangeByPrefix(prefix: String): Pair<Int, Int> {
-//        val comparator = Comparator<LabelInfo> { prefixElement, labelInfo ->
-//            val lowercaseElement = prefixElement.label
-//            val lowercaseLabel = labelInfo.label.lowercase()
-//            // prefix match, ignore case
-//            if (lowercaseElement.length <= lowercaseLabel.length
-//                && lowercaseElement == lowercaseLabel.substring(0, lowercaseElement.length)
-//            ) {
-//                0
-//            } else {
-//                lowercaseElement.compareTo(lowercaseLabel)
-//            }
-//        }
-//        return orderedLabelList.binarySearchLowerBoundIndex(
-//            element = LabelInfo(prefix, 0), comparator = comparator
-//        ) to orderedLabelList.binarySearchUpperBoundIndex(
-//            element = LabelInfo(prefix, 0), comparator = comparator
-//        )
-//    }
-//
-//    fun getLabelListByPrefix(prefix: String): List<LabelInfo> {
-//        if (prefix.isEmpty()) return emptyList()
-//        return with(getRangeByPrefix(prefix.lowercase())) {
-//            if (first != -1 && second != -1 && first <= second) {
-//                Log.d(getCallSiteInfoFunc(), "found: ($first, $second)")
-//                orderedLabelList.subList(first, second + 1)
-//            } else {
-//                Log.w(getCallSiteInfoFunc(), "no reasonable index found: ($first, $second)")
-//                emptyList()
-//            }
-//        }.apply {
-//            Log.d(getCallSiteInfoFunc(), "obtained popup labels: $this")
-//        }
-//    }
-
     init {
-//        if (album != null && album > 0) {
-//            Log.d(getCallSiteInfo(), "Get argument album: $album")
-//            setPagingFlow(album, initialKey)
-//        } else {
-//            assert(!label.isNullOrEmpty() && label.trim().isNotEmpty())
-//            setLabelPagingFlow(label!!, initialKey)
-//        }
         when (argumentType) {
-            1 -> setPagingFlow(argumentValue.toLong(), initialKey)
+            1 -> {
+                currentAlbum = argumentValue.toLong()
+                setPagingFlow(argumentValue.toLong(), initialKey)
+            }
+
             2 -> setLabelPagingFlow(argumentValue, initialKey)
-            3 -> setAlbumUnlabeledPagingFlow(argumentValue.toLong(), initialKey)
+
+            3 -> {
+                currentAlbum = argumentValue.toLong()
+                setAlbumUnlabeledPagingFlow(argumentValue.toLong(), initialKey)
+            }
+
             else -> throw RuntimeException("Unrecognized argument type: $argumentType")
         }
         viewModelScope.launch {
@@ -306,6 +277,10 @@ class SingleImageViewModel @Inject constructor(
         )
     }
 
+    fun resetImageLabelFlow(){
+        _imageLabelStateFlow.value = ImageLabelLists.InitialLists
+    }
+
     fun setAddedLabelList(labelList: List<String>?) {
         // _addedLabelListFlow.value = labelList.toMutableList()
         _imageLabelStateFlow.value = _imageLabelStateFlow.value.copy(
@@ -320,6 +295,21 @@ class SingleImageViewModel @Inject constructor(
                 Log.d(getCallSiteInfoFunc(), "reset popup labels: ${orderedLabelList.map { it.label }}")
             }
         }
+    }
+
+    private val _imageExifFlow = MutableStateFlow<List<String>>(emptyList())
+    val imageExifFlow: StateFlow<List<String>>
+        get() = _imageExifFlow
+
+    // get image exif information
+    fun getImageInformation(imageFile: File){
+        viewModelScope.launch {
+            _imageExifFlow.value = repository.getImageInformation(imageFile)
+        }
+    }
+
+    fun resetImageInformation(){
+        _imageExifFlow.value = emptyList()
     }
 }
 
@@ -339,4 +329,8 @@ data class ImageLabelLists(
     var wholeImageLabelList: List<ImageLabelResult>? = null,
     var addedLabelList: List<String>? = null,
     var labelingDone: Boolean = false
-)
+){
+    companion object{
+        val InitialLists = ImageLabelLists()
+    }
+}

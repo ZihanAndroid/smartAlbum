@@ -8,6 +8,7 @@ import android.util.Log
 import androidx.core.graphics.drawable.toBitmap
 import androidx.core.net.toUri
 import androidx.datastore.core.DataStore
+import androidx.lifecycle.viewModelScope
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
@@ -25,6 +26,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
@@ -127,7 +129,7 @@ class ImageRepository @Inject constructor(
     suspend fun deleteAndAddImages(
         deletedIds: List<Long>,
         addedFilePaths: List<File>,
-        //cachedImages: List<ByteArray>,
+        // cachedImages: List<ByteArray>,
         album: Long
     ): List<ImageInfo> = database.withTransaction {
         imageInfoDao.deleteById(deletedIds)
@@ -135,7 +137,7 @@ class ImageRepository @Inject constructor(
             ImageInfo(
                 album = album,
                 path = file.absolutePath.removePrefix(AlbumPathDecoder.decode(album).absolutePath),
-                //cachedImage = cachedImages[index],
+                // cachedImage = cachedImages[index],
                 // if failed to get createdTime of the image file, set timestamp to null
                 timestamp = try {
                     ExifHelper.getImageCreatedTime(file)?.let { Timestamp.valueOf(it).time } ?: 0
@@ -163,8 +165,22 @@ class ImageRepository @Inject constructor(
         imageInfoDao.insert(*imageInfo)
     }
 
-    suspend fun updateImageInfo(vararg imageInfo: ImageInfo) {
-        imageInfoDao.update(*imageInfo)
+    suspend fun updateImageAlbum(newAlbum: AlbumInfo? = null, imageInfoList: List<ImageInfo>) {
+        database.withTransaction {
+            if (newAlbum != null) {
+                insertAlbumInfo(newAlbum)
+            }
+            imageInfoDao.update(*imageInfoList.toTypedArray())
+        }
+    }
+
+    suspend fun createImageAlbum(newAlbum: AlbumInfo? = null, imageInfoList: List<ImageInfo>) {
+        database.withTransaction {
+            if (newAlbum != null) {
+                insertAlbumInfo(newAlbum)
+            }
+            imageInfoDao.insert(*imageInfoList.toTypedArray())
+        }
     }
 
     suspend fun changeImageInfoFavorite(idList: List<Long>) {
@@ -174,6 +190,7 @@ class ImageRepository @Inject constructor(
     suspend fun insertAlbumInfo(vararg albumInfo: AlbumInfo) {
         albumInfoDao.insert(*albumInfo)
     }
+
     suspend fun getAlbumByPath(path: String): Long? = albumInfoDao.getAlbumByPath(path)
 
     suspend fun getAllOrderedLabelList(): List<LabelInfo> = imageLabelDao.getAllOrderedLabels()
@@ -263,6 +280,7 @@ class ImageRepository @Inject constructor(
     suspend fun getImagesByLabel(label: String) = imageInfoDao.getImagesByLabel("$label%")
 
     suspend fun getImageInfoById(ids: List<Long>) = imageInfoDao.getImageInfoByIds(*ids.toLongArray())
+    suspend fun getAllImagesByAlbum(album: Long) = imageInfoDao.getAllImagesByAlbum(album)
 
     fun getUnlabeledAlbumPagerFlow(): Flow<PagingData<AlbumWithLatestImage>> = Pager(
         config = PagingConfig(
@@ -299,27 +317,34 @@ class ImageRepository @Inject constructor(
         }
     }
 
+    suspend fun getMimeTypes(fileAbsolutePathList: List<String>): Map<String, String> {
+        return with(StorageHelper) {
+            context.getMimeTypeForImageFile(fileAbsolutePathList)
+        }
+    }
+
     suspend fun getMoveImageRequest(imageInfoList: List<ImageInfo>): StorageHelper.MediaModifyRequest {
         return with(StorageHelper) {
             context.requestImageFileModification(imageInfoList.map { it.fullImageFile.absolutePath })
         }
     }
 
-    // return a list indicate the images failed to copy, if all the copy succeeds, then the list is empty
+    // return a map for (absolute paths : error code) for failed items
     suspend fun copyImageTo(
         newAlbum: AlbumInfo,
-        items: List<StorageHelper.MediaStoreItem>
-    ): List<StorageHelper.MediaStoreItem> {
-        val failedItems = mutableListOf<StorageHelper.MediaStoreItem>()
+        items: List<ImageCopyItem>
+    ): Map<String, StorageHelper.ImageCopyError> {
+        val failedItems = mutableMapOf<String, StorageHelper.ImageCopyError>()
         with(StorageHelper) {
             items.forEach { item ->
-                if (!context.copyImageToSharedStorage(
-                        newImage = File(newAlbum.path, File(item.absolutePath).name),
-                        imageMimeType = item.mimeType,
-                        fileFrom = File(item.absolutePath)
-                    )
-                ) {
-                    failedItems.add(item)
+                context.copyImageToSharedStorage(
+                    newImage = File(newAlbum.path, File(item.absolutePath).name),
+                    imageMimeType = item.mimeType,
+                    fileFrom = File(item.absolutePath),
+                ).let { code ->
+                    if (code != StorageHelper.ImageCopyError.NO_ERROR) {
+                        failedItems[item.absolutePath] = code
+                    }
                 }
             }
         }
@@ -333,4 +358,34 @@ class ImageRepository @Inject constructor(
             }
         }
     }
+
+    suspend fun requestFileNameUpdate(absolutePath: String): StorageHelper.MediaModifyRequest {
+        return with(StorageHelper) {
+            context.requestImageFileModification(listOf(absolutePath))
+        }
+    }
+
+    private suspend fun updateImageName(imageId: Long, newFileName: String) {
+        imageInfoDao.updateImageName(imageId, newFileName)
+    }
+
+    suspend fun updateFileName(imageId: Long, absolutePath: String, newFileName: String): Boolean {
+        return with(StorageHelper) {
+            if (context.updateImageFileName(absolutePath, newFileName)) {
+                updateImageName(imageId, newFileName)
+                true
+            } else false
+        }
+    }
+
+    suspend fun getImageInformation(imageFile: File): List<String> {
+        return with(ExifHelper) {
+            context.getImageInformation(imageFile)
+        }
+    }
+
+    data class ImageCopyItem(
+        val absolutePath: String,
+        val mimeType: String
+    )
 }

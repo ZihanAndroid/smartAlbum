@@ -42,11 +42,23 @@ interface ImageInfoDao : BaseDao<ImageInfo> {
     }
 
     @Query("""
+        UPDATE image_info
+        SET path=:newFileName
+        WHERE id=:imageId
+    """)
+    suspend fun updateImageName(imageId: Long, newFileName: String)
+
+    @Query("""
         SELECT * FROM image_info
         WHERE id in (:id)
     """)
     suspend fun getImageInfoByIds(vararg id: Long): List<ImageInfo>
 
+    @Query("""
+        SELECT id FROM image_info
+        where album=:album
+    """)
+    suspend fun getAllImagesByAlbum(album: Long): List<Long>
 
     @Query("""
         SELECT * FROM image_info

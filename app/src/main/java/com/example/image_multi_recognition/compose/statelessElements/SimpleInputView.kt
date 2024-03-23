@@ -26,18 +26,20 @@ import com.example.image_multi_recognition.R
 //@Preview(showSystemUi = true)
 fun SimpleInputView(
     modifier: Modifier = Modifier,
+    initialText: String = "",
     excludedNames: Set<String> = emptySet(),    // case insensitive
+    title: String,
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit,
 ) {
-    var input by rememberSaveable { mutableStateOf("") }
-    val caseInsensitiveSet = setOf(*excludedNames.map { it.lowercase() }.toTypedArray())
+    var input by rememberSaveable { mutableStateOf(initialText) }
+    val caseInsensitiveSet = setOf(*excludedNames.map { it.lowercase().trim() }.toTypedArray())
     // 0: no error, 1: empty string, 2: name exists
     var errorCode by rememberSaveable { mutableStateOf(0) }
     val onConfirmClick: (String) -> Unit = { inputString ->
-        if (inputString.isEmpty()) {
+        if (inputString.trim().isEmpty()) {
             errorCode = 1
-        } else if (inputString.lowercase() in caseInsensitiveSet) {
+        } else if (inputString.trim().lowercase() in caseInsensitiveSet) {
             errorCode = 2
         } else {
             onConfirm(inputString)
@@ -75,23 +77,24 @@ fun SimpleInputView(
                 modifier = Modifier.padding(24.dp).fillMaxWidth()
             ) {
                 Text(
-                    text = stringResource(R.string.new_album),
+                    text = title,
                     style = MaterialTheme.typography.titleMedium,
                 )
                 OutlinedTextField(
                     value = input,
                     onValueChange = {
                         // remove error string when user starts input
-                        if (errorCode != 0) errorCode = 0
-                        if (it.lowercase() in caseInsensitiveSet) errorCode = 2
+                        if (it.trim().lowercase() in caseInsensitiveSet) {
+                            if (errorCode != 2) errorCode = 2
+                        } else if (errorCode != 0) errorCode = 0
                         input = it
                     },
                     label = {
                         Text(
                             text = when (errorCode) {
-                                0 -> stringResource(R.string.album_name)
-                                1 -> stringResource(R.string.album_name_empty)
-                                else -> stringResource(R.string.album_name_exist)
+                                0 -> stringResource(R.string.input_name)
+                                1 -> stringResource(R.string.name_empty)
+                                else -> stringResource(R.string.name_exist)
                             },
                             style = MaterialTheme.typography.labelLarge,
                             color = if (errorCode == 0) Color.Unspecified else colorResource(R.color.colorAccent)
@@ -109,7 +112,7 @@ fun SimpleInputView(
                     modifier = Modifier.padding(horizontal = 8.dp),
                     onDismiss = onDismiss,
                     onConfirm = { onConfirmClick(input) },
-                    confirmDisabled = errorCode != 0 || input.isEmpty()
+                    confirmDisabled = errorCode != 0 || input.trim().isEmpty()
                 )
             }
         }

@@ -17,8 +17,8 @@ import com.example.image_multi_recognition.R
 import com.example.image_multi_recognition.compose.statelessElements.ImagePagerView
 import com.example.image_multi_recognition.compose.statelessElements.TopAppBarForNotRootDestination
 import com.example.image_multi_recognition.util.MutableSetWithState
+import com.example.image_multi_recognition.util.showSnackBar
 import com.example.image_multi_recognition.viewmodel.LabelPhotoViewModel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -40,17 +40,6 @@ fun LabelPhotoComposable(
     val waitForPreviousOperationString = stringResource(R.string.waiting_for_previous)
     val labelRemovedString = stringResource(R.string.label_removed)
     val deletedImageIds = rememberSaveable { mutableSetOf<Long>() }
-
-    LaunchedEffect(labelRemoving) {
-        if (labelRemoving == false) {
-            launch {
-                snackbarHostState.showSnackbar(labelRemovedString, duration = SnackbarDuration.Indefinite)
-            }.apply {
-                delay(1000)
-                cancel()
-            }
-        }
-    }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -74,6 +63,7 @@ fun LabelPhotoComposable(
                                         viewModel.removeLabels(this) {
                                             // clear the selectedImageIdSet immediately after the deletion is completed
                                             selectedImageInfoSet.clear()
+                                            showSnackBar(snackbarHostState, labelRemovedString)
                                         }
                                     }
                                 }
@@ -123,8 +113,11 @@ fun LabelPhotoComposable(
         ImagePagerView(
             modifier = modifier.padding(paddingValue),
             pagingItems = pagingItems,
-            onImageClick = { originalIndex ->
-                onImageClick(originalIndex, viewModel.label)
+            onImageClick = { imageInfoId ->
+                onImageClick(
+                    viewModel.getValidOriginalIndexAfterDeletion(imageInfoId, deletedImageIds),
+                    viewModel.label
+                )
             },
             onSendThumbnailRequest = viewModel::requestThumbnail,
             selectionMode = selectionMode,

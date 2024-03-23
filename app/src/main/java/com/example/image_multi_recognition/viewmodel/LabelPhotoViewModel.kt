@@ -33,7 +33,7 @@ class LabelPhotoViewModel @Inject constructor(
     }
 
     // after deletion, you can do some cleanup to make sure the UI shows the right info
-    fun removeLabels(imageIds: List<Long>, onComplete: ()->Unit){
+    fun removeLabels(imageIds: List<Long>, onComplete: suspend ()->Unit){
         viewModelScope.launch {
             _labelRemoving.value = true
             repository.removeImageLabelsByLabel(label, imageIds)
