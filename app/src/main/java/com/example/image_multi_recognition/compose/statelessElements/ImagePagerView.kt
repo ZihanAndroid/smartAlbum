@@ -55,7 +55,7 @@ fun ImagePagerView(
     modifier: Modifier = Modifier,
     onSendThumbnailRequest: (File, ImageInfo) -> Unit,
     selectionMode: Boolean = false,
-    onClickSelect: (Long) -> Unit = {},
+    // onClickSelect: (Long) -> Unit = {},
     onLongPress: (Long) -> Unit = {},
     enableLongPressAndDrag: Boolean = false, // enable drag selection
     // we use MutableSetWithState<Long> instead of MutableSetWithState<ImageInfo>
@@ -285,6 +285,7 @@ fun PagingItemImage(
     imageInfo: ImageInfo,
     onImageClick: (() -> Unit)? = null,
     onImageLongClick: (() -> Unit)? = null,
+    onImageDoubleClick: (()->Unit)? = null,
     availableScreenWidth: Int,
     onSendThumbnailRequest: (File, ImageInfo) -> Unit,
     selectionMode: Boolean = false,
@@ -327,7 +328,8 @@ fun PagingItemImage(
                     it.combinedClickable(
                         onClick = onImageClick,
                         // when onImageLongClick is null, onLongClick is set to null, as its default value in combinedClickable()
-                        onLongClick = onImageLongClick
+                        onLongClick = onImageLongClick,
+                        onDoubleClick = onImageDoubleClick
                     )
                 } else it
             }.padding(paddingValue).clip(RoundedCornerShape(cornerValue))

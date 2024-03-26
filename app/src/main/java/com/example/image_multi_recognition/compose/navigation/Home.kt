@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -31,10 +32,11 @@ import com.example.image_multi_recognition.util.ExifHelper
 import com.example.image_multi_recognition.util.getCallSiteInfoFunc
 import com.example.image_multi_recognition.viewmodel.PhotoViewModel
 
+@Preview
 @Composable
 fun Home(
     modifier: Modifier = Modifier,
-    photoViewModel: PhotoViewModel
+    // photoViewModel: PhotoViewModel
 ) {
 
     val navController = rememberNavController()
@@ -78,7 +80,7 @@ fun Home(
             NavigationGraph(
                 navController = navController,
                 modifier = Modifier.padding(suggestedPadding),
-                photoViewModel = photoViewModel,
+                // photoViewModel = photoViewModel,
                 rootSnackBarHostState = snackBarHostState,
                 onTopBottomBarHidden = {topBottomBarHidden = it}
             )
@@ -86,7 +88,7 @@ fun Home(
     } else {
         NavigationGraph(
             navController = navController,
-            photoViewModel = photoViewModel,
+            // photoViewModel = photoViewModel,
             onTopBottomBarHidden = {topBottomBarHidden = it},
             rootSnackBarHostState = snackBarHostState
         )

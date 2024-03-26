@@ -2,6 +2,7 @@ package com.example.image_multi_recognition.viewmodel
 
 import android.graphics.Rect
 import android.util.Log
+import androidx.compose.runtime.Stable
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -55,8 +56,10 @@ class SingleImageViewModel @Inject constructor(
     val imageLabelStateFlow: StateFlow<ImageLabelLists>
         get() = _imageLabelStateFlow
 
-    var labelingStart = false
+    // var labelingStart = false
+    var labelingClicked = false
     private var currentPage: Int = initialKey
+    private var labelingFinished = true
 
     // label: confidence
     private var partImageLabelConfidenceMap = mutableMapOf<String, Float>()
@@ -111,60 +114,65 @@ class SingleImageViewModel @Inject constructor(
     // instead, you should avoid doing something when you know the task is not needed in the callback
     fun detectAndLabelImage(imageInfo: ImageInfo) {
         // handle the request only once for each page
-        Log.d(getCallSiteInfoFunc(), "labelingStart: $labelingStart")
-        if (labelingStart) return
-        labelingStart = true
-        // create a new list to change the reference (so that recomposition can be triggered when you run "_imageLabelFlow.value = imageLabelList")
-        partImageLabelMap = mutableMapOf()
-        wholeImageLabelList = mutableListOf()
-        partImageLabelConfidenceMap.clear()
-        selectedLabelSet.clear()
-
+        // Log.d(getCallSiteInfoFunc(), "labelingStart: $labelingStart")
+        // if (labelingStart) return
+        // labelingStart = true
+        if (!labelingFinished) return
+        labelingFinished = false
+        labelingClicked = true
         viewModelScope.launch {
-            controlledLabelingRunner.joinPreviousOrRun {
-                val currentPageWhenRunning = currentPage
-                val imageHandled = withContext(Dispatchers.IO) {
-                    repository.getInputImage(imageInfo.fullImageFile)
-                } ?: return@joinPreviousOrRun
-                Log.d(
-                    getCallSiteInfo(),
-                    "image size for object detection: (width: ${imageHandled.width}, height: ${imageHandled.height})"
-                )
-                // the imageSize used by object detection may different from the size of the image displayed in CustomLayout
-                imageSize = imageHandled.width to imageHandled.height
+            // Note using "joinPreviousOrRun()" does not work here,
+            // because the following tasks starts other asynchronous tasks (detecting and labeling images),
+            // which cannot be controlled by joinPreviousOrRun()!
+            // joinPreviousOrRun() applies to tasks that does not start other asynchronous tasks
+            // e.g. NOT work here: controlledLabelingRunner.joinPreviousOrRun {...}
+            // create a new list to change the reference (so that recomposition can be triggered when you run "_imageLabelFlow.value = imageLabelList")
+            partImageLabelMap = mutableMapOf()
+            wholeImageLabelList = mutableListOf()
+            partImageLabelConfidenceMap.clear()
+            selectedLabelSet.clear()
+            val currentPageWhenRunning = currentPage
+            val imageHandled = withContext(Dispatchers.IO) {
+                repository.getInputImage(imageInfo.fullImageFile)
+            } ?: return@launch
+            Log.d(
+                getCallSiteInfo(),
+                "image size for object detection: (width: ${imageHandled.width}, height: ${imageHandled.height})"
+            )
+            // the imageSize used by object detection may different from the size of the image displayed in CustomLayout
+            imageSize = imageHandled.width to imageHandled.height
 
-                objectDetector.process(imageHandled)
-                    .addOnSuccessListener { detectedObjects ->
-                        // onSuccessListener can be called anytime in the main thread,
-                        // but the good thing is that the main thread is a single thread, everything in it is sequential
-                        Log.d(
-                            getCallSiteInfo(),
-                            "Detected object bounds: ${detectedObjects.joinToString { it.boundingBox.toString() }}"
-                        )
-                        // Note that the OnSuccessListener runs in the UI main thread!
+            objectDetector.process(imageHandled)
+                .addOnSuccessListener { detectedObjects ->
+                    // onSuccessListener can be called anytime in the main thread,
+                    // but the good thing is that the main thread is a single thread, everything in it is sequential
+                    Log.d(
+                        getCallSiteInfo(),
+                        "Detected object bounds: ${detectedObjects.joinToString { it.boundingBox.toString() }}"
+                    )
+                    // Note that the OnSuccessListener runs in the UI main thread!
+                    Log.d(
+                        getCallSiteInfoFunc(),
+                        "currentThread: ${Thread.currentThread().id}: ${Thread.currentThread().name}"
+                    )
+                    // change state to trigger recomposition
+                    val detectedRectList = detectedObjects.map { it.boundingBox }.toMutableList()
+                    // if the user has already swiped to the next page, we just ignore the result
+                    if (currentPageWhenRunning == currentPage) {
+                        // _rectListFlow.value = detectedRectList
+                        val rootRect = Rect()   // a rect for the whole image, we also label the whole image
+                        detectedRectList.add(rootRect)
+                        // image labeling
+                        labelingImage(imageInfo, imageHandled, detectedRectList, rootRect, currentPageWhenRunning)
+                    } else {
                         Log.d(
                             getCallSiteInfoFunc(),
-                            "currentThread: ${Thread.currentThread().id}: ${Thread.currentThread().name}"
+                            "current task is canceled, user moved from Page:$currentPageWhenRunning to Page:$currentPage"
                         )
-                        // change state to trigger recomposition
-                        val detectedRectList = detectedObjects.map { it.boundingBox }.toMutableList()
-                        // if the user has already swiped to the next page, we just ignore the result
-                        if (currentPageWhenRunning == currentPage) {
-                            // _rectListFlow.value = detectedRectList
-                            val rootRect = Rect()   // a rect for the whole image, we also label the whole image
-                            detectedRectList.add(rootRect)
-                            // image labeling
-                            labelingImage(imageInfo, imageHandled, detectedRectList, rootRect, currentPageWhenRunning)
-                        } else {
-                            Log.d(
-                                getCallSiteInfoFunc(),
-                                "current task is canceled, user moved from Page:$currentPageWhenRunning to Page:$currentPage"
-                            )
-                        }
-                    }.addOnFailureListener { e ->
-                        Log.e(getCallSiteInfo(), e.stackTraceToString())
                     }
-            }
+                }.addOnFailureListener { e ->
+                    Log.e(getCallSiteInfo(), e.stackTraceToString())
+                }
         }
     }
 
@@ -187,11 +195,12 @@ class SingleImageViewModel @Inject constructor(
                         )
                     }
                 ).addOnSuccessListener { labelList: List<ImageLabel>? ->
-                    // choose the label with max confidence and confidence >= 0.6
+                    // choose the label with max confidence and confidence >= ACCEPTED_CONFIDENCE
                     if (!labelList.isNullOrEmpty()) {
                         Log.d(getCallSiteInfoFunc(), "recognized label: $labelList")
                         if (rect != rootRect) {
-                            labelList.filter { it.confidence >= 0.6 }.maxBy { it.confidence }.let { label: ImageLabel ->
+                            labelList.filter { it.confidence >= DefaultConfiguration.ACCEPTED_CONFIDENCE }
+                                .maxByOrNull { it.confidence }?.let { label: ImageLabel ->
                                 // deduplication, choose the label with maximum confidence
                                 if (partImageLabelConfidenceMap[label.text] == null || label.confidence > partImageLabelConfidenceMap[label.text]!!) {
                                     partImageLabelConfidenceMap[label.text] = label.confidence
@@ -227,6 +236,7 @@ class SingleImageViewModel @Inject constructor(
         } ?: Log.e(getCallSiteInfoFunc(), "bitmapInternal of imageHandled is null!")
     }
 
+    // This method is always called from UI main thread. As a result, you do not need synchronization for setting "labelingFinished"
     private fun checkLabelingTaskCompletion(requiredTaskCount: Int, currentPageWhenRunning: Int) {
         if (currentPage == currentPageWhenRunning && requiredTaskCount == finishedLabelingTask) {
             finishedLabelingTask = 0
@@ -243,12 +253,14 @@ class SingleImageViewModel @Inject constructor(
             // (1) reference change to the MutableStateFlow.value
             // (2) the changed value is not equal to the previous one by standard of "equals()" method
             _imageLabelStateFlow.value = _imageLabelStateFlow.value.copy(
+                // after labeling, the partImageLabelList and wholeImageLabelList may be empty but not null
                 partImageLabelList = partImageLabelMap.map { it.value },
                 // deduplication of whole image labels
                 wholeImageLabelList = wholeImageLabelList.filter { it.label !in partImageLabelMap.keys },
                 addedLabelList = null,
                 labelingDone = false
             )
+            labelingFinished = true
             Log.d(getCallSiteInfoFunc(), "recognized part image label list: ${partImageLabelMap.map { it.value }}")
             Log.d(getCallSiteInfoFunc(), "recognized whole image label list: $wholeImageLabelList")
         }
@@ -257,7 +269,8 @@ class SingleImageViewModel @Inject constructor(
     // clearPage does not change states
     fun clearPage(nextPage: Int) {
         _imageLabelStateFlow.value = ImageLabelLists()
-        labelingStart = false
+        // labelingStart = false
+        labelingClicked = false
         currentPage = nextPage
         selectedLabelSet.clear()
     }
@@ -267,17 +280,19 @@ class SingleImageViewModel @Inject constructor(
         partImageLabelResult: List<ImageLabelResult>?,
         wholeImageLabelResult: List<ImageLabelResult>?,
         addedLabelList: List<String>?,
-        labelingDone: Boolean
+        labelingDone: Boolean,
+        preview: Boolean
     ) {
         _imageLabelStateFlow.value = _imageLabelStateFlow.value.copy(
             partImageLabelList = partImageLabelResult,
             wholeImageLabelList = wholeImageLabelResult,
             addedLabelList = addedLabelList,
-            labelingDone = labelingDone
+            labelingDone = labelingDone,
+            preview = preview
         )
     }
 
-    fun resetImageLabelFlow(){
+    fun resetImageLabelFlow() {
         _imageLabelStateFlow.value = ImageLabelLists.InitialLists
     }
 
@@ -302,22 +317,54 @@ class SingleImageViewModel @Inject constructor(
         get() = _imageExifFlow
 
     // get image exif information
-    fun getImageInformation(imageFile: File){
+    fun getImageInformation(imageFile: File) {
         viewModelScope.launch {
             _imageExifFlow.value = repository.getImageInformation(imageFile)
         }
     }
 
-    fun resetImageInformation(){
+    fun resetImageInformation() {
         _imageExifFlow.value = emptyList()
     }
+
+    fun setLabelPreview(imageInfo: ImageInfo) {
+        viewModelScope.launch {
+            // get original image size
+            val imageHandled = withContext(Dispatchers.IO) {
+                repository.getInputImage(imageInfo.fullImageFile)
+            }?.let { inputImage ->
+                imageSize = inputImage.width to inputImage.height
+                repository.getLabelsByImageId(imageInfo.id).let { imageLabels ->
+                    val partImageLabelList =
+                        imageLabels.filter { it.rect != null }.map { ImageLabelResult.fromImageLabel(it) }
+                    val wholeImageLabelList =
+                        imageLabels.filter { it.rect == null }.map { ImageLabelResult.fromImageLabel(it) }
+                    resetImageLabelFlow(
+                        partImageLabelResult = partImageLabelList,
+                        wholeImageLabelResult = wholeImageLabelList,
+                        addedLabelList = null,
+                        labelingDone = true,
+                        preview = true
+                    )
+                }
+            }
+        }
+    }
+
 }
 
+@Stable
 data class ImageLabelResult(
     val imageId: Long,
     val rect: Rect?,
     val label: String
-)
+) {
+    companion object {
+        fun fromImageLabel(imageLabel: com.example.image_multi_recognition.db.ImageLabel): ImageLabelResult {
+            return ImageLabelResult(imageLabel.id, imageLabel.rect, imageLabel.label)
+        }
+    }
+}
 
 // You should never use a MutableList inside a State like data class (e.g.: ImageLabelState)
 // If you do so, then when you add data into the MutableList, the reference of the MutableList does not change,
@@ -328,9 +375,10 @@ data class ImageLabelLists(
     var partImageLabelList: List<ImageLabelResult>? = null,
     var wholeImageLabelList: List<ImageLabelResult>? = null,
     var addedLabelList: List<String>? = null,
-    var labelingDone: Boolean = false
-){
-    companion object{
+    var labelingDone: Boolean = false,
+    var preview: Boolean = false
+) {
+    companion object {
         val InitialLists = ImageLabelLists()
     }
 }

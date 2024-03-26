@@ -16,7 +16,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.image_multi_recognition"
-        minSdk = 30
+        minSdk = 31
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
@@ -44,10 +44,15 @@ android {
     }
     kotlinOptions {
         jvmTarget = "17"
+        freeCompilerArgs += listOf(
+            "-P",
+            "plugin:androidx.compose.compiler.plugins.kotlin:stabilityConfigurationPath=" +
+                    "${rootDir}/compose_compiler_config.conf"
+        )
     }
     buildFeatures {
         compose = true
-        viewBinding = true
+        // viewBinding = true
     }
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.7"
@@ -97,7 +102,7 @@ dependencies {
     // Moshi JSON
     implementation("com.squareup.retrofit2:converter-moshi:2.9.0")
     // Use FusedLocationProviderClient to get user's current location
-    implementation("com.google.android.gms:play-services-location:21.1.0")
+    implementation("com.google.android.gms:play-services-location:21.2.0")
     // WorkManager
     implementation("androidx.work:work-runtime:2.9.0")
     // navigation compose
@@ -174,7 +179,7 @@ dependencies {
     // Extra Arbs https://kotest.io/docs/proptest/property-test-extra-arbs.html
     testImplementation ("io.kotest.extensions:kotest-property-arbs:2.1.2")
     // Android Test
-    androidTestImplementation("androidx.compose.ui:ui-test-junit4:1.6.1")
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4:1.6.4")
     androidTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
     //Assertions
     testImplementation("org.assertj:assertj-core:3.25.1")
@@ -186,7 +191,7 @@ dependencies {
 
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:$lifecycleVersion")
     implementation("androidx.activity:activity-compose:1.8.2")
-    implementation(platform("androidx.compose:compose-bom:2023.08.00"))
+    implementation(platform("androidx.compose:compose-bom:2024.03.00"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
@@ -194,7 +199,7 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
-    androidTestImplementation(platform("androidx.compose:compose-bom:2023.08.00"))
+    androidTestImplementation(platform("androidx.compose:compose-bom:2024.03.00"))
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")

@@ -21,8 +21,8 @@
     <string name="cancel">Cancel</string>
     <string name="resume">Resume</string>
     <string name="pause">Pause</string>
-    <string name="labeling_done">Labeling done!</string>
-    <string name="no_selected_label">No selected label!</string>
+    <string name="done">Done</string>
+    <string name="no_label">No label</string>
     <string name="input_label">Input a Label</string>
     <string name="loading">Loading</string>
     <string name="labeling_result">Labeling Result</string>
@@ -37,6 +37,7 @@
     <string name="move_to">Move to</string>
     <string name="copy_to">Copy to</string>
     <string name="rename">Rename</string>
+    <string name="delete">Delete</string>
     <string name="select_all">Select All</string>
     <string name="deselect_all">Deselect All</string>
     <string name="operation_done">Operation Done!</string>

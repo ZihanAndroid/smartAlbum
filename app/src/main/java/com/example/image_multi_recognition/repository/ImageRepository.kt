@@ -299,6 +299,10 @@ class ImageRepository @Inject constructor(
         imageLabelDao.insert(*imageLabels.toTypedArray())
     }
 
+    suspend fun getLabelsByImageId(imageId: Long): List<ImageLabel>{
+        return imageLabelDao.getLabelsByImageId(imageId)
+    }
+
     suspend fun removeImageLabelsByLabel(label: String, imageIds: List<Long>) {
         imageLabelDao.deleteByLabelAndIdList(label, *imageIds.toLongArray())
     }

@@ -9,30 +9,24 @@ interface ImageLabelDao : BaseDao<ImageLabel> {
     suspend fun deleteAll()
 
     // COLLATE NOCASE: case-insensitive
-    @Query(
-        """
+    @Query("""
         SELECT label, COUNT(id) as count
         FROM image_labels
         GROUP BY label
         ORDER BY label COLLATE NOCASE ASC, count DESC
-    """
-    )
+    """)
     suspend fun getAllOrderedLabels(): List<LabelInfo>
 
-    @Query(
-        """
+    @Query("""
         DELETE FROM image_labels
         WHERE id = :id
-    """
-    )
+    """)
     suspend fun deleteById(id: Long)
 
-    @Query(
-        """
+    @Query("""
         DELETE FROM image_labels
         WHERE label=:label and id in (:idList)
-    """
-    )
+    """)
     suspend fun _deleteByLabelAndId(label: String, idList: List<Long>)
 
     suspend fun deleteByLabelAndIdList(label: String, vararg ids: Long) {
@@ -45,6 +39,12 @@ interface ImageLabelDao : BaseDao<ImageLabel> {
             index = nextIndex
         }
     }
+
+    @Query("""
+        SELECT * FROM image_labels
+        WHERE id=:imageId
+    """)
+    suspend fun getLabelsByImageId(imageId: Long): List<ImageLabel>
 
 //    @Query(
 //        """

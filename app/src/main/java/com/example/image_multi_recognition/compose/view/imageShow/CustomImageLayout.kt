@@ -15,7 +15,7 @@ fun CustomImageLayout(
     originalHeight: Int,
     imageLabelList: List<ImageLabelResult>,
     modifier: Modifier = Modifier,
-    placingStrategyWithCache: Boolean = false,
+    placingStrategyWithCache: Boolean = false,  // set this value to false if it is your first time to show image label
     image: @Composable () -> Unit,
     labelDrawing: @Composable (String) -> Unit,
     rectDrawing: @Composable () -> Unit,
@@ -41,7 +41,8 @@ fun CustomImageLayout(
     //         )
     //     }
     // }
-
+    Log.d(getCallSiteInfoFunc(), "original size: ($originalWidth, $originalHeight)")
+    Log.d(getCallSiteInfoFunc(), "rect: ${rectList.joinToString()}")
     // custom layout handle pixel instead of dp
     Layout(
         contents = listOf(image, rects, labels),
@@ -49,11 +50,14 @@ fun CustomImageLayout(
     ) { (imageMeasurables, rectMeasurables, labelMesurables), constrains ->
         val imagePlaceable = imageMeasurables.first().measure(constrains)
         val labelPlaceables = labelMesurables.map { it.measure(constrains) }
-        val widthProportion: Double = imagePlaceable.width.toDouble() / originalWidth
         val heightProportion: Double = imagePlaceable.height.toDouble() / originalHeight
+        // intrinsic width
+        val intrinsicWidth = heightProportion * originalWidth
+        // val widthProportion: Double = imagePlaceable.width.toDouble() / originalWidth
+        val widthProportionNew = intrinsicWidth / originalWidth
 
         val rectPlaceables = rectMeasurables.mapIndexed { index, rectMeasurable ->
-            val width = ((rectList[index].width()) * widthProportion).toInt()
+            val width = ((rectList[index].width()) * widthProportionNew).toInt()
             val height = ((rectList[index].height()) * heightProportion).toInt()
             rectMeasurable.measure(
                 constrains.copy(
@@ -64,10 +68,13 @@ fun CustomImageLayout(
                 )
             )
         }
+        // Note that when we apply heightIn() modifier, we only restrict the height of the imagePlaceable
         Log.d(
             getCallSiteInfoFunc(),
             "proportion: (x, y) = (${imagePlaceable.width.toDouble() / originalWidth}, ${imagePlaceable.height.toDouble() / originalHeight})"
         )
+        // bias caused by applying heightIn() to calculate intrinsic width
+        val halfXBias = (imagePlaceable.width - intrinsicWidth) / 2.0
         layout(
             height = imagePlaceable.height,
             width = imagePlaceable.width
@@ -79,7 +86,7 @@ fun CustomImageLayout(
             )
             rectPlaceables.forEachIndexed { index, rectPlaceable ->
                 rectPlaceable.place(
-                    (rectList[index].left * widthProportion).toInt(),
+                    (rectList[index].left * widthProportionNew + halfXBias).toInt(),
                     (rectList[index].top * heightProportion).toInt()
                 )
             }
@@ -96,14 +103,20 @@ fun CustomImageLayout(
                     placingResultList = places,
                     labelWidth = labelPlaceables.map { it.width },
                     labelHeight = labelPlaceables.map { it.height },
-                    widthProportion = widthProportion,
+                    widthProportion = widthProportionNew,
                     heightProportion = heightProportion,
                     boundaryWidth = imagePlaceable.width,
                     boundaryHeight = imagePlaceable.height
                 )
                 Log.d(getCallSiteInfoFunc(), "placing strategy: $places.toString()")
                 labelPlaceables.forEachIndexed { index, labelPlaceable ->
-                    labelPlaceable.place(convertedPlaces[index].first, convertedPlaces[index].second)
+                    labelPlaceable.place(
+                        // support heightIn() modifier
+                        // (imagePlaceable.width * (widthProportionBefore - widthProportion) / 2.0 - convertedPlaces[index].first * (widthProportion / widthProportionBefore)).toInt(),
+                        x = (convertedPlaces[index].first + halfXBias).toInt(),
+                        // convertedPlaces[index].first
+                        y = convertedPlaces[index].second
+                    )
                 }
             }
         }

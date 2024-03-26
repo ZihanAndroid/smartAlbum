@@ -1,13 +1,21 @@
 package com.example.image_multi_recognition.util
 
 import android.util.Log
+import androidx.compose.foundation.gestures.*
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.PointerInputScope
+import androidx.compose.ui.input.pointer.positionChanged
+import androidx.compose.ui.util.fastAny
+import androidx.compose.ui.util.fastForEach
 import androidx.paging.PagingSource
 import androidx.paging.PagingState
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.math.PI
+import kotlin.math.abs
 
 // Assume the List<T> is ordered by ascendant, return -1 if no element is found
 // "element" is passed as the first parameter of "comparator()"
@@ -90,7 +98,7 @@ inline fun <reified T, reified R, reified U : Comparable<U>> List<T>.getDifferen
 // (You can do that in your app's internal storage)
 // Because you will get a file uri, not an image uri.
 // And maybe you do not have the permission to access file uri in external storage because if you just request READ_MEDIA_IMAGES
-//fun Context.getImageFileUri(): Uri{
+// fun Context.getImageFileUri(): Uri{
 //    contentResolver.query(
 //        MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
 //
@@ -193,5 +201,78 @@ suspend fun showSnackBar(snackbarHostState: SnackbarHostState, message: String, 
             delay(delayTimeMillis)
             cancel()
         }
+    }
+}
+
+
+// add some customization to detectTransformGestures()
+suspend fun PointerInputScope.detectTransformGesturesWithoutConsume(
+    panZoomLock: Boolean = false,
+    // onGesture() returns a Boolean to indicate whether we need to call onGesture for further pointer event
+    onGestureFinished: () -> Unit = {},
+    onGesture: (centroid: Offset, pan: Offset, zoom: Float, rotation: Float, onEventConsume: () -> Unit) -> Boolean,
+) {
+    awaitEachGesture {
+        var rotation = 0f
+        var zoom = 1f
+        var pan = Offset.Zero
+        var pastTouchSlop = false
+        val touchSlop = viewConfiguration.touchSlop
+        var lockedToPanZoom = false
+        var cancelFurtherOnGesture = false
+
+        awaitFirstDown(requireUnconsumed = false)
+
+        do {
+            val event = awaitPointerEvent()
+            // just calling awaitPointerEvent() repeatedly to wait for this gesture finished
+            val canceled = event.changes.fastAny { it.isConsumed }
+            if (!canceled) {
+                if (cancelFurtherOnGesture) continue
+                val zoomChange = event.calculateZoom()
+                val rotationChange = event.calculateRotation()
+                val panChange = event.calculatePan()
+
+                if (!pastTouchSlop) {
+                    zoom *= zoomChange
+                    rotation += rotationChange
+                    pan += panChange
+
+                    val centroidSize = event.calculateCentroidSize(useCurrent = false)
+                    val zoomMotion = abs(1 - zoom) * centroidSize
+                    val rotationMotion = abs(rotation * PI.toFloat() * centroidSize / 180f)
+                    val panMotion = pan.getDistance()
+
+                    if (zoomMotion > touchSlop ||
+                        rotationMotion > touchSlop ||
+                        panMotion > touchSlop
+                    ) {
+                        pastTouchSlop = true
+                        lockedToPanZoom = panZoomLock && rotationMotion < touchSlop
+                    }
+                }
+
+                if (pastTouchSlop) {
+                    val centroid = event.calculateCentroid(useCurrent = false)
+                    val effectiveRotation = if (lockedToPanZoom) 0f else rotationChange
+                    if (effectiveRotation != 0f ||
+                        zoomChange != 1f ||
+                        panChange != Offset.Zero
+                    ) {
+                        if (!onGesture(centroid, panChange, zoomChange, effectiveRotation) {
+                                // let the caller decides whether to consume the event or not
+                                event.changes.fastForEach {
+                                    if (it.positionChanged()) {
+                                        it.consume()
+                                    }
+                                }
+                            }) {
+                            cancelFurtherOnGesture = true
+                        }
+                    }
+                }
+            }
+        } while (!canceled && event.changes.fastAny { it.pressed })
+        // onGestureFinished()
     }
 }

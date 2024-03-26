@@ -10,10 +10,7 @@ import com.example.image_multi_recognition.DefaultConfiguration
 import com.example.image_multi_recognition.db.ImageInfo
 import com.example.image_multi_recognition.db.ImageLabel
 import com.example.image_multi_recognition.repository.ImageRepository
-import com.example.image_multi_recognition.util.ControlledRunner
-import com.example.image_multi_recognition.util.ExifHelper
-import com.example.image_multi_recognition.util.getCallSiteInfo
-import com.example.image_multi_recognition.util.toPagingSource
+import com.example.image_multi_recognition.util.*
 import com.example.image_multi_recognition.viewmodel.LabelUiModel
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.label.ImageLabeler
@@ -32,6 +29,7 @@ abstract class LabelingSupportViewModel(
     // imageId: object count
     val imageObjectsMap: MutableMap<Long, Int> = mutableMapOf()
     val labelImagesMap: MutableMap<String, MutableSet<ImageInfo>> = mutableMapOf()
+    val imageLabelConfidence: MutableMap<ImageLabelIdentity, Float> = mutableMapOf()
     val labelImagesFlow = Pager(
         initialKey = 0,
         config = PagingConfig(
@@ -63,8 +61,8 @@ abstract class LabelingSupportViewModel(
         get() = _scanPaused
     var scanCancelled: Boolean = false
 
-    private val _labelAdding: MutableStateFlow<Boolean?> = MutableStateFlow(null)
-    val labelAddingStateFlow: StateFlow<Boolean?>
+    private val _labelAdding: MutableStateFlow<Boolean> = MutableStateFlow(false)
+    val labelAddingStateFlow: StateFlow<Boolean>
         get() = _labelAdding
 
     init {
@@ -77,7 +75,7 @@ abstract class LabelingSupportViewModel(
                         delay(1000)
                     }
                 }
-                withContext(Dispatchers.IO) {
+                withContext(Dispatchers.Default) {
                     if (detectedImage.rect == null) {
                         detectedImage.inputImage
                     } else {
@@ -94,23 +92,47 @@ abstract class LabelingSupportViewModel(
                                     return@addOnSuccessListener
                                 }
                                 // runs in UI Main thread
-                                if (labelList.size > 1) {
-                                    labelList.maxBy { it.confidence }.let { label ->
-                                        if (label.confidence > DefaultConfiguration.ACCEPTED_CONFIDENCE) {
-                                            if (labelImagesMap[label.text] == null) {
-                                                labelImagesMap[label.text] = mutableSetOf()
+                                val labels = mutableListOf<com.google.mlkit.vision.label.ImageLabel>()
+                                if (labelList.isNotEmpty()) {
+                                    Log.d(getCallSiteInfoFunc(), "labelList: ${labelList.joinToString()}")
+                                    if (inputImage == detectedImage.inputImage) {
+                                        // pick at most two labels for a whole image
+                                        labelList.filter { it.confidence >= DefaultConfiguration.ACCEPTED_CONFIDENCE }
+                                            .sortedBy { it.confidence }.reversed().let { list ->
+                                                list.subList(0, if (list.size > 1) 2 else list.size).forEach { label ->
+                                                    // deduplication
+                                                    if (labelImagesMap[label.text] == null || detectedImage.imageInfo !in labelImagesMap[label.text]!!) {
+                                                        labels.add(label)
+                                                    }
+                                                }
                                             }
-                                            // deduplication
-                                            if (detectedImage.imageInfo !in labelImagesMap[label.text]!!) {
-                                                labelImagesMap[label.text]!!.add(detectedImage.imageInfo)
-                                                rectMap[RectKey(detectedImage.imageInfo.id, label.text)] =
-                                                    detectedImage.rect
+                                    } else {
+                                        labelList.maxBy { it.confidence }.let { label ->
+                                            val identity = ImageLabelIdentity(detectedImage.imageInfo, label.text)
+                                            if (label.confidence >= DefaultConfiguration.ACCEPTED_CONFIDENCE) {
+                                                if (labelImagesMap[label.text] == null || detectedImage.imageInfo !in labelImagesMap[label.text]!! ||
+                                                    // for the whole image, its confidence does not in imageLabelConfidence (represented by 0)
+                                                    // so we always override a whole image label by a partial image label
+                                                    label.confidence > (imageLabelConfidence[identity] ?: 0f)
+                                                ) {
+                                                    // confidence is for partial image only.
+                                                    // for a whole image, we only check duplication
+                                                    imageLabelConfidence[identity] = label.confidence
+                                                    labels.add(label)
+                                                }
                                             }
-                                            Log.d(
-                                                getCallSiteInfo(),
-                                                "${detectedImage.imageInfo} is recognized as ${label.text}"
-                                            )
                                         }
+                                    }
+                                    labels.forEach { label ->
+                                        if (labelImagesMap[label.text] == null) {
+                                            labelImagesMap[label.text] = mutableSetOf()
+                                        }
+                                        labelImagesMap[label.text]!!.add(detectedImage.imageInfo)
+                                        rectMap[RectKey(detectedImage.imageInfo.id, label.text)] = detectedImage.rect
+                                        Log.d(
+                                            getCallSiteInfo(),
+                                            "${detectedImage.imageInfo} is recognized as ${label.text}"
+                                        )
                                     }
                                 }
                                 labelingStateChange(detectedImage.imageInfo.id)
@@ -134,15 +156,15 @@ abstract class LabelingSupportViewModel(
         imageObjectsMap.putAll(imageInfoList.map { it.id to -1 })
         viewModelScope.launch {
             imageInfoList.forEach { imageInfo ->
-                withContext(Dispatchers.IO) {
-                    if (scanCancelled) {
-                        return@withContext
-                    } else {
-                        while (scanPaused.value) {
-                            delay(1000)
-                            Log.d(getCallSiteInfo(), "paused here!")
-                        }
+                if (scanCancelled) {
+                    return@launch
+                } else {
+                    while (scanPaused.value) {
+                        delay(1000)
+                        Log.d(getCallSiteInfo(), "paused here!")
                     }
+                }
+                withContext(Dispatchers.IO) {
                     val imageHandled = withContext(Dispatchers.IO) {
                         repository.getInputImage(imageInfo.fullImageFile)
                     }
@@ -185,20 +207,19 @@ abstract class LabelingSupportViewModel(
         }
     }
 
-    fun addSelectedImageLabel(labelImageMap: Map<String, List<Long>>) {
-        if(labelImageMap.isNotEmpty()) {
-            viewModelScope.launch {
-                controlledRunner.joinPreviousOrRun {
-                    _labelAdding.value = true
-                    repository.insertImageLabels(
-                        labelImageMap.flatMap { labelImages ->
-                            labelImages.value.map { imageId ->
-                                ImageLabel(imageId, labelImages.key, rectMap[RectKey(imageId, labelImages.key)])
-                            }
+    suspend fun addSelectedImageLabel(labelImageMap: Map<String, List<Long>>, onComplete: suspend () -> Unit) {
+        if (labelImageMap.isNotEmpty()) {
+            controlledRunner.joinPreviousOrRun {
+                _labelAdding.value = true
+                repository.insertImageLabels(
+                    labelImageMap.flatMap { labelImages ->
+                        labelImages.value.map { imageId ->
+                            ImageLabel(imageId, labelImages.key, rectMap[RectKey(imageId, labelImages.key)])
                         }
-                    )
-                    _labelAdding.value = false
-                }
+                    }
+                )
+                _labelAdding.value = false
+                onComplete()
             }
         }
     }
@@ -237,8 +258,12 @@ abstract class LabelingSupportViewModel(
         }
     }
 
-    fun resetLabelAdding(){
-        _labelAdding.value = null
+    fun resetLabelAdding() {
+        _labelAdding.value = false
+    }
+
+    fun startLabelAdding() {
+        _labelAdding.value = true
     }
 
     private fun resetLabeling() {
@@ -258,6 +283,11 @@ data class DetectedImage(
 
 data class RectKey(
     val imageId: Long,
+    val label: String
+)
+
+data class ImageLabelIdentity(
+    val imageInfo: ImageInfo,
     val label: String
 )
 

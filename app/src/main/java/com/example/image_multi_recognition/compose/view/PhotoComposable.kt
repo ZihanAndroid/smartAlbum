@@ -67,72 +67,6 @@ fun PhotoComposable(
         }
     )
 
-    // val deletionPendingIntent by viewModel.deletionPendingIntentFlow.collectAsStateWithLifecycle()
-    // val movePendingIntent by viewModel.movePendingIntentFlow.collectAsStateWithLifecycle()
-    //
-    // // https://stackoverflow.com/questions/64721218/jetpack-compose-launch-activityresultcontract-request-from-composable-function
-    // val imageRequestLauncher =
-    //     rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { activityResult ->
-    //         if (onImagesDeleting) {  // only monitor the ActivityResult generated from deleting images
-    //             if (activityResult.resultCode == RESULT_OK) {
-    //                 viewModel.deleteImages(selectedImageIdSet.toList()) {
-    //                     deletedImageIds.addAll(selectedImageIdSet)
-    //                     showSnackBar(
-    //                         rootSnackBarHostState ?: snackbarHostState,
-    //                         "${context.getString(R.string.deletion_success)}!"
-    //                     )
-    //                 }
-    //             } else {
-    //                 // failed to delete images, user may deny our deletion request
-    //                 coroutineScope.launch {
-    //                     showSnackBar(
-    //                         rootSnackBarHostState ?: snackbarHostState,
-    //                         "${context.getString(R.string.deletion_fail)}!"
-    //                     )
-    //                 }
-    //                 viewModel.resetDeleteImagesState()
-    //             }
-    //         } else if (onImagesMoving) {
-    //             if (activityResult.resultCode == RESULT_OK) {
-    //                 viewModel.moveImagesTo { failedImages ->
-    //                     deletedImageIds.addAll(selectedImageIdSet - failedImages.map { it.first.id }.toSet())
-    //                     showSnackBar(
-    //                         snackbarHostState = rootSnackBarHostState ?: snackbarHostState,
-    //                         message = if (failedImages.isNotEmpty()) {
-    //                             if(failedImages.find { it.second == StorageHelper.ImageCopyError.IO_ERROR } != null){
-    //                                 "${StorageHelper.ImageCopyError.IO_ERROR}"
-    //                             }else{
-    //                                 context.getString(R.string.same_name_exist)
-    //                             }
-    //                         }
-    //                         else "${context.getString(R.string.move_success)}!",
-    //                         delayTimeMillis = if(failedImages.isNotEmpty()) 3000 else 1000  // set a longer time period for an error message
-    //                     )
-    //                 }
-    //             } else {
-    //                 coroutineScope.launch {
-    //                     showSnackBar(
-    //                         rootSnackBarHostState ?: snackbarHostState,
-    //                         "${context.getString(R.string.move_fail)}!"
-    //                     )
-    //                 }
-    //                 viewModel.resetMoveImagesState()
-    //             }
-    //         }
-    //     }
-    //
-    // LaunchedEffect(deletionPendingIntent) {
-    //     deletionPendingIntent?.let { pendingIntent ->
-    //         imageRequestLauncher.launch(IntentSenderRequest.Builder(pendingIntent.intentSender).build())
-    //     }
-    // }
-    //
-    // LaunchedEffect(movePendingIntent) {
-    //     movePendingIntent?.let { intent ->
-    //         imageRequestLauncher.launch(IntentSenderRequest.Builder(intent.pendingIntent!!.intentSender).build())
-    //     }
-    // }
-
     Scaffold(
         snackbarHost = if (customTopBar) {
             { SnackbarHost(snackbarHostState) }
@@ -250,13 +184,13 @@ fun PhotoComposable(
                 },
                 onSendThumbnailRequest = viewModel::requestThumbnail,
                 selectionMode = selectionMode,
-                onClickSelect = { imageId ->
-                    if (imageId !in selectedImageIdSet) {
-                        selectedImageIdSet += imageId
-                    } else {
-                        selectedImageIdSet -= imageId
-                    }
-                },
+                // onClickSelect = { imageId ->
+                //     if (imageId !in selectedImageIdSet) {
+                //         selectedImageIdSet += imageId
+                //     } else {
+                //         selectedImageIdSet -= imageId
+                //     }
+                // },
                 onLongPress = { imageId ->
                     if (!selectionMode && viewModel.noImageOperationOngoing()) {
                         selectedImageIdSet.clear()

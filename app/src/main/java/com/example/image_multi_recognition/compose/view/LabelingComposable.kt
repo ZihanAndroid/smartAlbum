@@ -60,6 +60,7 @@ fun LabelingComposable(
     var labelingClicked by rememberSaveable { mutableStateOf(false) }
     val labelingState by viewModel.labelingStateFlow.collectAsStateWithLifecycle()
     val labelAdding by viewModel.labelAddingStateFlow.collectAsStateWithLifecycle()
+    val rootSnackBar by remember { derivedStateOf { rootSnackBarHostState } }
 
     val imageSelectedStateHolder: Map<String, Map<Long, MutableState<Boolean>>> = remember(labelingState) {
         // viewModel.labelImagesMap is the backing data of pagingItem from viewModel.labelImagesFlow
@@ -75,17 +76,17 @@ fun LabelingComposable(
     val coroutineScope = rememberCoroutineScope()
     val labelAddedString = stringResource(R.string.label_added)
 
-    LaunchedEffect(labelAdding) {
-        if (labelAdding == false) {
-            // https://stackoverflow.com/questions/71471679/jetpack-compose-scaffold-possible-to-override-the-standard-durations-of-snackbar
-            val job = launch {
-                rootSnackBarHostState.showSnackbar(labelAddedString, duration = SnackbarDuration.Indefinite)
-            }
-            delay(1000)
-            job.cancel()
-            labelingClicked = false
-        }
-    }
+    // LaunchedEffect(labelAdding) {
+    //     if (labelAdding == false) {
+    //         // https://stackoverflow.com/questions/71471679/jetpack-compose-scaffold-possible-to-override-the-standard-durations-of-snackbar
+    //         val job = launch {
+    //             rootSnackBarHostState.showSnackbar(labelAddedString, duration = SnackbarDuration.Indefinite)
+    //         }
+    //         delay(1000)
+    //         job.cancel()
+    //         labelingClicked = false
+    //     }
+    // }
 
     if (labelingClicked) {
         if (labelingState.labelingDone) {
@@ -97,13 +98,23 @@ fun LabelingComposable(
                 ) {
                     IconButton(
                         onClick = {
-                            coroutineScope.launch {
-                                if (!viewModel.onLabelingConfirm(imageSelectedStateHolder)) {
-                                    labelingClicked = false
+                            if (!labelAdding) {
+                                coroutineScope.launch {
+                                    viewModel.onLabelingConfirm(imageSelectedStateHolder) {
+                                        // https://stackoverflow.com/questions/71471679/jetpack-compose-scaffold-possible-to-override-the-standard-durations-of-snackbar
+                                        val job = launch {
+                                            rootSnackBar.showSnackbar(
+                                                labelAddedString,
+                                                duration = SnackbarDuration.Indefinite
+                                            )
+                                        }
+                                        delay(1000)
+                                        job.cancel()
+                                        labelingClicked = false
+                                    }
                                 }
                             }
-                        }
-                    ) {
+                        }) {
                         Icon(Icons.Filled.Check, "confirm_labels")
                     }
                     IconButton(
@@ -168,7 +179,6 @@ fun LabelingComposable(
                                 contentDescription = albumWithLatestImage.album.toString(),
                                 sizeDp = ((LocalConfiguration.current.screenWidthDp - DefaultConfiguration.ALBUM_INTERVAL * 3) / 2).dp,
                                 onAlbumClick = {
-                                    viewModel.resetLabelAdding()
                                     onAlbumClick(albumWithLatestImage.album)
                                 }
                             )
@@ -188,7 +198,7 @@ fun ImageLabelingResultShow(
     imageSelectedStateHolderParam: Map<String, Map<Long, MutableState<Boolean>>>,
     labelSelectedStateHolderParam: Map<String, MutableState<Boolean>>
 ) {
-    var selectedImageInfo: ImageInfo? by remember { mutableStateOf(null) }
+    var doubleClickedImageInfo: ImageInfo? by remember { mutableStateOf(null) }
     val gridState = rememberLazyGridState()
 
     var scrollingAmount by rememberSaveable { mutableStateOf(0f) }
@@ -249,7 +259,7 @@ fun ImageLabelingResultShow(
                             removedKeys.forEach { modifySelectedState(keyImageIdLabelMap[it], false) }
                         },
                         onKeyAdd = { addedKeys ->
-                            addedKeys.forEach { modifySelectedState(keyImageIdLabelMap[it], true)}
+                            addedKeys.forEach { modifySelectedState(keyImageIdLabelMap[it], true) }
                         },
                         keyExists = { key ->
                             keyImageIdLabelMap[key]?.let { item ->
@@ -329,8 +339,8 @@ fun ImageLabelingResultShow(
 
                         is LabelUiModel.Item -> {
                             Log.d(getCallSiteInfo(), "Recomposition in LabelUiModel.Item")
-                            //val selected by remember { derivedStateOf { !excludedImageSet.set.contains(item.label to item.imageInfo.id) } }
-                            //key(item.imageInfo.id) {
+                            // val selected by remember { derivedStateOf { !excludedImageSet.set.contains(item.label to item.imageInfo.id) } }
+                            // key(item.imageInfo.id) {
                             Log.d(getCallSiteInfo(), "Recomposition in LabelUiModel.Item here!!!!!")
                             Log.d(
                                 getCallSiteInfo(),
@@ -339,6 +349,7 @@ fun ImageLabelingResultShow(
                             PagingItemImage(
                                 imageInfo = item.imageInfo,
                                 onImageClick = { modifySelectedState(item.toImageIdAndLabel(), null) },
+                                onImageDoubleClick = { doubleClickedImageInfo = item.imageInfo },
                                 availableScreenWidth = LocalConfiguration.current.screenWidthDp,
                                 onSendThumbnailRequest = { _, _ -> },
                                 selectionMode = true,
@@ -363,11 +374,11 @@ fun ImageLabelingResultShow(
                 )
             }
         }
-        if (selectedImageInfo != null) {
+        if (doubleClickedImageInfo != null) {
             FullScreenImage(
-                imageFile = selectedImageInfo!!.fullImageFile,
-                contentDescription = selectedImageInfo!!.id.toString(),
-                onDismiss = { selectedImageInfo = null }
+                imageFile = doubleClickedImageInfo!!.fullImageFile,
+                contentDescription = doubleClickedImageInfo!!.id.toString(),
+                onDismiss = { doubleClickedImageInfo = null }
             )
         }
     }
@@ -406,7 +417,7 @@ fun FullScreenImage(
                         getCallSiteInfo(),
                         "size: $size, centroid: [${centroid.x}, ${centroid.y}], pan: [${pan.x}, ${pan.y}]"
                     )
-                    //val oldZoom = zoom
+                    // val oldZoom = zoom
                     zoom = (zoom * gestureZoom).coerceAtLeast(1f)
                     // equation:
                     // (centroid.x - offset.x) / zoom = (centroid.x - newOffset.x) / newZoom
@@ -508,13 +519,12 @@ fun UnlabeledInfo(
     }
 }
 
-internal suspend fun LabelingSupportViewModel.onLabelingConfirm(imageSelectedStateHolder: Map<String, Map<Long, MutableState<Boolean>>>): Boolean {
-    return withContext(Dispatchers.Default) {
-        getSelectionResult(imageSelectedStateHolder).let {
-            addSelectedImageLabel(it)
-            it.isNotEmpty()
-        }
-    }
+internal suspend fun LabelingSupportViewModel.onLabelingConfirm(
+    imageSelectedStateHolder: Map<String, Map<Long, MutableState<Boolean>>>,
+    onComplete: suspend () -> Unit = {}
+) {
+    startLabelAdding()
+    addSelectedImageLabel(getSelectionResult(imageSelectedStateHolder)) { onComplete() }
 }
 
 internal fun getSelectionResult(imageSelectedStateHolder: Map<String, Map<Long, MutableState<Boolean>>>) =

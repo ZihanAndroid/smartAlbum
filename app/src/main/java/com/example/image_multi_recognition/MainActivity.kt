@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.image_multi_recognition.compose.navigation.Home
 import com.example.image_multi_recognition.permission.PermissionAccessor
@@ -75,7 +76,7 @@ class MainActivity : ComponentActivity() {
                 Image_multi_recognitionTheme {
                     // A surface container using the 'background' color from the theme
                     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                        Home(photoViewModel = viewModel())
+                        Home()
                         // TestComposable()
                     }
                 }

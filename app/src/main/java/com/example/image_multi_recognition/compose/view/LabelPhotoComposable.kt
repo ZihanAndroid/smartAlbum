@@ -121,13 +121,13 @@ fun LabelPhotoComposable(
             },
             onSendThumbnailRequest = viewModel::requestThumbnail,
             selectionMode = selectionMode,
-            onClickSelect = {
-                if (selectedImageInfoSet.contains(it)) {
-                    selectedImageInfoSet -= it
-                } else {
-                    selectedImageInfoSet += it
-                }
-            },
+            // onClickSelect = {
+            //     if (selectedImageInfoSet.contains(it)) {
+            //         selectedImageInfoSet -= it
+            //     } else {
+            //         selectedImageInfoSet += it
+            //     }
+            // },
             onLongPress = { imageId ->
                 if (!selectionMode && labelRemoving != true) selectionMode = true
                 if (labelRemoving != true) {

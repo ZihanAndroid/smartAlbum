@@ -19,7 +19,7 @@ fun NavigationGraph(
     modifier: Modifier = Modifier,
     // Note the hiltViewModel() here does not within any destination,
     // it can be seen as the global ViewModel for the app which has the same lifecycle as the Activity does
-    photoViewModel: PhotoViewModel,
+    // photoViewModel: PhotoViewModel,
     rootSnackBarHostState: SnackbarHostState,
     onTopBottomBarHidden: (Boolean)->Unit
 ) {
@@ -32,7 +32,7 @@ fun NavigationGraph(
             route = Destination.PHOTO.navRoute,
         ) {
             PhotoComposable(
-                viewModel = photoViewModel,
+                viewModel = hiltViewModel(),
                 onImageClick = { album, originalIndex ->
                     // set argument "label" to empty whitespace String
                     "${Destination.SINGLE_IMAGE.route}/1/${album}/$originalIndex".let { route ->

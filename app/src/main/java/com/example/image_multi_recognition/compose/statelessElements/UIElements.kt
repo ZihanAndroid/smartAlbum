@@ -1,47 +1,53 @@
 package com.example.image_multi_recognition.compose.statelessElements
 
-import android.graphics.Paint.Align
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Done
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.constraintlayout.compose.ConstraintLayout
 import coil.compose.AsyncImage
 import com.example.image_multi_recognition.R
 import java.io.File
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun LabelSelectionElement(
     label: String,
     modifier: Modifier = Modifier,
     initialSelected: Boolean = false,
+    longPressAndDragSupport: Boolean = false,
     onClick: ((String, Boolean) -> Unit)? = null,
 ) {
     var selected by rememberSaveable { mutableStateOf(initialSelected) }
+    // long press and drag support
+    var movable by remember { mutableStateOf(false) }
+    var offsetX by remember { mutableStateOf(0f) }
+    var offsetY by remember { mutableStateOf(0f) }
 
     ElevatedFilterChip(
         // crop the padding set by minHeight(32.dp) inside SelectableChip() call of ElevatedFilterChip
-        modifier = modifier.crop(vertical = 4.dp),
+        modifier = modifier.crop(vertical = 4.dp).graphicsLayer {
+            translationX = offsetX
+            translationY = offsetY
+        },
         onClick = {
             // do not change selected when onclick is null (keep it as initialSelected)
             onClick?.let {
@@ -53,6 +59,22 @@ fun LabelSelectionElement(
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.let { prevModifier ->
+                    if (longPressAndDragSupport) {
+                        // https://stackoverflow.com/questions/74119839/detecting-long-press-events-on-chips-in-jetpack-compose
+                        prevModifier.pointerInput(Unit) {
+                            detectDragGesturesAfterLongPress(
+                                onDragStart = { movable = true },
+                                onDrag = { change, _ ->
+                                    offsetX += change.position.x
+                                    offsetY += change.position.y
+                                },
+                                onDragCancel = { movable = false },
+                                onDragEnd = { movable = false }
+                            )
+                        }
+                    } else prevModifier
+                }
                 // color = colorResource(R.color.SeaGreen)
             )
         },
@@ -62,7 +84,21 @@ fun LabelSelectionElement(
                 Icon(
                     imageVector = Icons.Filled.Done,
                     contentDescription = "Selected $label",
-                    modifier = Modifier.size(FilterChipDefaults.IconSize),
+                    modifier = Modifier.size(FilterChipDefaults.IconSize).let { prevModifier ->
+                        if (longPressAndDragSupport) {
+                            prevModifier.pointerInput(Unit) {
+                                detectDragGesturesAfterLongPress(
+                                    onDragStart = { movable = true },
+                                    onDrag = { change, _ ->
+                                        offsetX += change.position.x
+                                        offsetY += change.position.y
+                                    },
+                                    onDragCancel = { movable = false },
+                                    onDragEnd = { movable = false }
+                                )
+                            }
+                        } else prevModifier
+                    },
                     tint = colorResource(R.color.LimeGreen)
                 )
             }
@@ -70,27 +106,6 @@ fun LabelSelectionElement(
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun LabelElement(
-    label: String,
-    modifier: Modifier = Modifier,
-) {
-    ElevatedSuggestionChip(
-        // crop the padding set by minHeight(32.dp) inside SelectableChip() call of ElevatedFilterChip
-        //modifier = modifier.crop(vertical = 4.dp),
-        onClick = {},
-        label = {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelMedium,
-                // color = colorResource(R.color.SeaGreen)
-            )
-        }
-    )
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ElevatedSmallIconButton(
     imageVector: ImageVector,
@@ -135,7 +150,7 @@ fun TopAppBarForNotRootDestination(
             IconButton(
                 onClick = onBack
             ) {
-                Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "back")
+                Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "back")
             }
         },
         actions = actions

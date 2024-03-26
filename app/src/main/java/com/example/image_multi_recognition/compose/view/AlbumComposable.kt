@@ -97,12 +97,12 @@ fun AlbumPagingItem(
         Box(
             modifier = Modifier.fillMaxSize()
                 .clip(RoundedCornerShape(12.dp))
-                .background(colorResource(R.color.greyAlpha).copy(alpha = 0.7f))
+                .background(colorResource(R.color.black).copy(alpha = 0.3f))
         )
         Text(
             text = title,
             style = MaterialTheme.typography.labelLarge.copy(fontSize = 16.sp),
-            textAlign = TextAlign.Center
+            textAlign = TextAlign.Center,
         )
     }
 }

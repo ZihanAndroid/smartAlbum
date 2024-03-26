@@ -1,14 +1,17 @@
 package com.example.image_multi_recognition.compose.view
 
+import android.annotation.SuppressLint
 import android.util.Log
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerDefaults
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Share
@@ -36,6 +39,7 @@ import com.example.image_multi_recognition.viewmodel.ImageLabelResult
 import com.example.image_multi_recognition.viewmodel.SingleImageViewModel
 import com.example.image_multi_recognition.viewmodel.basic.ImageFileOperationComposableSupport
 
+@SuppressLint("RememberReturnType")
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SingleImageComposable(
@@ -71,6 +75,7 @@ fun SingleImageComposable(
     var renamingImageOngoing by rememberSaveable { mutableStateOf(false) }
 
     val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
     var imageIdList = rememberSaveable { mutableListOf<Long>() }
     var albumSelectState by rememberSaveable(saver = AlbumSelectState.saver) {
         mutableStateOf(AlbumSelectState.noSelection)
@@ -97,6 +102,7 @@ fun SingleImageComposable(
         // we clear it so that when moving to the next page, the same imageLabelResult is not shown
         viewModel.clearPage(pagerState.currentPage)
     }
+    val pageScrolling by remember { derivedStateOf { pagerState.isScrollInProgress } }
 
     // a strange behavior, once I access "pagerState.pageCount" instead of "pagingItems.itemCount" here, it causes infinite recomposition
     // Log.d(getCallSiteInfoFunc(), "currentPage: ${pagerState.pageCount}")
@@ -111,6 +117,23 @@ fun SingleImageComposable(
             onBack = onBackClick,
             topRightItems = listOf(
                 SingleImageViewItem(ImageVector.vectorResource(R.drawable.baseline_new_label_24), "label"),
+                SingleImageViewItem(ImageVector.vectorResource(R.drawable.baseline_preview_24), "preview_label")
+            ),
+            topRightOnClicks = listOf({
+                // labeling start
+                pagingItems[pagerState.currentPage]?.let { imageInfo ->
+                    viewModel.detectAndLabelImage(imageInfo)
+                }
+            }, {
+                // preview labels
+                currentImageInfo?.let {
+                    viewModel.setLabelPreview(it)
+                }
+            }),
+            bottomItems = listOf(
+                SingleImageViewItem(Icons.Default.Info, "info"),
+                SingleImageViewItem(ImageVector.vectorResource(R.drawable.baseline_rotate_right_24), "rotate"),
+                SingleImageViewItem(Icons.Default.Share, "share"),
                 SingleImageViewItem(
                     imageVector = Icons.Default.Favorite,
                     contentDescription = "favorite",
@@ -120,25 +143,6 @@ fun SingleImageComposable(
                         null
                     }
                 )
-            ),
-            topRightOnClicks = listOf({
-                // labeling start
-                pagingItems[pagerState.currentPage]?.let { imageInfo ->
-                    viewModel.detectAndLabelImage(imageInfo)
-                }
-            }, {
-                if (pagingItems.itemSnapshotList.size > pagerState.currentPage && viewModel.noImageOperationOngoing()) {
-                    // Data has been retrieved from PagingSource
-                    pagingItems.itemSnapshotList[pagerState.currentPage]?.let { imageInfo ->
-                        viewModel.changeFavoriteImages(listOf(imageInfo.id))
-                    }
-                }
-            }),
-            bottomItems = listOf(
-                SingleImageViewItem(Icons.Default.Info, "info"),
-                SingleImageViewItem(ImageVector.vectorResource(R.drawable.baseline_rotate_right_24), "rotate"),
-                SingleImageViewItem(Icons.Default.Share, "share"),
-                SingleImageViewItem(Icons.Default.Delete, "delete")
             ),
             bottomOnClicks = listOf({
                 currentImageInfo?.fullImageFile?.let { imageFile ->
@@ -150,17 +154,17 @@ fun SingleImageComposable(
             }, {
 
             }, {
-                currentImageInfo?.id?.let { imageId ->
-                    imageIdList.clear()
-                    imageIdList.add(imageId)
-                    viewModel.requestImagesDeletion(listOf(imageId)) {
-                        showSnackBar(snackbarHostState, "${context.getString(R.string.deletion_fail)}!")
+                if (pagingItems.itemSnapshotList.size > pagerState.currentPage && viewModel.noImageOperationOngoing()) {
+                    // Data has been retrieved from PagingSource
+                    pagingItems.itemSnapshotList[pagerState.currentPage]?.let { imageInfo ->
+                        viewModel.changeFavoriteImages(listOf(imageInfo.id))
                     }
                 }
             }),
             moreVertItems = listOf(
                 stringResource(R.string.move_to),
                 stringResource(R.string.copy_to),
+                stringResource(R.string.delete),
                 stringResource(R.string.rename)
             ),
             moreVertItemOnClicks = listOf({
@@ -187,22 +191,38 @@ fun SingleImageComposable(
                     )
                 }
             }, {
+                // request deleting an image
+                currentImageInfo?.id?.let { imageId ->
+                    imageIdList.clear()
+                    imageIdList.add(imageId)
+                    viewModel.requestImagesDeletion(listOf(imageId)) {
+                        showSnackBar(snackbarHostState, "${context.getString(R.string.deletion_fail)}!")
+                    }
+                }
+            }, {
                 // rename an image file
                 renamingImageOngoing = true
             })
         ) { paddingValues ->
+            Log.d(getCallSiteInfoFunc(), "paddingValues: $paddingValues")
             HorizontalPager(
                 state = pagerState,
-                modifier = Modifier.padding(paddingValues)
+                // userScrollEnabled = false, // control the scrolling behavior by pointer input programmatically
+                modifier = Modifier.padding(paddingValues),
+                // Default is 400ms, which is a little longer than expected
+                flingBehavior = PagerDefaults.flingBehavior(pagerState, snapAnimationSpec = tween(Spring.StiffnessLow.toInt(), 0)),
+                key = { pagingItems[it]?.id ?: -1 }
             ) { itemIndex ->
                 pagingItems[itemIndex]?.let { imageInfo ->
                     if (!imageLabelLists.labelingDone) {
+                        Log.d(getCallSiteInfoFunc(), "Recomposition")
                         SingleImagePage(
                             imageInfo = imageInfo,
                             partImageLabelResult = imageLabelLists.partImageLabelList,
                             wholeImageLabelResult = imageLabelLists.wholeImageLabelList,
                             addedLabelList = imageLabelLists.addedLabelList,
                             originalImageSize = viewModel.imageSize,
+                            pageScrolling = pageScrolling,
                             onLabelClick = { label, selected ->
                                 if (selected) viewModel.selectedLabelSet.add(label)
                                 else viewModel.selectedLabelSet.remove(label)
@@ -250,10 +270,11 @@ fun SingleImageComposable(
                                                 }
                                         },
                                     addedLabelList = imageLabelLists.addedLabelList,
-                                    labelingDone = true
+                                    labelingDone = true,
+                                    preview = false
                                 )
                                 // allow labeling again
-                                viewModel.labelingStart = false
+                                // viewModel.labelingStart = false
                             },
                             onLabelAddingClick = { addLabelClicked = true },
                             onAddedLabelClick = { label, selected ->
@@ -264,7 +285,7 @@ fun SingleImageComposable(
                             },
                             onDismiss = {
                                 viewModel.resetImageLabelFlow()
-                                viewModel.labelingStart = false
+                                // viewModel.labelingStart = false
                             },
                             modifier = Modifier.fillMaxSize()
                         )
@@ -277,8 +298,10 @@ fun SingleImageComposable(
                             otherImageLabelResult = imageLabelLists.wholeImageLabelList,
                             onDismiss = {
                                 viewModel.resetImageLabelFlow()
-                                viewModel.labelingStart = false
+                                // viewModel.labelingStart = false
                             },
+                            // labelingClicked = viewModel.labelingClicked,
+                            isPreview = imageLabelLists.preview,
                             modifier = Modifier.fillMaxSize()
                         )
                     }

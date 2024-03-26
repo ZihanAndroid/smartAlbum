@@ -21,13 +21,15 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import java.util.concurrent.Executor
+import java.util.concurrent.Executors
 import javax.inject.Singleton
 
 object DefaultConfiguration {
     const val PAGE_SIZE = 80
     // SQLITE_MAX_VARIABLE_NUMBER in SQLite is 999 by default, set "DB_BATCH_SIZE" to a value smaller than that
     const val DB_BATCH_SIZE = 950
-
+    const val IMAGE_MAX_HEIGHT_PROPORTION = 0.62
     const val IMAGE_PER_ROW = 4
     const val ALBUM_PER_ROW = 2
     const val IMAGE_INTERVAL = 4
@@ -44,11 +46,20 @@ object DefaultConfiguration {
 object ImageModules {
     @Provides
     @Singleton
-    fun provideObjectDetector(): ObjectDetector {
+    fun provideThreadPool(): Executor{
+        return Executors.newCachedThreadPool()
+    }
+
+    @Provides
+    @Singleton
+    fun provideObjectDetector(
+        executor: Executor
+    ): ObjectDetector {
         // https://developers.google.com/ml-kit/vision/object-detection/android
         val options = ObjectDetectorOptions.Builder()
             .setDetectorMode(ObjectDetectorOptions.SINGLE_IMAGE_MODE)
             .enableMultipleObjects()
+            .setExecutor(executor)
             //.enableClassification()  // Optional
             .build()
         return ObjectDetection.getClient(options)
@@ -56,10 +67,13 @@ object ImageModules {
 
     @Provides
     @Singleton
-    fun provideImageLabeler(): ImageLabeler {
+    fun provideImageLabeler(
+        executor: Executor
+    ): ImageLabeler {
         // https://developers.google.com/ml-kit/vision/image-labeling/android
         val options = ImageLabelerOptions.Builder()
             .setConfidenceThreshold(0.6f)
+            .setExecutor(executor)
             .build()
         return ImageLabeling.getClient(options)
     }

@@ -1,5 +1,6 @@
 package com.example.image_multi_recognition.compose.view
 
+import android.util.Log
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,6 +19,7 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import com.example.image_multi_recognition.R
 import com.example.image_multi_recognition.compose.statelessElements.ImagePagerView
 import com.example.image_multi_recognition.compose.statelessElements.TopAppBarForNotRootDestination
+import com.example.image_multi_recognition.util.getCallSiteInfo
 import com.example.image_multi_recognition.viewmodel.AlbumPhotoLabelingViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -51,17 +53,17 @@ fun AlbumPhotoLabelingComposable(
     val snackbarHostState = remember { SnackbarHostState() }
     val labelAddedString = stringResource(R.string.label_added)
 
-    LaunchedEffect(labelAdding){
-        if (labelAdding == false){
-            // https://stackoverflow.com/questions/71471679/jetpack-compose-scaffold-possible-to-override-the-standard-durations-of-snackbar
-            val job = launch {
-                snackbarHostState.showSnackbar(labelAddedString, duration = SnackbarDuration.Indefinite)
-            }
-            delay(1000)
-            job.cancel()
-            labelingClicked = false
-        }
-    }
+    // LaunchedEffect(labelAdding) {
+    //     if (labelAdding == false) {
+    //         // https://stackoverflow.com/questions/71471679/jetpack-compose-scaffold-possible-to-override-the-standard-durations-of-snackbar
+    //         val job = launch {
+    //             snackbarHostState.showSnackbar(labelAddedString, duration = SnackbarDuration.Indefinite)
+    //         }
+    //         delay(1000)
+    //         job.cancel()
+    //         labelingClicked = false
+    //     }
+    // }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -94,9 +96,21 @@ fun AlbumPhotoLabelingComposable(
                         if (labelingState.labelingDone) {
                             IconButton(
                                 onClick = {
-                                    coroutineScope.launch {
-                                        if(!viewModel.onLabelingConfirm(imageSelectedStateHolder)){
-                                            labelingClicked = false
+                                    if(!labelAdding) {
+                                        coroutineScope.launch {
+                                            viewModel.onLabelingConfirm(imageSelectedStateHolder) {
+                                                Log.d(getCallSiteInfo(), "job created")
+                                                val job = launch {
+                                                    Log.d(getCallSiteInfo(), "job started")
+                                                    snackbarHostState.showSnackbar(
+                                                        labelAddedString,
+                                                        duration = SnackbarDuration.Indefinite
+                                                    )
+                                                }
+                                                delay(1000)
+                                                job.cancel()
+                                                labelingClicked = false
+                                            }
                                         }
                                     }
                                 },
@@ -149,7 +163,10 @@ fun AlbumPhotoLabelingComposable(
                     modifier = modifier,
                     pagingItems = pagingItems,
                     onImageClick = { imageInfoId ->
-                        onImageClick(viewModel.album, viewModel.getValidOriginalIndexAfterDeletion(imageInfoId, emptySet()))
+                        onImageClick(
+                            viewModel.album,
+                            viewModel.getValidOriginalIndexAfterDeletion(imageInfoId, emptySet())
+                        )
                     },
                     onSendThumbnailRequest = viewModel::requestThumbnail
                 )
