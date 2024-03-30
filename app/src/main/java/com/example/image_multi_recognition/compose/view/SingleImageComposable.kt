@@ -35,9 +35,11 @@ import com.example.image_multi_recognition.compose.view.imageShow.SingleImagePag
 import com.example.image_multi_recognition.db.ImageLabel
 import com.example.image_multi_recognition.util.getCallSiteInfoFunc
 import com.example.image_multi_recognition.util.showSnackBar
+import com.example.image_multi_recognition.util.splitLastBy
 import com.example.image_multi_recognition.viewmodel.ImageLabelResult
 import com.example.image_multi_recognition.viewmodel.SingleImageViewModel
 import com.example.image_multi_recognition.viewmodel.basic.ImageFileOperationComposableSupport
+import kotlinx.coroutines.launch
 
 @SuppressLint("RememberReturnType")
 @OptIn(ExperimentalFoundationApi::class)
@@ -45,7 +47,7 @@ import com.example.image_multi_recognition.viewmodel.basic.ImageFileOperationCom
 fun SingleImageComposable(
     viewModel: SingleImageViewModel,
     modifier: Modifier = Modifier,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
 ) {
     Log.d(getCallSiteInfoFunc(), "Recomposition")
     val pagingDataFlow by viewModel.pagingFlow.collectAsStateWithLifecycle()
@@ -87,6 +89,7 @@ fun SingleImageComposable(
             } else null
         }
     }
+    var fileNamesInAlbum by remember { mutableStateOf(emptyList<String>()) }
 
     ImageFileOperationComposableSupport(
         support = viewModel,
@@ -103,7 +106,7 @@ fun SingleImageComposable(
         viewModel.clearPage(pagerState.currentPage)
     }
     val pageScrolling by remember { derivedStateOf { pagerState.isScrollInProgress } }
-
+    val showAppBar by remember { mutableStateOf(true) }
     // a strange behavior, once I access "pagerState.pageCount" instead of "pagingItems.itemCount" here, it causes infinite recomposition
     // Log.d(getCallSiteInfoFunc(), "currentPage: ${pagerState.pageCount}")
     // Log.d(getCallSiteInfoFunc(), "currentPage: ${pagingItems.itemCount}")
@@ -201,7 +204,10 @@ fun SingleImageComposable(
                 }
             }, {
                 // rename an image file
-                renamingImageOngoing = true
+                coroutineScope.launch {
+                    fileNamesInAlbum = viewModel.getAllFileNamesByCurrentAlbum(viewModel.currentAlbum!!)
+                    renamingImageOngoing = true
+                }
             })
         ) { paddingValues ->
             Log.d(getCallSiteInfoFunc(), "paddingValues: $paddingValues")
@@ -210,7 +216,10 @@ fun SingleImageComposable(
                 // userScrollEnabled = false, // control the scrolling behavior by pointer input programmatically
                 modifier = Modifier.padding(paddingValues),
                 // Default is 400ms, which is a little longer than expected
-                flingBehavior = PagerDefaults.flingBehavior(pagerState, snapAnimationSpec = tween(Spring.StiffnessLow.toInt(), 0)),
+                flingBehavior = PagerDefaults.flingBehavior(
+                    pagerState,
+                    snapAnimationSpec = tween(Spring.StiffnessLow.toInt(), 0)
+                ),
                 key = { pagingItems[it]?.id ?: -1 }
             ) { itemIndex ->
                 pagingItems[itemIndex]?.let { imageInfo ->
@@ -273,8 +282,6 @@ fun SingleImageComposable(
                                     labelingDone = true,
                                     preview = false
                                 )
-                                // allow labeling again
-                                // viewModel.labelingStart = false
                             },
                             onLabelAddingClick = { addLabelClicked = true },
                             onAddedLabelClick = { label, selected ->
@@ -285,7 +292,6 @@ fun SingleImageComposable(
                             },
                             onDismiss = {
                                 viewModel.resetImageLabelFlow()
-                                // viewModel.labelingStart = false
                             },
                             modifier = Modifier.fillMaxSize()
                         )
@@ -332,24 +338,28 @@ fun SingleImageComposable(
             )
         }
         if (renamingImageOngoing) {
-            SimpleInputView(
-                title = stringResource(R.string.file_rename),
-                initialText = currentImageInfo?.fullImageFile?.name ?: "",
-                excludedNames = setOf(),
-                onDismiss = { renamingImageOngoing = false },
-                onConfirm = { newFileName ->
-                    renamingImageOngoing = false
-                    currentImageInfo?.let { imageInfo ->
-                        viewModel.requestFileNameUpdate(
-                            imageId = imageInfo.id,
-                            absolutePath = imageInfo.fullImageFile.absolutePath,
-                            newFileName = newFileName
-                        ) {
-                            showSnackBar(snackbarHostState, context.getString(R.string.rename_fail))
+            currentImageInfo?.fullImageFile?.name?.let { fileName ->
+                val (prefix, suffix) = remember { fileName.splitLastBy() }
+                val caseInsensitiveSet = remember { fileNamesInAlbum.toSet().map { it.lowercase().trim() }.toSet() }
+                SimpleInputView(
+                    title = stringResource(R.string.file_rename),
+                    initialText = prefix,
+                    checkExcluded = { (it.lowercase().trim() + suffix) in caseInsensitiveSet },
+                    onDismiss = { renamingImageOngoing = false },
+                    onConfirm = { newFileName ->
+                        renamingImageOngoing = false
+                        currentImageInfo?.let { imageInfo ->
+                            viewModel.requestFileNameUpdate(
+                                imageId = imageInfo.id,
+                                absolutePath = imageInfo.fullImageFile.absolutePath,
+                                newFileName = newFileName + suffix
+                            ) {
+                                showSnackBar(snackbarHostState, context.getString(R.string.rename_fail))
+                            }
                         }
                     }
-                }
-            )
+                )
+            }
         }
         if (promptWindowShow) {
             SimpleInfoView(

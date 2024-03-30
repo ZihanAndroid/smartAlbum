@@ -35,6 +35,7 @@ interface ImageFileOperationSupport {
     val renameImageStateFlow: StateFlow<Boolean>
     val addFavoriteImageStateFlow: StateFlow<Boolean>
     val pendingIntentFlow: StateFlow<PendingIntent?>
+
     // val movePendingIntentFlow: StateFlow<StorageHelper.MediaModifyRequest?>
     val albumListStateFlow: StateFlow<List<AlbumInfoWithLatestImage>>
 
@@ -47,32 +48,36 @@ interface ImageFileOperationSupport {
         imageIdList: List<Long>,
         newAlbum: AlbumInfo,
         isAlbumNew: Boolean,
-        onRequestFail: suspend () -> Unit
+        onRequestFail: suspend () -> Unit,
     )
+
     fun moveImagesTo(onComplete: suspend (List<Pair<ImageInfo, StorageHelper.ImageCopyError>>) -> Unit)
     fun copyImagesTo(
         newAlbum: AlbumInfo,
         isAlbumNew: Boolean,
         imageIdList: List<Long>,
-        onComplete: suspend (List<Pair<String, StorageHelper.ImageCopyError>>) -> Unit
+        onComplete: suspend (List<Pair<String, StorageHelper.ImageCopyError>>) -> Unit,
     )
+
     fun changeFavoriteImages(imageIdList: List<Long>)
     fun shareImages(imageIdList: List<Long>)
     fun setAlbumListStateFlow(excludedAlbum: Long)
     fun noImageOperationOngoing(): Boolean
     suspend fun getAllImageIdsByCurrentAlbum(currentAlbum: Long): List<Long>
+    suspend fun getAllFileNamesByCurrentAlbum(currentAlbum: Long): List<String>
     fun requestFileNameUpdate(
         imageId: Long,
         absolutePath: String,
         newFileName: String,
-        onRequestFail: suspend () -> Unit
+        onRequestFail: suspend () -> Unit,
     )
+
     fun updateFileName(onComplete: suspend () -> Unit, onFailure: suspend () -> Unit)
 }
 
 @Singleton
 class ImageFileOperationSupportViewModel @Inject constructor(
-    val repository: ImageRepository
+    val repository: ImageRepository,
 ) : ViewModel(), ImageFileOperationSupport {
     // image operations
     private val _deleteImagesStateFlow = MutableStateFlow(false)
@@ -150,7 +155,7 @@ class ImageFileOperationSupportViewModel @Inject constructor(
         imageIdList: List<Long>,
         newAlbum: AlbumInfo,
         isAlbumNew: Boolean,
-        onRequestFail: suspend () -> Unit
+        onRequestFail: suspend () -> Unit,
     ) {
         _moveImagesStateFlow.value = true
         viewModelScope.launch {
@@ -209,7 +214,7 @@ class ImageFileOperationSupportViewModel @Inject constructor(
         newAlbum: AlbumInfo,
         isAlbumNew: Boolean,
         imageIdList: List<Long>,
-        onComplete: suspend (List<Pair<String, StorageHelper.ImageCopyError>>) -> Unit
+        onComplete: suspend (List<Pair<String, StorageHelper.ImageCopyError>>) -> Unit,
     ) {
         viewModelScope.launch {
             _copyImagesStateFlow.value = true
@@ -262,6 +267,11 @@ class ImageFileOperationSupportViewModel @Inject constructor(
         return repository.getAllImagesByAlbum(currentAlbum)
     }
 
+    override suspend fun getAllFileNamesByCurrentAlbum(currentAlbum: Long): List<String> {
+        return repository.getAllFileNamesByCurrentAlbum(currentAlbum)
+            .map { if (it.startsWith("/")) it.substring(1) else it }
+    }
+
     override fun noImageOperationOngoing(): Boolean =
         !_moveImagesStateFlow.value && !_deleteImagesStateFlow.value && !_renameImagesStateFlow.value
                 && !_copyImagesStateFlow.value && !_addFavoriteImagesStateFlow.value
@@ -271,7 +281,7 @@ class ImageFileOperationSupportViewModel @Inject constructor(
         imageId: Long,
         absolutePath: String,
         newFileName: String,
-        onRequestFail: suspend () -> Unit
+        onRequestFail: suspend () -> Unit,
     ) {
         _renameImagesStateFlow.value = true
         viewModelScope.launch {
@@ -304,13 +314,13 @@ class ImageFileOperationSupportViewModel @Inject constructor(
         val newAlbum: AlbumInfo,
         val isAlbumNew: Boolean,
         val request: StorageHelper.MediaModifyRequest,
-        val imageInfoList: List<ImageInfo>
+        val imageInfoList: List<ImageInfo>,
     )
 
     data class FileNameUpdateRequest(
         val imageId: Long,
         val absolutePath: String,
-        val newFileName: String
+        val newFileName: String,
     )
 }
 

@@ -22,6 +22,7 @@ fun SingleImageView(
     modifier: Modifier = Modifier,
     snackbarHostState: SnackbarHostState,
     onBack: () -> Unit,
+    showAppBar: Boolean = true,
     topRightItems: List<SingleImageViewItem> = emptyList(),
     topRightOnClicks: List<() -> Unit> = emptyList(),
     bottomItems: List<SingleImageViewItem> = emptyList(),
@@ -38,85 +39,89 @@ fun SingleImageView(
     Scaffold(
         snackbarHost = { SnackbarHost(handledSnackbarHostState) },
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.titleLarge.copy(fontSize = 18.sp)
-                    )
-                },
-                navigationIcon = {
-                    IconButton(
-                        onClick = onBack
-                    ) {
-                        Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "back")
-                    }
-                },
-                actions = {
-                    Row {
-                        topRightItems.forEachIndexed { index, item ->
-                            IconButton(
-                                onClick = topRightOnClicks[index]
-                            ) {
-                                Icon(
-                                    imageVector = item.imageVector,
-                                    contentDescription = item.contentDescription,
-                                    modifier = item.modifier.size(22.dp),
-                                    tint = item.tint ?: LocalContentColor.current
-                                )
-                            }
+            if(showAppBar) {
+                TopAppBar(
+                    title = {
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.titleLarge.copy(fontSize = 18.sp)
+                        )
+                    },
+                    navigationIcon = {
+                        IconButton(
+                            onClick = onBack
+                        ) {
+                            Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "back")
                         }
-                        if (moreVertItems.isNotEmpty()) {
-                            // Put the remaining icons into MoreVert icon
-                            Box {
-                                DropdownMenu(
-                                    expanded = showMoreVertItems,
-                                    onDismissRequest = { showMoreVertItems = false },
-                                    modifier = Modifier.crop(vertical = 8.dp)
-                                        .widthIn(min = (LocalConfiguration.current.screenWidthDp / 3).dp)
+                    },
+                    actions = {
+                        Row {
+                            topRightItems.forEachIndexed { index, item ->
+                                IconButton(
+                                    onClick = topRightOnClicks[index]
                                 ) {
-                                    moreVertItems.forEachIndexed { index, text ->
-                                        if (index > 0) Divider()
-                                        DropdownMenuItem(
-                                            onClick = {
-                                                showMoreVertItems = false
-                                                moreVertItemOnClicks[index]()
-                                            },
-                                            text = {
-                                                Text(
-                                                    text = text,
-                                                    style = MaterialTheme.typography.labelLarge
-                                                )
-                                            }
-                                        )
+                                    Icon(
+                                        imageVector = item.imageVector,
+                                        contentDescription = item.contentDescription,
+                                        modifier = item.modifier.size(22.dp),
+                                        tint = item.tint ?: LocalContentColor.current
+                                    )
+                                }
+                            }
+                            if (moreVertItems.isNotEmpty()) {
+                                // Put the remaining icons into MoreVert icon
+                                Box {
+                                    DropdownMenu(
+                                        expanded = showMoreVertItems,
+                                        onDismissRequest = { showMoreVertItems = false },
+                                        modifier = Modifier.crop(vertical = 8.dp)
+                                            .widthIn(min = (LocalConfiguration.current.screenWidthDp / 3).dp)
+                                    ) {
+                                        moreVertItems.forEachIndexed { index, text ->
+                                            if (index > 0) Divider()
+                                            DropdownMenuItem(
+                                                onClick = {
+                                                    showMoreVertItems = false
+                                                    moreVertItemOnClicks[index]()
+                                                },
+                                                text = {
+                                                    Text(
+                                                        text = text,
+                                                        style = MaterialTheme.typography.labelLarge
+                                                    )
+                                                }
+                                            )
+                                        }
+                                    }
+                                    IconButton(
+                                        onClick = { showMoreVertItems = true }
+                                    ) {
+                                        Icon(Icons.Default.MoreVert, "moreVert")
                                     }
                                 }
-                                IconButton(
-                                    onClick = { showMoreVertItems = true }
-                                ) {
-                                    Icon(Icons.Default.MoreVert, "moreVert")
-                                }
                             }
                         }
                     }
-                }
-            )
+                )
+            }
         },
         bottomBar = {
-            Row(
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                bottomItems.forEachIndexed { index, item ->
-                    IconButton(
-                        onClick = bottomOnClicks[index]
-                    ) {
-                        Icon(
-                            imageVector = item.imageVector,
-                            contentDescription = item.contentDescription,
-                            modifier = item.modifier,
-                            tint = item.tint ?: LocalContentColor.current
-                        )
+            if(showAppBar) {
+                Row(
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    bottomItems.forEachIndexed { index, item ->
+                        IconButton(
+                            onClick = bottomOnClicks[index]
+                        ) {
+                            Icon(
+                                imageVector = item.imageVector,
+                                contentDescription = item.contentDescription,
+                                modifier = item.modifier,
+                                tint = item.tint ?: LocalContentColor.current
+                            )
+                        }
                     }
                 }
             }

@@ -45,8 +45,6 @@ object ScopedThumbNailStorage {
 
     // initialize imageStorage and check availability, call this method in MainActivity
     fun Context.setupScopedStorage(): Boolean {
-
-
         return if (!isExternalStorageAvailable()) {
             // use internal storage instead
             imageStorage = File(filesDir, dirName)
@@ -95,7 +93,7 @@ object StorageHelper {
     suspend fun Context.copyImageToSharedStorage(
         newImage: File,
         imageMimeType: String,
-        fileFrom: File
+        fileFrom: File,
     ): ImageCopyError {
         // val type = Environment.DIRECTORY_PICTURES
         // shared storage root for a certain media type
@@ -168,6 +166,43 @@ object StorageHelper {
     // when the user approves "MediaStore.createWriteRequest", no file is modified, you just get the permission to modify
     private fun Context.getImagesWriteRequest(uriList: List<Uri>): PendingIntent {
         return MediaStore.createWriteRequest(contentResolver, uriList)
+    }
+
+
+    suspend fun Context.getDateCreatedForImageFile(fileAbsolutePathList: List<String>): List<Pair<String, Long>> {
+        var index = 0
+        val resList = mutableListOf<List<Pair<String, Long>>>()
+        while (index < fileAbsolutePathList.size) {
+            val nextIndex = if (index + 950 > fileAbsolutePathList.size) fileAbsolutePathList.size else index + 950
+            resList.add(_getDateCreatedForImageFile(fileAbsolutePathList.subList(index, nextIndex)))
+            index = nextIndex
+        }
+        return resList.flatten()
+    }
+
+    // this function assume that the size of fileAbsolutePathList is less than 1000 (SQLite supports at most 999 parameters in an SQL expression)
+    private suspend fun Context._getDateCreatedForImageFile(fileAbsolutePathList: List<String>): List<Pair<String, Long>> {
+        val resList: MutableList<Pair<String, Long>> = mutableListOf()
+        val collection = MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
+        val projection = arrayOf(
+            MediaStore.Images.Media.DATA,
+            MediaStore.Images.Media.DATE_TAKEN
+        )
+        val selection =
+            "${MediaStore.Images.Media.DATA} in (${fileAbsolutePathList.joinToString(separator = ",") { "'$it'" }})"
+
+        withContext(Dispatchers.IO) {
+            contentResolver.query(collection, projection, selection, null, null)?.use { cursor ->
+                val dataColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA)
+                val timeCreatedColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_TAKEN)
+                while (cursor.moveToNext()) {
+                    val data = cursor.getString(dataColumn)
+                    val timeCreated = cursor.getLong(timeCreatedColumn)
+                    resList.add(data to timeCreated)
+                }
+            }
+        }
+        return resList
     }
 
     // Note you cannot just use File.toUri() for MediaStore access, because such uri does not have the corresponding permissions in MediaStore
@@ -278,13 +313,13 @@ object StorageHelper {
 
     data class MediaModifyRequest(
         val pendingIntent: PendingIntent?,
-        val mediaStoreItems: List<MediaStoreItem>
+        val mediaStoreItems: List<MediaStoreItem>,
     )
 
     data class MediaStoreItem(
         val absolutePath: String,
         val contentUri: Uri,
-        val mimeType: String
+        val mimeType: String,
     )
 
     enum class ImageCopyError {

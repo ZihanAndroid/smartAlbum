@@ -21,7 +21,7 @@ fun NavigationGraph(
     // it can be seen as the global ViewModel for the app which has the same lifecycle as the Activity does
     // photoViewModel: PhotoViewModel,
     rootSnackBarHostState: SnackbarHostState,
-    onTopBottomBarHidden: (Boolean)->Unit
+    onTopBottomBarHidden: (Boolean)->Unit,
 ) {
     NavHost(
         modifier = modifier,
@@ -47,7 +47,7 @@ fun NavigationGraph(
                     }
                 },
                 onTopBottomBarHidden = onTopBottomBarHidden,
-                rootSnackBarHostState = rootSnackBarHostState
+                rootSnackBarHostState = rootSnackBarHostState,
             )
         }
         composable(

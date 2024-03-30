@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.compose.foundation.gestures.*
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.runtime.remember
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.positionChanged
@@ -23,7 +24,7 @@ fun <T> List<T>.binarySearchLowerBoundIndex(
     element: T,
     start: Int = 0,
     end: Int = size,
-    comparator: Comparator<T>
+    comparator: Comparator<T>,
 ): Int {
     if (!(start < end && this.size >= end && start >= 0)) return -1
     // set (startIndex, endIndex], the passed parameter is [start, end)
@@ -48,7 +49,7 @@ fun <T> List<T>.binarySearchUpperBoundIndex(
     element: T,
     start: Int = 0,
     end: Int = size,
-    comparator: Comparator<T>
+    comparator: Comparator<T>,
 ): Int {
     if (!(start < end && this.size >= end && start >= 0)) return -1
     // set [startIndex, endIndex)
@@ -80,7 +81,7 @@ fun String.capitalizeFirstChar(): String =
 inline fun <reified T, reified R, reified U : Comparable<U>> List<T>.getDifference(
     list: List<R>,
     keyExtractorThis: (T) -> U,
-    keyExtractorParam: (R) -> U
+    keyExtractorParam: (R) -> U,
 ): Pair<List<T>, List<R>> {
     val notInParamList = mutableListOf<T>()
     val paramMap = mutableMapOf(*(list.map { keyExtractorParam(it) to (it to false) }.toTypedArray()))
@@ -204,75 +205,13 @@ suspend fun showSnackBar(snackbarHostState: SnackbarHostState, message: String, 
     }
 }
 
-
-// add some customization to detectTransformGestures()
-suspend fun PointerInputScope.detectTransformGesturesWithoutConsume(
-    panZoomLock: Boolean = false,
-    // onGesture() returns a Boolean to indicate whether we need to call onGesture for further pointer event
-    onGestureFinished: () -> Unit = {},
-    onGesture: (centroid: Offset, pan: Offset, zoom: Float, rotation: Float, onEventConsume: () -> Unit) -> Boolean,
-) {
-    awaitEachGesture {
-        var rotation = 0f
-        var zoom = 1f
-        var pan = Offset.Zero
-        var pastTouchSlop = false
-        val touchSlop = viewConfiguration.touchSlop
-        var lockedToPanZoom = false
-        var cancelFurtherOnGesture = false
-
-        awaitFirstDown(requireUnconsumed = false)
-
-        do {
-            val event = awaitPointerEvent()
-            // just calling awaitPointerEvent() repeatedly to wait for this gesture finished
-            val canceled = event.changes.fastAny { it.isConsumed }
-            if (!canceled) {
-                if (cancelFurtherOnGesture) continue
-                val zoomChange = event.calculateZoom()
-                val rotationChange = event.calculateRotation()
-                val panChange = event.calculatePan()
-
-                if (!pastTouchSlop) {
-                    zoom *= zoomChange
-                    rotation += rotationChange
-                    pan += panChange
-
-                    val centroidSize = event.calculateCentroidSize(useCurrent = false)
-                    val zoomMotion = abs(1 - zoom) * centroidSize
-                    val rotationMotion = abs(rotation * PI.toFloat() * centroidSize / 180f)
-                    val panMotion = pan.getDistance()
-
-                    if (zoomMotion > touchSlop ||
-                        rotationMotion > touchSlop ||
-                        panMotion > touchSlop
-                    ) {
-                        pastTouchSlop = true
-                        lockedToPanZoom = panZoomLock && rotationMotion < touchSlop
-                    }
-                }
-
-                if (pastTouchSlop) {
-                    val centroid = event.calculateCentroid(useCurrent = false)
-                    val effectiveRotation = if (lockedToPanZoom) 0f else rotationChange
-                    if (effectiveRotation != 0f ||
-                        zoomChange != 1f ||
-                        panChange != Offset.Zero
-                    ) {
-                        if (!onGesture(centroid, panChange, zoomChange, effectiveRotation) {
-                                // let the caller decides whether to consume the event or not
-                                event.changes.fastForEach {
-                                    if (it.positionChanged()) {
-                                        it.consume()
-                                    }
-                                }
-                            }) {
-                            cancelFurtherOnGesture = true
-                        }
-                    }
-                }
-            }
-        } while (!canceled && event.changes.fastAny { it.pressed })
-        // onGestureFinished()
+// abc.jpg -> "abc", "jpg"
+fun String.splitLastBy(delimiter: Char = '.'): Pair<String, String> {
+    val lastIndex = indexOfLast { char -> char == '.' }.let {
+        if (it == -1) length else it
     }
+    val prefix = this.substring(0, lastIndex)
+    // suffix contains '.'
+    val suffix = this.substring(lastIndex, length)
+    return prefix to suffix
 }

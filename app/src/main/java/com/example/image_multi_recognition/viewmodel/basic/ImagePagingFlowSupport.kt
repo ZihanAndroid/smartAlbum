@@ -18,6 +18,7 @@ import java.time.ZoneId
 interface ImagePagingFlowSupport {
     val imageIdOriginalIndexMap: MutableMap<Long, Int>
 
+    // Note this method is valid only when you set "enablePlaceholders = true" in Pager
     fun getValidOriginalIndexAfterDeletion(imageId: Long, deletedImageIds: Set<Long>): Int {
         assert(imageId !in deletedImageIds)
         val imageIdIndex = imageIdOriginalIndexMap[imageId]!!

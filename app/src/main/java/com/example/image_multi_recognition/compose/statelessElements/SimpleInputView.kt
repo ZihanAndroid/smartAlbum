@@ -18,8 +18,16 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.example.image_multi_recognition.R
+import com.example.image_multi_recognition.util.splitLastBy
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -27,19 +35,21 @@ import com.example.image_multi_recognition.R
 fun SimpleInputView(
     modifier: Modifier = Modifier,
     initialText: String = "",
-    excludedNames: Set<String> = emptySet(),    // case insensitive
+    suffixText: String = "",
     title: String,
+    checkExcluded: (String) -> Boolean,
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit,
 ) {
-    var input by rememberSaveable { mutableStateOf(initialText) }
-    val caseInsensitiveSet = setOf(*excludedNames.map { it.lowercase().trim() }.toTypedArray())
+    // disallow change file extension name
+    var input by remember { mutableStateOf(TextFieldValue(initialText)) }
+    var firstLoad = rememberSaveable { true }
     // 0: no error, 1: empty string, 2: name exists
-    var errorCode by rememberSaveable { mutableStateOf(0) }
+    var errorCode by rememberSaveable { mutableIntStateOf(0) }
     val onConfirmClick: (String) -> Unit = { inputString ->
         if (inputString.trim().isEmpty()) {
             errorCode = 1
-        } else if (inputString.trim().lowercase() in caseInsensitiveSet) {
+        } else if (checkExcluded(inputString)) {
             errorCode = 2
         } else {
             onConfirm(inputString)
@@ -80,39 +90,67 @@ fun SimpleInputView(
                     text = title,
                     style = MaterialTheme.typography.titleMedium,
                 )
-                OutlinedTextField(
-                    value = input,
-                    onValueChange = {
-                        // remove error string when user starts input
-                        if (it.trim().lowercase() in caseInsensitiveSet) {
-                            if (errorCode != 2) errorCode = 2
-                        } else if (errorCode != 0) errorCode = 0
-                        input = it
-                    },
-                    label = {
-                        Text(
-                            text = when (errorCode) {
-                                0 -> stringResource(R.string.input_name)
-                                1 -> stringResource(R.string.name_empty)
-                                else -> stringResource(R.string.name_exist)
-                            },
-                            style = MaterialTheme.typography.labelLarge,
-                            color = if (errorCode == 0) Color.Unspecified else colorResource(R.color.colorAccent)
-                        )
-                    },
-                    singleLine = true,
-                    keyboardActions = KeyboardActions(onDone = { onConfirmClick(input) }),
-                    colors = TextFieldDefaults.colors(
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                        focusedContainerColor = MaterialTheme.colorScheme.surface
-                    ),
-                    modifier = Modifier.focusRequester(textFieldFocusRequester).padding(8.dp).fillMaxWidth()
-                )
+                Row {
+                    OutlinedTextField(
+                        value = input.let {
+                            if (firstLoad) {
+                                it.copy(selection = TextRange(0, it.text.length))
+                            } else it
+                        },
+                        onValueChange = {
+                            // remove error string when user starts input
+                            if (firstLoad) {
+                                firstLoad = false
+                            } else { // skip the on-the-fly check for the first load
+                                if (checkExcluded(it.text)) {
+                                    if (errorCode != 2) errorCode = 2
+                                } else if (errorCode != 0) errorCode = 0
+                            }
+                            input = it
+                        },
+                        label = {
+                            Text(
+                                text = when (errorCode) {
+                                    0 -> {
+                                        stringResource(R.string.input_name)
+                                        buildAnnotatedString {
+                                            append(stringResource(R.string.input_name))
+                                            if(suffixText.isNotEmpty()) {
+                                                append(" (")
+                                                withStyle(
+                                                    SpanStyle(fontStyle = FontStyle.Italic)
+                                                ) {
+                                                    append(suffixText)
+                                                }
+                                                append(")")
+                                            }
+                                        }
+                                    }
+
+                                    1 -> buildAnnotatedString { append(stringResource(R.string.name_empty)) }
+                                    else -> buildAnnotatedString { append(stringResource(R.string.name_exist)) }
+                                },
+                                style = MaterialTheme.typography.labelLarge,
+                                color = if (errorCode == 0) Color.Unspecified else colorResource(R.color.colorAccent),
+                            )
+
+                        },
+                        singleLine = true,
+                        keyboardActions = KeyboardActions(onDone = { onConfirmClick(input.text) }),
+                        colors = TextFieldDefaults.colors(
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                            focusedContainerColor = MaterialTheme.colorScheme.surface
+                        ),
+                        // textStyle = LocalTextStyle.current.copy(textAlign = TextAlign.End),
+                        modifier = Modifier.focusRequester(textFieldFocusRequester).padding(8.dp)
+                    )
+                }
+
                 InputViewButtons(
                     modifier = Modifier.padding(horizontal = 8.dp),
                     onDismiss = onDismiss,
-                    onConfirm = { onConfirmClick(input) },
-                    confirmDisabled = errorCode != 0 || input.trim().isEmpty()
+                    onConfirm = { onConfirmClick(input.text) },
+                    confirmDisabled = input.text.trim().let { checkExcluded(it) || it.isEmpty() }
                 )
             }
         }
@@ -124,7 +162,7 @@ fun InputViewButtons(
     modifier: Modifier = Modifier,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
-    confirmDisabled: Boolean = false
+    confirmDisabled: Boolean = false,
 ) {
     Row(
         modifier = modifier.fillMaxWidth(),

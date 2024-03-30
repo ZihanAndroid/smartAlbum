@@ -12,13 +12,15 @@ class ApplicationForHilt : Application(), ImageLoaderFactory {
     // Coil ImageLoader
     override fun newImageLoader(): ImageLoader {
         return ImageLoader.Builder(this)
+            // disable coil's disk cache because we already created thumbnail files in the disk
+            .diskCache(null)
             .crossfade(true)
             .memoryCache {
                 MemoryCache.Builder(this)
                     .maxSizePercent(0.25)
                     .build()
             }
-           // .diskCache {  // we do not need diskCache here, because we do not load images through network in this app
+           // .diskCache {
            //     DiskCache.Builder()
            //         .directory(this.cacheDir.resolve("image_cache"))
            //         .maxSizePercent(0.02)

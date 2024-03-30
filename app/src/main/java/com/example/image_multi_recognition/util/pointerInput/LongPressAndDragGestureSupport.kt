@@ -1,4 +1,4 @@
-package com.example.image_multi_recognition.util
+package com.example.image_multi_recognition.util.pointerInput
 
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -25,6 +25,7 @@ fun <T : Any> keyAtOffset(hitPoint: Offset, lazyGridState: LazyGridState): T? =
 //            delay(10)
 //        }
 //    }
+// This modifier assumes that key are provided in consecutive way
 fun <T : Any> Modifier.longPressAndDragSelection(
     lazyGridState: LazyGridState,
     scrollingAmountSetter: (Float) -> Unit,

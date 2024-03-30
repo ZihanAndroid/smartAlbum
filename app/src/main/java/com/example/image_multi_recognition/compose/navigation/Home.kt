@@ -1,10 +1,12 @@
 package com.example.image_multi_recognition.compose.navigation
 
 import android.util.Log
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -12,31 +14,23 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.NavDestination
-import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.image_multi_recognition.R
-import com.example.image_multi_recognition.compose.statelessElements.crop
-import com.example.image_multi_recognition.util.ExifHelper
 import com.example.image_multi_recognition.util.getCallSiteInfoFunc
 import com.example.image_multi_recognition.viewmodel.PhotoViewModel
 
-@Preview
 @Composable
 fun Home(
     modifier: Modifier = Modifier,
-    // photoViewModel: PhotoViewModel
+    refreshAllImages: () -> Unit,
+    // photoViewModel: PhotoViewModel,
 ) {
 
     val navController = rememberNavController()
@@ -47,7 +41,7 @@ fun Home(
     val currentDestination = currentBackStack?.destination
     Log.d(getCallSiteInfoFunc(), "current destination: ${currentDestination?.route?.split("/")?.get(0)}")
     // the child destination may want to hide the top and bottom bar
-    var topBottomBarHidden by rememberSaveable{ mutableStateOf(false) }
+    var topBottomBarHidden by rememberSaveable { mutableStateOf(false) }
 
     // for Root destination, use Scaffold,
     // for non-root destination, avoid showing topBar and bottomBar here, (they are parts of destination composable, not part of Scaffold)
@@ -56,18 +50,19 @@ fun Home(
             snackbarHost = { SnackbarHost(snackBarHostState) },
             topBar = {
                 // show different topBar based on current destination
-                if(!topBottomBarHidden) {
+                if (!topBottomBarHidden) {
                     ScaffoldTopBar(
                         destination = currentDestination,
                         popUpItems = listOf(stringResource(R.string.NavPopUpItem_NotDone)),
                         onPopUpItemClick = listOf(
                             { contentShownBySnackBar = it }
-                        )
+                        ),
+                        refreshAllImages = refreshAllImages
                     )
                 }
             },
             bottomBar = {
-                if(!topBottomBarHidden) {
+                if (!topBottomBarHidden) {
                     ScaffoldBottomBar(
                         navController = navController,
                         items = Destination.entries.filter { it.isRootDestination },
@@ -82,15 +77,15 @@ fun Home(
                 modifier = Modifier.padding(suggestedPadding),
                 // photoViewModel = photoViewModel,
                 rootSnackBarHostState = snackBarHostState,
-                onTopBottomBarHidden = {topBottomBarHidden = it}
+                onTopBottomBarHidden = { topBottomBarHidden = it },
             )
         }
     } else {
         NavigationGraph(
             navController = navController,
             // photoViewModel = photoViewModel,
-            onTopBottomBarHidden = {topBottomBarHidden = it},
-            rootSnackBarHostState = snackBarHostState
+            onTopBottomBarHidden = { topBottomBarHidden = it },
+            rootSnackBarHostState = snackBarHostState,
         )
     }
 
@@ -105,9 +100,10 @@ fun Home(
 @Composable
 fun ScaffoldTopBar(
     destination: NavDestination?,
+    refreshAllImages: () -> Unit,
     popUpItems: List<String> = emptyList(),
     onPopUpItemClick: List<(String) -> Unit> = emptyList(),
-    onSettingClick: () -> Unit = {}
+    onSettingClick: () -> Unit = {},
 ) {
     var menuOpened by rememberSaveable { mutableStateOf(false) }
 
@@ -120,30 +116,23 @@ fun ScaffoldTopBar(
             )
         },
         actions = {
-//            if (Destination.LABEL.sameRouteAs(destination)) {
-//                IconButton(
-//                    onClick = {}
-//                ) {
-//                    Icon(
-//                        imageVector = ImageVector.vectorResource(R.drawable.baseline_new_label_24),
-//                        contentDescription = "autoLabeling",
-//                    )
-//                }
-//            }
+            // the refresh is done automatically, do not need to refresh manually
+            if (listOf(Destination.PHOTO, Destination.ALBUM, Destination.LABEL).includeRouteAs(destination)) {
+                IconButton(
+                    onClick = refreshAllImages
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = "topBarMoreOptions",
+                    )
+                }
+            }
             IconButton(
                 onClick = onSettingClick
             ) {
                 Icon(
                     imageVector = Icons.Default.Settings,
                     contentDescription = "topBarSettings",
-                )
-            }
-            IconButton(
-                onClick = { menuOpened = true }
-            ) {
-                Icon(
-                    imageVector = Icons.Default.MoreVert,
-                    contentDescription = "topBarMoreOptions",
                 )
             }
             DropdownMenu(
@@ -191,7 +180,7 @@ fun ScaffoldBottomBar(
                             contentDescription = destination.name,
                             modifier = Modifier.size(28.dp)
                         )
-                        if(destination.sameRouteAs(currentDestination)){
+                        if (destination.sameRouteAs(currentDestination)) {
                             Text(
                                 text = stringResource(destination.label!!),
                                 style = MaterialTheme.typography.labelSmall

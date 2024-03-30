@@ -1,6 +1,9 @@
 package com.example.image_multi_recognition.compose.view
 
 import android.util.Log
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
@@ -23,11 +26,13 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -38,11 +43,12 @@ import com.example.image_multi_recognition.DefaultConfiguration
 import com.example.image_multi_recognition.R
 import com.example.image_multi_recognition.compose.statelessElements.PagingItemImage
 import com.example.image_multi_recognition.compose.statelessElements.ToggleIcon
+import com.example.image_multi_recognition.compose.view.imageShow.OffsetAnimationData
+import com.example.image_multi_recognition.compose.view.imageShow.ZoomAnimationData
 import com.example.image_multi_recognition.db.ImageInfo
 import com.example.image_multi_recognition.util.AlbumPathDecoder
 import com.example.image_multi_recognition.util.getCallSiteInfo
-import com.example.image_multi_recognition.util.longPressAndDragSelection
-import com.example.image_multi_recognition.util.onKeyProvided
+import com.example.image_multi_recognition.util.pointerInput.*
 import com.example.image_multi_recognition.viewmodel.LabelUiModel
 import com.example.image_multi_recognition.viewmodel.LabelingViewModel
 import com.example.image_multi_recognition.viewmodel.basic.LabelingSupportViewModel
@@ -55,7 +61,7 @@ fun LabelingComposable(
     modifier: Modifier = Modifier,
     viewModel: LabelingViewModel,
     rootSnackBarHostState: SnackbarHostState,
-    onAlbumClick: (Long) -> Unit
+    onAlbumClick: (Long) -> Unit,
 ) {
     var labelingClicked by rememberSaveable { mutableStateOf(false) }
     val labelingState by viewModel.labelingStateFlow.collectAsStateWithLifecycle()
@@ -196,7 +202,7 @@ fun ImageLabelingResultShow(
     pagingItems: LazyPagingItems<LabelUiModel>,
     modifier: Modifier = Modifier,
     imageSelectedStateHolderParam: Map<String, Map<Long, MutableState<Boolean>>>,
-    labelSelectedStateHolderParam: Map<String, MutableState<Boolean>>
+    labelSelectedStateHolderParam: Map<String, MutableState<Boolean>>,
 ) {
     var doubleClickedImageInfo: ImageInfo? by remember { mutableStateOf(null) }
     val gridState = rememberLazyGridState()
@@ -273,7 +279,7 @@ fun ImageLabelingResultShow(
                     modifySelectedState(keyImageIdLabelMap[key], null)
                 },
                 keyTracked = { it > 0 }
-            )
+            ).fillMaxSize()
         ) {
             items(
                 key = { index ->
@@ -353,11 +359,9 @@ fun ImageLabelingResultShow(
                                 availableScreenWidth = LocalConfiguration.current.screenWidthDp,
                                 onSendThumbnailRequest = { _, _ -> },
                                 selectionMode = true,
-                                // selected = !excludedImageSet.contains(ExcludedItem(item.imageInfo.id, item.label))
                                 selected = imageSelectedStateHolder[item.label]?.get(item.imageInfo.id)?.value
                                     ?: false
                             )
-                            //}
                         }
                     }
                 }
@@ -389,63 +393,113 @@ fun FullScreenImage(
     imageFile: File,
     modifier: Modifier = Modifier,
     contentDescription: String = "",
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
 ) {
-    var offset by remember { mutableStateOf(Offset.Zero) }
-    var zoom by remember { mutableStateOf(1f) }
+    val zoomState = remember { mutableFloatStateOf(1f) }
+    var zoom by zoomState   // you need to pass the state to some modifier
+    val offsetState = remember { mutableStateOf(Offset.Zero) }
+    var offset by offsetState
+    val rememberedTransformOriginState = remember { mutableStateOf(TransformOrigin.Center) }
+    var rememberedTransformOrigin by rememberedTransformOriginState
+    val coroutineScope = rememberCoroutineScope()
 
-    Box(
+    // animation
+    var zoomAnimationData by remember { mutableStateOf(ZoomAnimationData()) }
+    var offsetAnimationData by remember { mutableStateOf(OffsetAnimationData()) }
+    var transformByAnimation by remember { mutableStateOf(false) }
+    val animatedZoomOffset = remember { Animatable(ZoomOffsetData(), ZoomOffsetData.VectorConverter) }
+    var animationTriggered by remember { mutableStateOf<Boolean?>(null) }
+    var animationOngoing by remember { mutableStateOf(false) }
+    var currentImageSize by remember { mutableStateOf(IntSize.Zero) }
+    var currentParentSize by remember { mutableStateOf(IntSize.Zero) }
+
+    LaunchedEffect(animationTriggered) {
+        if (animationTriggered != null) {
+            animationOngoing = true
+            animatedZoomOffset.animateTo(
+                targetValue = ZoomOffsetData(
+                    zoomAnimationData.right,
+                    Offset(offsetAnimationData.right.x, offsetAnimationData.right.y)
+                ),
+                animationSpec = spring(stiffness = Spring.StiffnessMedium)
+            )
+            offset = offsetAnimationData.right
+            zoom = zoomAnimationData.right
+            animationOngoing = false
+        }
+    }
+
+
+    Column (
         modifier = Modifier.fillMaxSize()
-            .background(colorResource(R.color.greyAlpha).copy(alpha = 0.75f))
-            //.clickable { onDismiss() }
-            .pointerInput(Unit) {
-                detectTapGestures(
-                    // double tap to zoom in or zoom out
-                    onDoubleTap = { tapOffset ->
-                        zoom = if (zoom > 1f) 1f else 2f
-                        offset = Offset(x = tapOffset.x * (1 - zoom), y = tapOffset.y * (1 - zoom))
-                    },
-                    onTap = { onDismiss() }
-                )
-            }.pointerInput(Unit) {
-                // Note that you can access "size" inside the PointerInputScope to get the size of AsyncImage
-                // you can use that "size" to restrict the boundary of offset.
-                // Also note that the value centroid is corresponding to the coordinate of "size",
-                // the pointer input region without the offset and zooming
-                detectTransformGestures { centroid, pan, gestureZoom, _ ->
-                    Log.d(
-                        getCallSiteInfo(),
-                        "size: $size, centroid: [${centroid.x}, ${centroid.y}], pan: [${pan.x}, ${pan.y}]"
-                    )
-                    // val oldZoom = zoom
-                    zoom = (zoom * gestureZoom).coerceAtLeast(1f)
-                    // equation:
-                    // (centroid.x - offset.x) / zoom = (centroid.x - newOffset.x) / newZoom
-                    // Then we get "newOffset.x"
-                    offset = Offset(
-                        x = (gestureZoom * (offset.x - centroid.x + pan.x) + centroid.x)
-                            .coerceIn(size.width * (1 - zoom), 0f),
-                        y = (gestureZoom * (offset.y - centroid.y + pan.y) + centroid.y)
-                            .coerceIn(size.height * (1 - zoom), 0f)
-                    )
+            .background(colorResource(R.color.black).copy(alpha = 0.6f))
+            .doubleClickZoomSupport(
+                currentImageSize = currentImageSize,
+                currentParentSize = currentParentSize,
+                zoomState = zoomState,
+                offsetState = offsetState,
+                onSingleTap = { onDismiss() }
+            ) { newZoom, newOffset, newTransformOrigin, offsetRemained ->
+                // for animation
+                zoomAnimationData = ZoomAnimationData(left = zoom, right = newZoom)
+                offsetAnimationData = if (zoom == 1f || offset == Offset.Zero) {
+                    OffsetAnimationData(Offset.Zero, Offset.Zero)
+                } else {
+                    OffsetAnimationData(offsetRemained, Offset.Zero)
                 }
-            },
-        contentAlignment = Alignment.Center
+                coroutineScope.launch {
+                    newTransformOrigin?.let {
+                        rememberedTransformOrigin = it
+                    }
+                    // set animation zoom offset when transformByAnimation is set to true
+                    animatedZoomOffset.snapTo(
+                        ZoomOffsetData(
+                            zoomAnimationData.left,
+                            Offset(offsetRemained.x, offsetRemained.y)
+                        )
+                    )
+                    if (!transformByAnimation) transformByAnimation = true
+                    animationTriggered = !(animationTriggered ?: false)
+                }
+            }.pinchZoomAndPanMoveSupport(
+                currentImageSize = currentImageSize,
+                currentParentSize = currentParentSize,
+                zoomState = zoomState,
+                offsetState = offsetState,
+                transformOriginState = rememberedTransformOriginState,
+                shouldRun = { !animationOngoing },
+            ) { newZoom, newOffset, newTransformOrigin ->
+                if (transformByAnimation) transformByAnimation = false
+                zoom = newZoom
+                offset = newOffset
+                newTransformOrigin?.let { rememberedTransformOrigin = it }
+            }.onGloballyPositioned { currentParentSize = it.size },
+        verticalArrangement = Arrangement.Center
     ) {
+        Log.d("", "AsyncImage is called")
         AsyncImage(
             model = imageFile,
             contentDescription = contentDescription,
-            modifier = modifier
+            modifier = modifier.fillMaxWidth()
                 .heightIn(max = (LocalConfiguration.current.screenHeightDp * 0.8).toInt().dp)
                 //.clipToBounds()
+                .onGloballyPositioned { currentImageSize = it.size }
                 .graphicsLayer {
-                    scaleX = zoom
-                    scaleY = zoom
-                    translationX = offset.x
-                    translationY = offset.y
-                    // transformOrigin affects where the scaling starts from
-                    transformOrigin = TransformOrigin(0f, 0f)
-                }.fillMaxWidth()
+                    if (transformByAnimation) {
+                        scaleX = animatedZoomOffset.value.zoom
+                        scaleY = animatedZoomOffset.value.zoom
+                        translationX = animatedZoomOffset.value.offset.x
+                        translationY = animatedZoomOffset.value.offset.y
+                        // Note the range of a TransformOrigin is [0.0, 1.0]
+                        transformOrigin = rememberedTransformOrigin
+                    } else {
+                        scaleX = zoom
+                        scaleY = zoom
+                        translationX = offset.x
+                        translationY = offset.y
+                        transformOrigin = TransformOrigin(0f, 0f)
+                    }
+                }
         )
     }
 }
@@ -457,7 +511,7 @@ fun LabelingOnProgress(
     scanPaused: Boolean,
     onResumePauseClicked: () -> Unit,
     onCancelClicked: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Box(
         contentAlignment = Alignment.Center,
@@ -521,7 +575,7 @@ fun UnlabeledInfo(
 
 internal suspend fun LabelingSupportViewModel.onLabelingConfirm(
     imageSelectedStateHolder: Map<String, Map<Long, MutableState<Boolean>>>,
-    onComplete: suspend () -> Unit = {}
+    onComplete: suspend () -> Unit = {},
 ) {
     startLabelAdding()
     addSelectedImageLabel(getSelectionResult(imageSelectedStateHolder)) { onComplete() }
@@ -538,7 +592,7 @@ internal fun getSelectionResult(imageSelectedStateHolder: Map<String, Map<Long, 
 
 private data class ImageIdAndLabel(
     val imageId: Long,
-    val label: String
+    val label: String,
 )
 
 private fun LabelUiModel.Item.toImageIdAndLabel() = ImageIdAndLabel(imageInfo.id, label)

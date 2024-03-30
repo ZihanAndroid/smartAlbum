@@ -18,12 +18,12 @@ interface ImageInfoDao : BaseDao<ImageInfo> {
 //    """)
 //    suspend fun setLabeled(id: Long, labeled: Boolean)
 
-    @Query("""
-        SELECT id, path
-        FROM image_info
-        WHERE album=:album
-    """)
-    suspend fun getAllImageOfAlbum(album: Long): List<ImageIdPath>
+    // @Query("""
+    //     SELECT id, path
+    //     FROM image_info
+    //     WHERE album=:album
+    // """)
+    // suspend fun getAllImageOfAlbum(album: Long): List<ImageIdPath>
 
     @Query("""
         DELETE FROM image_info
@@ -59,6 +59,18 @@ interface ImageInfoDao : BaseDao<ImageInfo> {
         where album=:album
     """)
     suspend fun getAllImagesByAlbum(album: Long): List<Long>
+
+    @Query("""
+        SELECT * FROM image_info
+        where album=:album
+    """)
+    suspend fun getAllImageInfoByAlbum(album: Long): List<ImageInfo>
+
+    @Query("""
+        SELECT path FROM image_info
+        where album=:album
+    """)
+    suspend fun getAllFileNamesByCurrentAlbum(album: Long): List<String>
 
     @Query("""
         SELECT * FROM image_info

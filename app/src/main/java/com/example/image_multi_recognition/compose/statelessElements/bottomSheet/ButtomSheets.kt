@@ -115,12 +115,13 @@ fun BottomSheetView(
             )
         }
     } else {
+        val excludedAlbumSet = remember { AlbumPathDecoder.albumNamePathMap.map { it.value.name }.toSet() }
         SimpleInputView(
             title = stringResource(R.string.new_album),
-            excludedNames = AlbumPathDecoder.albumNamePathMap.map { it.value.name }.toSet(),
+            checkExcluded = {it in excludedAlbumSet},
             onDismiss = onDismissRequest,
             onConfirm = { newAlbum ->
-
+                Log.d("", "$newAlbum is required")
             }
         )
     }

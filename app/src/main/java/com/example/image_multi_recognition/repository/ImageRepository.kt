@@ -2,7 +2,10 @@ package com.example.image_multi_recognition.repository
 
 import android.app.PendingIntent
 import android.content.Context
+import android.database.ContentObserver
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
 import android.provider.MediaStore
 import android.util.Log
 import androidx.core.graphics.drawable.toBitmap
@@ -13,6 +16,8 @@ import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.room.withTransaction
+import coil.compose.AsyncImagePainter
+import coil.compose.ImagePainter
 import coil.imageLoader
 import coil.request.ImageRequest
 import com.example.image_multi_recognition.AppData
@@ -22,10 +27,7 @@ import com.example.image_multi_recognition.util.*
 import com.google.mlkit.vision.common.InputImage
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -33,7 +35,9 @@ import java.io.IOException
 import java.sql.Timestamp
 import java.util.concurrent.Executors
 import javax.inject.Inject
+import javax.inject.Singleton
 
+@Singleton
 class ImageRepository @Inject constructor(
     private val appDataStore: DataStore<AppData>,
     private val database: ImageInfoDatabase,
@@ -41,29 +45,27 @@ class ImageRepository @Inject constructor(
     private val imageInfoDao: ImageInfoDao,
     private val albumInfoDao: AlbumInfoDao,
     // private val imageBoundDao: ImageBoundDao,
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
 ) {
+    init {
+        context.contentResolver.registerContentObserver(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, true,
+            object : ContentObserver(Handler(Looper.getMainLooper())) {
+                override fun onChange(selfChange: Boolean) {
+                    // it seems that taking a new photo may trigger this onChange callback multiple times
+                    _mediaStoreChangeFlow.value = !_mediaStoreChangeFlow.value
+                }
+            })
+    }
+
+    private val _mediaStoreChangeFlow = MutableStateFlow(false)
+    val mediaStoreChangeFlow: StateFlow<Boolean>
+        get() = _mediaStoreChangeFlow
+
     // val dataReadyFlow =
-    val backgroundThreadPool = Executors.newCachedThreadPool()
+    val backgroundThreadPool = Executors.newFixedThreadPool(1)
 
-    val mediaStoreVersionFlow: Flow<String> = appDataStore.data.catch { e ->
-        if (e is IOException) {
-            Log.e("DataStoreProtoRepository", "Error in fetching AppData:\n${e.stackTraceToString()}")
-            emit(AppData.getDefaultInstance())
-        } else {
-            throw e
-        }
-    }.map { it.mediaStoreVersion }.distinctUntilChanged()
-
-    // return newVersion if media stored is updated or empty string if not
-    fun checkMediaStoreUpdate(previousVersion: String): String {
-        return MediaStore.getVersion(context).let { newVersion ->
-            if (newVersion != previousVersion) {
-                newVersion
-            } else {
-                ""
-            }
-        }
+    fun resetAllImages(){
+        _mediaStoreChangeFlow.value = !_mediaStoreChangeFlow.value
     }
 
     suspend fun updateMediaStoreVersion(newVersion: String) {
@@ -77,47 +79,8 @@ class ImageRepository @Inject constructor(
     }
 
     suspend fun getAllAlbumInfo(): List<AlbumInfo> = albumInfoDao.getAllAlbums()
-//    suspend fun registerUnLabeledImage(
-//        album: String,
-//        path: String,
-//        imageBounds: List<ImageBound>,
-//        timestamp: Long
-//    ): Boolean {
-//        if (imageBounds.isEmpty()) {
-//            Log.e(getCallSiteInfo(), "An empty imageBounds list is passed")
-//            return false
-//        }
-//        return database.withTransaction {
-//            imageInfoDao.insert(
-//                ImageInfo(
-//                    id = imageBounds[0].id,
-//                    album = album,
-//                    path = path,
-//                    labeled = false,
-//                    timestamp = timestamp
-//                )
-//            )
-//            imageBoundDao.insert(*imageBounds.toTypedArray())
-//            true
-//        }
-//    }
 
-//    suspend fun registerLabeledImage(imageLabels: List<ImageLabel>): Boolean {
-//        if (imageLabels.isEmpty()) {
-//            Log.e(getCallSiteInfo(), "An empty imageLabels list is passed")
-//            return false
-//        }
-//        return database.withTransaction {
-//            imageLabels[0].id.let { id ->
-//                imageInfoDao.setLabeled(id, true)
-//                imageLabelDao.insert(*imageLabels.toTypedArray())
-//                imageBoundDao.deleteById(id) > 0
-//            }
-//        }
-//    }
-
-    // suspend fun getBoundsFromId(id: Long): List<Rect> = imageBoundDao.selectById(id)
-    suspend fun getAllImageOfAlbum(album: Long): List<ImageIdPath> = imageInfoDao.getAllImageOfAlbum(album)
+    suspend fun getAllImageInfoByAlbum(album: Long): List<ImageInfo> = imageInfoDao.getAllImageInfoByAlbum(album)
 
     suspend fun deleteAndAddAlbums(deletedAlbums: List<AlbumInfo>, addedAlbums: List<AlbumInfo>): List<Long> {
         return database.withTransaction {
@@ -126,38 +89,52 @@ class ImageRepository @Inject constructor(
         }
     }
 
+    // return added or existing album id
+    suspend fun addAlbumInfoIfNotExist(albumInfo: AlbumInfo): Long {
+        return database.withTransaction {
+            albumInfoDao.getAlbumByPath(albumInfo.path) ?: albumInfoDao.insert(albumInfo)[0]
+        }
+    }
+
     suspend fun deleteAndAddImages(
         deletedIds: List<Long>,
         addedFilePaths: List<File>,
         // cachedImages: List<ByteArray>,
-        album: Long
-    ): List<ImageInfo> = database.withTransaction {
-        imageInfoDao.deleteById(deletedIds)
-        val addedImageInfo = addedFilePaths.map { file ->
-            ImageInfo(
-                album = album,
-                path = file.absolutePath.removePrefix(AlbumPathDecoder.decode(album).absolutePath),
-                // cachedImage = cachedImages[index],
-                // if failed to get createdTime of the image file, set timestamp to null
-                timestamp = try {
-                    ExifHelper.getImageCreatedTime(file)?.let { Timestamp.valueOf(it).time } ?: 0
-                } catch (e: IOException) {
-                    0
-                }
-            )
+        album: Long,
+    ): List<ImageInfo> {
+        val createdDate = with(StorageHelper) {
+            context.getDateCreatedForImageFile(addedFilePaths.map { it.absolutePath }).toMap()
         }
-        // set auto-increment id
-        val ids = imageInfoDao.insert(*addedImageInfo.toTypedArray())
-        if (ids.size == addedImageInfo.size) {
-            addedImageInfo.mapIndexed { index, oldImageInfo ->
-                oldImageInfo.copy(id = ids[index])
+        return database.withTransaction {
+            imageInfoDao.deleteById(deletedIds)
+            val addedImageInfo = addedFilePaths.map { file ->
+                ImageInfo(
+                    album = album,
+                    path = file.absolutePath.removePrefix(AlbumPathDecoder.decode(album).absolutePath + "/"),
+                    // cachedImage = cachedImages[index],
+                    // if failed to get createdTime of the image file, set timestamp to null
+                    timestamp = try {
+                        // getting meta-data from MediaStore is much than reading files
+                        createdDate[file.absolutePath] ?: 0
+                        // ExifHelper.getImageCreatedTime(file)?.let { Timestamp.valueOf(it).time } ?: 0
+                    } catch (e: IOException) {
+                        0
+                    }
+                )
             }
-        } else {
-            Log.e(
-                getCallSiteInfo(),
-                "Image insertion failed!\nreturned ids: ${ids.joinToString()}\nImageInfo to add: ${addedImageInfo.joinToString()}"
-            )
-            emptyList()
+            // set auto-increment id
+            val ids = imageInfoDao.insert(*addedImageInfo.toTypedArray())
+            if (ids.size == addedImageInfo.size) {
+                addedImageInfo.mapIndexed { index, oldImageInfo ->
+                    oldImageInfo.copy(id = ids[index])
+                }
+            } else {
+                Log.e(
+                    getCallSiteInfo(),
+                    "Image insertion failed!\nreturned ids: ${ids.joinToString()}\nImageInfo to add: ${addedImageInfo.joinToString()}"
+                )
+                emptyList()
+            }
         }
     }
 
@@ -246,7 +223,7 @@ class ImageRepository @Inject constructor(
             .target(
                 onSuccess = { drawable ->
                     // Log.d(getCallSiteInfo(), "Current Thread: ${Thread.currentThread().name}")
-                    Log.d(getCallSiteInfo(), "load image success: ${imageInfo.fullImageFile.absolutePath}")
+                    // Log.d(getCallSiteInfo(), "load image success: ${imageInfo.fullImageFile.absolutePath}")
                     backgroundThreadPool.submit {
                         imageInfo.setImageCache(drawable.toBitmap())
                     }
@@ -257,15 +234,6 @@ class ImageRepository @Inject constructor(
             ).build()
         if (!imageInfo.isThumbnailAvailable) context.imageLoader.enqueue(request)
     }
-
-//    fun genThumbnail(file: File, imageInfo: ImageInfo) {
-//        try {
-//            // val bitmap = context.contentResolver.loadThumbnail(Uri.fromFile(file), imageInfo.thumbnailSize, null)
-//            // imageInfo.setImageCache(bitmap)
-//        } catch (e: IOException) {
-//            Log.e(getCallSiteInfo(), e.stackTraceToString())
-//        }
-//    }
 
     fun getInputImage(file: File): InputImage? {
         return try {
@@ -281,6 +249,7 @@ class ImageRepository @Inject constructor(
 
     suspend fun getImageInfoById(ids: List<Long>) = imageInfoDao.getImageInfoByIds(*ids.toLongArray())
     suspend fun getAllImagesByAlbum(album: Long) = imageInfoDao.getAllImagesByAlbum(album)
+    suspend fun getAllFileNamesByCurrentAlbum(album: Long) = imageInfoDao.getAllFileNamesByCurrentAlbum(album)
 
     fun getUnlabeledAlbumPagerFlow(): Flow<PagingData<AlbumWithLatestImage>> = Pager(
         config = PagingConfig(
@@ -299,7 +268,7 @@ class ImageRepository @Inject constructor(
         imageLabelDao.insert(*imageLabels.toTypedArray())
     }
 
-    suspend fun getLabelsByImageId(imageId: Long): List<ImageLabel>{
+    suspend fun getLabelsByImageId(imageId: Long): List<ImageLabel> {
         return imageLabelDao.getLabelsByImageId(imageId)
     }
 
@@ -336,7 +305,7 @@ class ImageRepository @Inject constructor(
     // return a map for (absolute paths : error code) for failed items
     suspend fun copyImageTo(
         newAlbum: AlbumInfo,
-        items: List<ImageCopyItem>
+        items: List<ImageCopyItem>,
     ): Map<String, StorageHelper.ImageCopyError> {
         val failedItems = mutableMapOf<String, StorageHelper.ImageCopyError>()
         with(StorageHelper) {
@@ -390,6 +359,6 @@ class ImageRepository @Inject constructor(
 
     data class ImageCopyItem(
         val absolutePath: String,
-        val mimeType: String
+        val mimeType: String,
     )
 }

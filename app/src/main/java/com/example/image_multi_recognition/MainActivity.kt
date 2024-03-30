@@ -15,6 +15,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.image_multi_recognition.compose.navigation.Home
 import com.example.image_multi_recognition.permission.PermissionAccessor
+import com.example.image_multi_recognition.repository.ImageRepository
 import com.example.image_multi_recognition.ui.theme.Image_multi_recognitionTheme
 import com.example.image_multi_recognition.util.ScopedThumbNailStorage
 import com.example.image_multi_recognition.util.getCallSiteInfo
@@ -26,6 +27,9 @@ import javax.inject.Inject
 class MainActivity : ComponentActivity() {
     @Inject
     lateinit var permissionAccessor: PermissionAccessor
+
+    @Inject
+    lateinit var repository: ImageRepository
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -76,8 +80,10 @@ class MainActivity : ComponentActivity() {
                 Image_multi_recognitionTheme {
                     // A surface container using the 'background' color from the theme
                     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                        Home()
-                        // TestComposable()
+                        Home(
+                            // photoViewModel = viewModel(),
+                            refreshAllImages = {repository.resetAllImages()}
+                        )
                     }
                 }
             }

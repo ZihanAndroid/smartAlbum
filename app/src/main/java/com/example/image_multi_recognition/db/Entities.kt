@@ -33,7 +33,7 @@ data class ImageInfo(
     // @ColumnInfo(name = "labeled") var labeled: Boolean,
     // @ColumnInfo(name = "albumId") val albumId: Long,
     @ColumnInfo(name = "time_created") val timestamp: Long,
-    @ColumnInfo(name="favorite") val favorite: Boolean = false
+    @ColumnInfo(name = "favorite") val favorite: Boolean = false,
     // cache thumbnail's path instead of thumbnail itself
     // https://developer.android.com/topic/performance/sqlite-performance-best-practices#store-small
     // @ColumnInfo(name = "cached_image", typeAffinity = ColumnInfo.BLOB) var cachedImage: ByteArray = ByteArray(0)
@@ -61,12 +61,13 @@ data class ImageInfo(
         try {
             if (!thumbnailFile.exists() || thumbnailFile.length() == 0L) {
                 FileOutputStream(thumbnailFile).use { outputStream ->
+                    // it seems that compressing to WEBP_LOSSY is much slower than JPEG
                     if (!bitmap.compress(Bitmap.CompressFormat.JPEG, 10, outputStream)) {
                         throw IOException("Failed to compress bitmap!")
                     }
                     Log.d(
                         getCallSiteInfo(),
-                        "Thumbnail size: ${String.format("%.f", thumbnailFile.length() / 1024.0)}KB"
+                        "Thumbnail size: ${String.format("%d", thumbnailFile.length() / 1024)}KB"
                     )
                 }
             }
