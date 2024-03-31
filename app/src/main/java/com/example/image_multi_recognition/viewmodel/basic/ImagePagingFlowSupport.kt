@@ -36,6 +36,8 @@ class ImagePagingFlowSupportImpl @Inject constructor(
         return when (pagingSourceType) {
             ImagePagingFlowSupport.PagingSourceType.UNLABELED_IMAGE -> false
             ImagePagingFlowSupport.PagingSourceType.LABEL_IMAGE -> {
+                // prevLabelImagePagingSource has not been initialized yet, try to initialize it first
+                if(prevPagingSource == null) prevPagingSource = repository.prevLabelImagePagingSource
                 prevPagingSource?.invalid?.apply {
                     Log.d("res","paging flow invalid: $this")
                     if (this) {
@@ -45,6 +47,7 @@ class ImagePagingFlowSupportImpl @Inject constructor(
             }
 
             ImagePagingFlowSupport.PagingSourceType.IMAGE -> {
+                if(prevPagingSource == null) prevPagingSource = repository.prevImagePagingSource
                 prevPagingSource?.invalid?.apply {
                     if (this) {
                         prevPagingSource = repository.prevImagePagingSource
