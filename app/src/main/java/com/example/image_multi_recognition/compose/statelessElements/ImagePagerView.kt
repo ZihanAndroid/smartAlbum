@@ -45,6 +45,7 @@ import com.example.image_multi_recognition.util.pointerInput.onKeyProvided
 import com.example.image_multi_recognition.util.pointerInput.tapClick
 import com.example.image_multi_recognition.viewmodel.UiModel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.isActive
 import java.io.File
 
@@ -67,14 +68,16 @@ fun ImagePagerView(
     Log.d(getCallSiteInfoFunc(), "Recomposition")
     val lazyGridState = rememberLazyGridState()
     val availableScreenWidth = LocalConfiguration.current.screenWidthDp
-    var scrollingAmountOnDragging by rememberSaveable { mutableStateOf(0f) }
+    var scrollingAmountOnDragging by rememberSaveable { mutableFloatStateOf(0f) }
+    val scrolledFlow = remember { MutableStateFlow(false) }
 
     // scrolling LaunchedEffect
     LaunchedEffect(scrollingAmountOnDragging) {
         if (scrollingAmountOnDragging != 0f) {
             while (isActive) {
                 lazyGridState.scrollBy(scrollingAmountOnDragging)
-                delay(10)
+                scrolledFlow.value = !scrolledFlow.value
+                delay(20)
             }
         }
     }
@@ -90,6 +93,7 @@ fun ImagePagerView(
             if (enableLongPressAndDrag) {
                 currentModifier.longPressAndDragSelection<Int>(
                     lazyGridState = lazyGridState,
+                    scrolledFlow = scrolledFlow,
                     autoScrollThreshold = with(LocalDensity.current) { DefaultConfiguration.DRAG_SCROLL_THRESHOLD.dp.toPx() },
                     scrollingAmountSetter = { scrollingAmountOnDragging = it },
                     provideDraggedKeys = { initialKey, prevKey, currentKey ->
@@ -296,7 +300,7 @@ fun PagingItemImage(
     }
 
     val imagePath = if (imageInfo.isThumbnailAvailable) {
-        Log.d(getCallSiteInfoFunc(), "Loading image: ${imageInfo.path} from cache")
+        // Log.d(getCallSiteInfoFunc(), "Loading image: ${imageInfo.path} from cache")
         imageInfo.thumbnailFile
     } else {
         Log.d(getCallSiteInfoFunc(), "Loading image: ${imageInfo.path} from disk")

@@ -99,9 +99,7 @@ fun AlbumPhotoLabelingComposable(
                                     if(!labelAdding) {
                                         coroutineScope.launch {
                                             viewModel.onLabelingConfirm(imageSelectedStateHolder) {
-                                                Log.d(getCallSiteInfo(), "job created")
                                                 val job = launch {
-                                                    Log.d(getCallSiteInfo(), "job started")
                                                     snackbarHostState.showSnackbar(
                                                         labelAddedString,
                                                         duration = SnackbarDuration.Indefinite
@@ -145,7 +143,7 @@ fun AlbumPhotoLabelingComposable(
                     val scanPaused by viewModel.scanPaused.collectAsStateWithLifecycle()
                     LabelingOnProgress(
                         progress = labelingState.labeledImageCount.toFloat() / viewModel.imageObjectsMap.size,
-                        text = "${stringResource(R.string.loading)}...\t${labelingState.labeledImageCount}/${viewModel.imageObjectsMap.size}",
+                        text = "${stringResource(R.string.labeling)}...    ${labelingState.labeledImageCount}/${viewModel.imageObjectsMap.size}",
                         onResumePauseClicked = { viewModel.reverseScanPaused() },
                         onCancelClicked = {
                             viewModel.scanCancelled = true
@@ -165,7 +163,7 @@ fun AlbumPhotoLabelingComposable(
                     onImageClick = { imageInfoId ->
                         onImageClick(
                             viewModel.album,
-                            viewModel.getValidOriginalIndexAfterDeletion(imageInfoId, emptySet())
+                            viewModel.getValidOriginalIndex(imageInfoId)
                         )
                     },
                     onSendThumbnailRequest = viewModel::requestThumbnail

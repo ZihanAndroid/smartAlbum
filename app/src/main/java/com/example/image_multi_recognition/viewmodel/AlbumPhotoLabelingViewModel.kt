@@ -11,6 +11,7 @@ import com.example.image_multi_recognition.db.ImageInfo
 import com.example.image_multi_recognition.repository.ImageRepository
 import com.example.image_multi_recognition.util.toPagingSource
 import com.example.image_multi_recognition.viewmodel.basic.ImagePagingFlowSupport
+import com.example.image_multi_recognition.viewmodel.basic.ImagePagingFlowSupportImpl
 import com.example.image_multi_recognition.viewmodel.basic.LabelingSupportViewModel
 import com.google.mlkit.vision.label.ImageLabeler
 import com.google.mlkit.vision.objects.ObjectDetector
@@ -25,11 +26,11 @@ class AlbumPhotoLabelingViewModel @Inject constructor(
     private val repository: ImageRepository,
     objectDetector: ObjectDetector,
     imageLabeler: ImageLabeler,
-    savedStateHandle: SavedStateHandle
-) : LabelingSupportViewModel(repository, objectDetector, imageLabeler), ImagePagingFlowSupport {
+    savedStateHandle: SavedStateHandle,
+    imagePagingFlowSupportImpl: ImagePagingFlowSupportImpl,
+) : LabelingSupportViewModel(repository, objectDetector, imageLabeler),
+    ImagePagingFlowSupport by imagePagingFlowSupportImpl {
     val album = savedStateHandle.get<Long>("album")!!
-
-    override val imageIdOriginalIndexMap: MutableMap<Long, Int> = mutableMapOf()
 
     private val unlabeledImageInAlbumFlow = repository.getUnlabeledImagesByAlbum(album)
     val unlabeledImageInAlbumStateFlow: StateFlow<List<ImageInfo>> =
@@ -48,7 +49,8 @@ class AlbumPhotoLabelingViewModel @Inject constructor(
                         enablePlaceholders = true
                     ),
                     pagingSourceFactory = { imageInfoList.toPagingSource(DefaultConfiguration.PAGE_SIZE) }
-                ).flow.convertImageInfoPagingFlow().cachedIn(viewModelScope)
+                ).flow.convertImageInfoPagingFlow(ImagePagingFlowSupport.PagingSourceType.UNLABELED_IMAGE)
+                    .cachedIn(viewModelScope)
             }
         }
     }

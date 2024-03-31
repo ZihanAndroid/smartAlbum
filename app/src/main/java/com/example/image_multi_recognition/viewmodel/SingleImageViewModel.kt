@@ -12,7 +12,10 @@ import com.example.image_multi_recognition.DefaultConfiguration
 import com.example.image_multi_recognition.db.ImageInfo
 import com.example.image_multi_recognition.db.LabelInfo
 import com.example.image_multi_recognition.repository.ImageRepository
-import com.example.image_multi_recognition.util.*
+import com.example.image_multi_recognition.util.ControlledRunner
+import com.example.image_multi_recognition.util.ExifHelper
+import com.example.image_multi_recognition.util.getCallSiteInfo
+import com.example.image_multi_recognition.util.getCallSiteInfoFunc
 import com.example.image_multi_recognition.viewmodel.basic.ImageFileOperationSupport
 import com.example.image_multi_recognition.viewmodel.basic.ImageFileOperationSupportViewModel
 import com.example.image_multi_recognition.viewmodel.basic.LabelSearchSupport
@@ -44,8 +47,8 @@ class SingleImageViewModel @Inject constructor(
     val argumentValue: String = savedStateHandle.get<String>("argumentValue")!!
     val initialKey: Int = savedStateHandle.get<Int>("initialKey")!!
     var currentAlbum: Long? = null
+    var currentLabel: String? = null
 
-    private val controlledLabelingRunner = ControlledRunner<Unit>()
     private val controlledLabelingDoneRunner = ControlledRunner<Unit>()
 
     private val _pagingFlow: MutableStateFlow<Flow<PagingData<ImageInfo>>> = MutableStateFlow(emptyFlow())
@@ -56,7 +59,10 @@ class SingleImageViewModel @Inject constructor(
     val imageLabelStateFlow: StateFlow<ImageLabelLists>
         get() = _imageLabelStateFlow
 
-    // var labelingStart = false
+    private val _labelAddedCacheAvailable = MutableStateFlow(false)
+    val labelAddedCacheAvailable: StateFlow<Boolean>
+        get() = _labelAddedCacheAvailable
+
     var labelingClicked = false
     private var currentPage: Int = initialKey
     private var labelingFinished = true
@@ -78,13 +84,18 @@ class SingleImageViewModel @Inject constructor(
         when (argumentType) {
             1 -> {
                 currentAlbum = argumentValue.toLong()
+                currentLabel = null
                 setPagingFlow(argumentValue.toLong(), initialKey)
             }
 
-            2 -> setLabelPagingFlow(argumentValue, initialKey)
+            2 -> {
+                currentLabel = argumentValue
+                setLabelPagingFlow(argumentValue, initialKey)
+            }
 
             3 -> {
                 currentAlbum = argumentValue.toLong()
+                currentLabel = ""
                 setAlbumUnlabeledPagingFlow(argumentValue.toLong(), initialKey)
             }
 
@@ -97,6 +108,7 @@ class SingleImageViewModel @Inject constructor(
     }
 
     private fun setPagingFlow(album: Long, initialKey: Int) {
+        Log.d(getCallSiteInfoFunc(), "initialKey: $initialKey")
         _pagingFlow.value = repository.getImagePagingFlow(album, initialKey).cachedIn(viewModelScope)
     }
 
@@ -113,10 +125,6 @@ class SingleImageViewModel @Inject constructor(
     // To avoid this, you cannot cancel the callback from "OnSuccessListener" of "objectDetector",
     // instead, you should avoid doing something when you know the task is not needed in the callback
     fun detectAndLabelImage(imageInfo: ImageInfo) {
-        // handle the request only once for each page
-        // Log.d(getCallSiteInfoFunc(), "labelingStart: $labelingStart")
-        // if (labelingStart) return
-        // labelingStart = true
         if (!labelingFinished) return
         labelingFinished = false
         labelingClicked = true
@@ -269,10 +277,14 @@ class SingleImageViewModel @Inject constructor(
     // clearPage does not change states
     fun clearPage(nextPage: Int) {
         _imageLabelStateFlow.value = ImageLabelLists()
-        // labelingStart = false
+        _labelAddedCacheAvailable.value = false
         labelingClicked = false
         currentPage = nextPage
         selectedLabelSet.clear()
+    }
+
+    fun setLabelAddedCacheAvailable(){
+        _labelAddedCacheAvailable.value = true
     }
 
     // reset _imageLabelFlow to start recomposition

@@ -14,6 +14,7 @@ import com.example.image_multi_recognition.util.*
 import com.example.image_multi_recognition.viewmodel.basic.ImageFileOperationSupport
 import com.example.image_multi_recognition.viewmodel.basic.ImageFileOperationSupportViewModel
 import com.example.image_multi_recognition.viewmodel.basic.ImagePagingFlowSupport
+import com.example.image_multi_recognition.viewmodel.basic.ImagePagingFlowSupportImpl
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
@@ -28,13 +29,12 @@ open class PhotoViewModel @Inject constructor(
     private val repository: ImageRepository,
     imageFileOperationSupportViewModel: ImageFileOperationSupportViewModel,
     savedStateHandle: SavedStateHandle,
-) : ViewModel(), ImagePagingFlowSupport, ImageFileOperationSupport by imageFileOperationSupportViewModel {
+    imagePagingFlowSupportImpl: ImagePagingFlowSupportImpl
+) : ViewModel(), ImagePagingFlowSupport by imagePagingFlowSupportImpl,
+    ImageFileOperationSupport by imageFileOperationSupportViewModel {
     // "ImageFileOperationSupport by imageFileOperationSupportViewModel": you can use delegation to achieve something like multi-inheritance in Kotlin
     private val backgroundThreadPool: ExecutorService = Executors.newCachedThreadPool()
 
-    override val imageIdOriginalIndexMap: MutableMap<Long, Int> = mutableMapOf()
-
-    // private var currentMediaStoreVersion: String? = null
     // for startDestination, the "album" is null by default
     var currentAlbum: Long? = savedStateHandle.get<Long>("album")
 
@@ -195,7 +195,7 @@ open class PhotoViewModel @Inject constructor(
 
     fun setImagePagingFlow(album: Long) {
         _pagingFlow.value = repository.getImagePagingFlow(album)
-            .convertImageInfoPagingFlow()
+            .convertImageInfoPagingFlow(ImagePagingFlowSupport.PagingSourceType.IMAGE)
             .cachedIn(viewModelScope)
     }
 

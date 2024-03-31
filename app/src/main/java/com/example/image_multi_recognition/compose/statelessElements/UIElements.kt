@@ -132,7 +132,7 @@ fun ElevatedSmallIconButton(
 @Composable
 fun TopAppBarForNotRootDestination(
     title: String,
-    onBack: () -> Unit,
+    onBack: (() -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
     TopAppBar(
@@ -147,10 +147,12 @@ fun TopAppBarForNotRootDestination(
             )
         },
         navigationIcon = {
-            IconButton(
-                onClick = onBack
-            ) {
-                Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "back")
+            if(onBack != null) {
+                IconButton(
+                    onClick = onBack
+                ) {
+                    Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "back")
+                }
             }
         },
         actions = actions

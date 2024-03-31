@@ -28,9 +28,10 @@ import com.example.image_multi_recognition.db.LabelInfo
 fun InputSearch(
     modifier: Modifier = Modifier,
     onStartFocused: Boolean = true,
-    dropDownItemHeight: Int = 48,
+    dropDownItemHeight: Int = 42,
     onSearchClick: (String) -> Unit,
-    onSearchTextChange: (String) -> List<LabelInfo>
+    onSearchClickNoFurther: () -> Unit,
+    onSearchTextChange: (String) -> List<LabelInfo>,
 ) {
     var inputSelected by rememberSaveable { mutableStateOf(true) }
     var inputText by rememberSaveable { mutableStateOf("") }
@@ -63,22 +64,17 @@ fun InputSearch(
                 )
             },
             modifier = Modifier.fillMaxWidth().onFocusChanged {
-                if(it.isFocused){
+                if (it.isFocused) {
                     dropDownItems = onSearchTextChange(inputText.trim())
-                }else if(!it.isFocused){
+                } else if (!it.isFocused) {
                     // clear DropdownMenu to avoid the following strange exception (or bug of Jetpack Compose?)
                     // "java.lang.IllegalStateException: LayoutCoordinate operations are only valid when isAttached is true"
                     dropDownItems = emptyList()
                 }
                 inputSelected = it.isFocused
             }.menuAnchor().focusRequester(textFieldFocusRequester),
-            trailingIcon = {
-                IconButton(
-                    onClick = {
-                        onSearchClick(inputText)
-                        focusManager.clearFocus()
-                    }
-                ) {
+            leadingIcon = {
+                IconButton(onClick = onSearchClickNoFurther) {
                     Icon(
                         imageVector = Icons.Filled.Search,
                         contentDescription = "search"
@@ -123,7 +119,7 @@ fun InputSearch(
                             inputText = dropDownItems[index].label
                             focusManager.clearFocus()
                         },
-                        modifier = Modifier.height(dropDownItemHeight.dp)
+                        modifier = Modifier.height(dropDownItemHeight.dp),
                     )
                 }
             }

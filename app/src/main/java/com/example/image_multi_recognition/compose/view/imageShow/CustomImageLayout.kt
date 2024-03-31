@@ -92,6 +92,7 @@ fun CustomImageLayout(
             }
             if (labelPlaceables.isNotEmpty()) {
                 val places = if (!placingStrategyWithCache) {
+                    CachedLabelPlacingStrategy.clearLabels()
                     CachedLabelPlacingStrategy.placeLabels(
                         imageLabelList.map { it.label },
                         imageLabelList.map { it.rect!! }

@@ -48,7 +48,6 @@ fun PhotoComposable(
 
     var selectionMode by rememberSaveable { mutableStateOf(false) }
     val selectedImageIdSet = remember { MutableSetWithState<Long>() }
-    val deletedImageIds = rememberSaveable { mutableSetOf<Long>() }
 
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
@@ -61,10 +60,6 @@ fun PhotoComposable(
         support = viewModel,
         snackbarHostState = rootSnackBarHostState ?: snackbarHostState,
         imageIdList = selectedImageIdSet.toList(),
-        onDeleteSuccessExtra = { deletedImageIds.addAll(selectedImageIdSet) },
-        onMoveSuccessExtra = { failedImages ->
-            deletedImageIds.addAll(selectedImageIdSet - failedImages.map { it.id }.toSet())
-        }
     )
 
     Scaffold(
@@ -176,21 +171,13 @@ fun PhotoComposable(
                 modifier = modifier.padding(paddingValues),
                 pagingItems = pagingItems,
                 onImageClick = { imageInfoId ->
-                    // Log.d(getCallSiteInfoFunc(), "deleted image ids: ${deletedImageIds.joinToString()}")
                     onImageClick(
                         viewModel.currentAlbum!!,
-                        viewModel.getValidOriginalIndexAfterDeletion(imageInfoId, deletedImageIds)
+                        viewModel.getValidOriginalIndex(imageInfoId)
                     )
                 },
                 onSendThumbnailRequest = viewModel::requestThumbnail,
                 selectionMode = selectionMode,
-                // onClickSelect = { imageId ->
-                //     if (imageId !in selectedImageIdSet) {
-                //         selectedImageIdSet += imageId
-                //     } else {
-                //         selectedImageIdSet -= imageId
-                //     }
-                // },
                 onLongPress = { imageId ->
                     if (!selectionMode && viewModel.noImageOperationOngoing()) {
                         selectedImageIdSet.clear()
@@ -207,7 +194,6 @@ fun PhotoComposable(
                 },
                 enableLongPressAndDrag = true,
                 selectedImageIdSet = selectedImageIdSet,
-                deletedImageIds = deletedImageIds,
             )
 
             if (albumSelectState.selecting) {

@@ -2,46 +2,89 @@ package com.example.image_multi_recognition.viewmodel.basic
 
 import android.util.Log
 import androidx.paging.PagingData
+import androidx.paging.PagingSource
 import androidx.paging.insertSeparators
 import androidx.paging.map
 import com.example.image_multi_recognition.db.ImageInfo
+import com.example.image_multi_recognition.repository.ImageRepository
 import com.example.image_multi_recognition.util.ExifHelper
 import com.example.image_multi_recognition.util.getCallSiteInfo
 import com.example.image_multi_recognition.viewmodel.UiModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import java.io.File
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
+import javax.inject.Inject
 
 interface ImagePagingFlowSupport {
-    val imageIdOriginalIndexMap: MutableMap<Long, Int>
+    fun getValidOriginalIndex(imageId: Long): Int
+    fun Flow<PagingData<ImageInfo>>.convertImageInfoPagingFlow(pagingSourceType: PagingSourceType): Flow<PagingData<UiModel>>
+    enum class PagingSourceType {
+        UNLABELED_IMAGE, LABEL_IMAGE, IMAGE
+    }
+}
 
-    // Note this method is valid only when you set "enablePlaceholders = true" in Pager
-    fun getValidOriginalIndexAfterDeletion(imageId: Long, deletedImageIds: Set<Long>): Int {
-        assert(imageId !in deletedImageIds)
-        val imageIdIndex = imageIdOriginalIndexMap[imageId]!!
-        var bias = 0
-        deletedImageIds.forEach { deletedImageId ->
-            if(imageIdOriginalIndexMap[deletedImageId]!! < imageIdIndex ) ++bias
+// Not Singleton
+class ImagePagingFlowSupportImpl @Inject constructor(
+    private val repository: ImageRepository,
+) : ImagePagingFlowSupport {
+    private val imageIdOriginalIndexMap: MutableMap<Long, Int> = mutableMapOf()
+
+    private var prevPagingSource: PagingSource<Int, ImageInfo>? = null
+    private fun previousInvalid(pagingSourceType: ImagePagingFlowSupport.PagingSourceType): Boolean {
+        return when (pagingSourceType) {
+            ImagePagingFlowSupport.PagingSourceType.UNLABELED_IMAGE -> false
+            ImagePagingFlowSupport.PagingSourceType.LABEL_IMAGE -> {
+                prevPagingSource?.invalid?.apply {
+                    Log.d("res","paging flow invalid: $this")
+                    if (this) {
+                        prevPagingSource = repository.prevLabelImagePagingSource
+                    }
+                } ?: false
+            }
+
+            ImagePagingFlowSupport.PagingSourceType.IMAGE -> {
+                prevPagingSource?.invalid?.apply {
+                    if (this) {
+                        prevPagingSource = repository.prevImagePagingSource
+                    }
+                } ?: false
+            }
         }
-        return imageIdIndex-bias
     }
 
-    fun Flow<PagingData<ImageInfo>>.convertImageInfoPagingFlow(): Flow<PagingData<UiModel>> {
+    override fun getValidOriginalIndex(imageId: Long): Int {
+        return imageIdOriginalIndexMap[imageId]!!
+    }
+
+    override fun Flow<PagingData<ImageInfo>>.convertImageInfoPagingFlow(pagingSourceType: ImagePagingFlowSupport.PagingSourceType): Flow<PagingData<UiModel>> {
         var count = 0
         val epochTime = LocalDateTime.ofInstant(Instant.EPOCH, ZoneId.of("UTC"))
+        // init prevPagingSource
+        prevPagingSource = when (pagingSourceType) {
+            ImagePagingFlowSupport.PagingSourceType.UNLABELED_IMAGE -> null
+            ImagePagingFlowSupport.PagingSourceType.LABEL_IMAGE -> repository.prevLabelImagePagingSource
+            ImagePagingFlowSupport.PagingSourceType.IMAGE -> repository.prevImagePagingSource
+        }
 
         return this.map { pagingData ->
             // there are two ways to get more pagingData
             // (1) fetch more ImageInfo from DB
             // (2) the PagingSource is invalid due to DB change (like changing "favorite" property of ImageInfo and update DB)
             pagingData.map { imageInfo ->
-                // Log.d(getCallSiteInfo(), "original index value: $count")
+                // first we check the whether the previouPaging source is valid,
+                // if not (like the user may take new photos and causes changes in MediaStore, which is captured by our app)
+                // we discard previous imageIdOriginalIndexMap
+                if (previousInvalid(pagingSourceType)) {
+                    imageIdOriginalIndexMap.clear()
+                    count = 0
+                }
                 if (imageInfo.id !in imageIdOriginalIndexMap) {
                     // do not publish a new originalIndex for imageInfo that has been handled
                     UiModel.Item(imageInfo).apply {
+                        // pagingData.insertSeparators() below at other items to paging.
+                        // we need to get rid of these items to pass the correct originalIndex for navigation
                         imageIdOriginalIndexMap[this.imageInfo.id] = ++count
                     }
                 } else {

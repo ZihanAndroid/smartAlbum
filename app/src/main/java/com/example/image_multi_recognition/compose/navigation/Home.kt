@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.navigation.NavDestination
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -50,7 +51,7 @@ fun Home(
             snackbarHost = { SnackbarHost(snackBarHostState) },
             topBar = {
                 // show different topBar based on current destination
-                if (!topBottomBarHidden) {
+                if (!topBottomBarHidden && !Destination.LABEL.sameRouteAs(currentDestination)) {
                     ScaffoldTopBar(
                         destination = currentDestination,
                         popUpItems = listOf(stringResource(R.string.NavPopUpItem_NotDone)),
@@ -112,7 +113,7 @@ fun ScaffoldTopBar(
         title = {
             Text(
                 text = stringResource(R.string.app_name),
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleLarge.copy(fontSize = 18.sp),
             )
         },
         actions = {
@@ -140,7 +141,7 @@ fun ScaffoldTopBar(
                 onDismissRequest = { menuOpened = false }
             ) {
                 popUpItems.forEachIndexed { index, item ->
-                    if (index > 0) Divider()
+                    if (index > 0) HorizontalDivider()
                     DropdownMenuItem(
                         onClick = {
                             menuOpened = false

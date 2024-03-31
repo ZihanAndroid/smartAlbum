@@ -1,5 +1,6 @@
 package com.example.image_multi_recognition.util.pointerInput
 
+import android.util.Log
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.lazy.grid.LazyGridState
@@ -8,6 +9,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.round
 import androidx.compose.ui.unit.toIntRect
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
+import java.util.concurrent.Flow
 
 // "key" is set by items(key) in lazy grid, assume key is consecutive
 fun <T : Any> keyAtOffset(hitPoint: Offset, lazyGridState: LazyGridState): T? =
@@ -28,6 +33,7 @@ fun <T : Any> keyAtOffset(hitPoint: Offset, lazyGridState: LazyGridState): T? =
 // This modifier assumes that key are provided in consecutive way
 fun <T : Any> Modifier.longPressAndDragSelection(
     lazyGridState: LazyGridState,
+    scrolledFlow: StateFlow<Boolean>,
     scrollingAmountSetter: (Float) -> Unit,
     autoScrollThreshold: Float,
     // "provideDraggedKeys" can be set by using "onKeyProvided" below if the key is Int
@@ -40,57 +46,79 @@ fun <T : Any> Modifier.longPressAndDragSelection(
 ) = this.pointerInput(Unit) {
     var initialKey: T? = null
     var prevKey: T? = null
-
-    detectDragGesturesAfterLongPress(
-        onDragStart = { offset ->
-            initialKey = keyAtOffset<T>(offset, lazyGridState)?.let { key ->
-                if (keyTracked(key)) {
-                    prevKey = key
-                    provideDraggedKeys(key, key, key)
-                    onSelectionStart(key)
-                    key
-                } else null
-            }
-        },
-        onDrag = { change, _ ->
-            if (initialKey != null) {
-                keyAtOffset<T>(change.position, lazyGridState)?.let { currentKey ->
+    var currentPosition = Offset.Zero
+    coroutineScope {
+        val job = launch {
+            scrolledFlow.collect { _ ->
+                keyAtOffset<T>(currentPosition, lazyGridState)?.let { currentKey ->
                     if (keyTracked(currentKey)) {
                         provideDraggedKeys(initialKey, prevKey, currentKey)
                         prevKey = currentKey
                     }
                 }
-                // set scrolling when dragging
-                val distFromBottom = lazyGridState.layoutInfo.viewportSize.height - change.position.y
-                val distFromTop = change.position.y
-                scrollingAmountSetter(
-                    when {
-                        distFromBottom < autoScrollThreshold -> autoScrollThreshold - distFromBottom
-                        distFromTop < autoScrollThreshold -> -(autoScrollThreshold - distFromTop)
-                        else -> 0f
-                    }
-                )
             }
-        },
-        onDragEnd = {
-            scrollingAmountSetter(0f)
-            initialKey = null
-        },
-        onDragCancel = {
-            scrollingAmountSetter(0f)
-            initialKey = null
         }
-    )
+        detectDragGesturesAfterLongPress(
+            onDragStart = { offset ->
+                initialKey = keyAtOffset<T>(offset, lazyGridState)?.let { key ->
+                    if (keyTracked(key)) {
+                        prevKey = key
+                        provideDraggedKeys(key, key, key)
+                        onSelectionStart(key)
+                        key
+                    } else null
+                }
+            },
+            onDrag = { change, _ ->
+                if (initialKey != null) {
+                    keyAtOffset<T>(change.position, lazyGridState)?.let { currentKey ->
+                        if (keyTracked(currentKey)) {
+                            provideDraggedKeys(initialKey, prevKey, currentKey)
+                            prevKey = currentKey
+                        }
+                    }
+                    currentPosition = change.position
+                    // set scrolling when dragging
+                    val distFromBottom = lazyGridState.layoutInfo.viewportSize.height - change.position.y
+                    val distFromTop = change.position.y
+                    scrollingAmountSetter(
+                        when {
+                            distFromBottom < autoScrollThreshold -> {
+                                autoScrollThreshold - distFromBottom
+
+                            }
+
+                            distFromTop < autoScrollThreshold -> {
+                                -(autoScrollThreshold - distFromTop)
+                            }
+
+                            else -> 0f
+                        }
+                    )
+                }
+            },
+            onDragEnd = {
+                scrollingAmountSetter(0f)
+                initialKey = null
+            },
+            onDragCancel = {
+                scrollingAmountSetter(0f)
+                initialKey = null
+            }
+        )
+        // cancel the job after detectDragGesturesAfterLongPress is done
+        job.cancel()
+    }
 }
 
 fun <T : Any> Modifier.tapClick(
     lazyGridState: LazyGridState,
     onTap: (T) -> Unit,
-    keyTracked: (T) -> Boolean
+    keyTracked: (T) -> Boolean,
 ) = this.pointerInput(Unit) {
     detectTapGestures { offset: Offset ->
         keyAtOffset<T>(offset, lazyGridState)?.let { key ->
-            if(keyTracked(key)){
+            if (keyTracked(key)) {
                 onTap(key)
             }
         }
@@ -107,7 +135,7 @@ fun onKeyProvided(
     onKeyAdd: (Collection<Int>) -> Unit,
     keyDeletedPreviously: (Int) -> Boolean = { false },
     keyExists: (Int) -> Boolean,
-    keyTracked: (Int) -> Boolean
+    keyTracked: (Int) -> Boolean,
 ) {
     // all in the indexRange are the keys
     fun addOrRemoveImageId(indexRange: IntRange) {

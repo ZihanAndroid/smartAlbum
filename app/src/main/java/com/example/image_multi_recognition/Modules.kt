@@ -10,12 +10,14 @@ import androidx.room.Room
 import com.example.image_multi_recognition.dataStore.AppDataSerializer
 import com.example.image_multi_recognition.db.*
 import com.example.image_multi_recognition.util.getCallSiteInfoFunc
+import com.example.image_multi_recognition.viewmodel.basic.*
 import com.google.mlkit.vision.label.ImageLabeler
 import com.google.mlkit.vision.label.ImageLabeling
 import com.google.mlkit.vision.label.defaults.ImageLabelerOptions
 import com.google.mlkit.vision.objects.ObjectDetection
 import com.google.mlkit.vision.objects.ObjectDetector
 import com.google.mlkit.vision.objects.defaults.ObjectDetectorOptions
+import dagger.Binds
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -38,7 +40,7 @@ object DefaultConfiguration {
 
     const val ACCEPTED_CONFIDENCE = 0.7
 
-    const val DRAG_SCROLL_THRESHOLD = 60
+    const val DRAG_SCROLL_THRESHOLD = 100
 }
 
 @Module
@@ -136,3 +138,16 @@ object DataStoreModule {
             }
         )
 }
+
+// @Module
+// @InstallIn(SingletonComponent::class)
+// abstract class BindsModule{
+//     // @Binds
+//     // internal abstract fun bindsImagePagingFlowSupport(
+//     //     imagePagingFlowSupportImpl: ImagePagingFlowSupportImpl
+//     // ): ImagePagingFlowSupport
+//     @Binds
+//     internal abstract fun bindsImageFileOperationSupport(
+//         imageFileOperationSupportViewModel: ImageFileOperationSupportViewModel
+//     ): ImageFileOperationSupport
+// }

@@ -18,10 +18,6 @@ import javax.inject.Inject
 class PhotoSearchViewModel @Inject constructor(
     val repository: ImageRepository
 ) : ViewModel(), LabelSearchSupport {
-//    private var _promptItemFlow = MutableStateFlow<List<String>>(emptyList())
-//    val searchItemFlow: StateFlow<List<String>>
-//        get() = _promptItemFlow
-
     private var _labelImagesFlow = MutableStateFlow<List<LabelWithLatestImage>>(emptyList())
     val labelImagesFlow: StateFlow<List<LabelWithLatestImage>>
         get() = _labelImagesFlow

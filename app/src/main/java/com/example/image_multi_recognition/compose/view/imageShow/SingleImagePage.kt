@@ -53,6 +53,7 @@ fun SingleImagePage(
     addedLabelList: List<String>?,
     originalImageSize: Pair<Int, Int>,
     modifier: Modifier = Modifier,
+    labelSelected: (String)->Boolean,
     onLabelClick: (String, Boolean) -> Unit,
     onLabelDone: () -> Unit,
     onLabelAddingClick: () -> Unit,
@@ -129,6 +130,9 @@ fun SingleImagePage(
                 currentParentSize = currentParentSize,
                 zoomState = zoomState,
                 offsetState = offsetState,
+                // During scrolling, two pages are shown, and both of them contains doubleClickZoomSupport() modifier.
+                // As a result, if you do not restrict the modifier for the next page,
+                // you can still zoom in/out the next page when the current and next pages are scrolling together
                 shouldRun = { !derivedPageSrcolling }
             ) { newZoom, newOffset, newTransformOrigin, offsetRemained ->
                 // for animation
@@ -142,7 +146,9 @@ fun SingleImagePage(
                     newTransformOrigin?.let {
                         rememberedTransformOrigin = it
                     }
-                    // set animation zoom offset when transformByAnimation is set to true
+                    // set animation zoom offset first when transformByAnimation is set to true
+                    // otherwise if you just set "transformByAnimation = true", the graphicsLayout will read the previous animation states
+                    // which may cause flick in the screen
                     animatedZoomOffset.snapTo(
                         ZoomOffsetData(
                             zoomAnimationData.left,
@@ -174,7 +180,8 @@ fun SingleImagePage(
         CustomImageLayout(
             originalWidth = originalImageSize.first,
             originalHeight = originalImageSize.second,
-            imageLabelList = partImageLabelResult ?: emptyList(),
+            // rect and labels are hidden when the page is scrolling
+            imageLabelList = if (!pageScrolling) partImageLabelResult ?: emptyList() else emptyList(),
             image = @Composable {
                 Log.d(getCallSiteInfoFunc(), "AsyncImage() is called")
                 AsyncImage(
@@ -192,6 +199,7 @@ fun SingleImagePage(
                     label = label,
                     onClick = onLabelClick,
                     modifier = Modifier,
+                    initialSelected = labelSelected(label),
                     // in case there is an overlap among the labels, we can drag them
                     longPressAndDragSupport = true
                 )
@@ -230,69 +238,71 @@ fun SingleImagePage(
                 }
             }
         )
-        // null means that the user has not clicked the "label" button
-        if (partImageLabelResult != null || wholeImageLabelResult != null) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                modifier = Modifier.constrainAs(labelRowRef) {
-                    start.linkTo(parent.start)
-                    bottom.linkTo(imageRef.top)
+        if(!pageScrolling) {
+            // null means that the user has not clicked the "labeling" button
+            if (partImageLabelResult != null || wholeImageLabelResult != null) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier.constrainAs(labelRowRef) {
+                        start.linkTo(parent.start)
+                        bottom.linkTo(imageRef.top)
+                    }
+                ) {
+                    wholeImageLabelResult?.sortedBy { it.label }?.forEach { labelResult ->
+                        LabelSelectionElement(
+                            label = labelResult.label,
+                            onClick = onLabelClick,
+                        )
+                    }
                 }
-            ) {
-                wholeImageLabelResult?.sortedBy { it.label }?.forEach { labelResult ->
-                    LabelSelectionElement(
-                        label = labelResult.label,
-                        onClick = onLabelClick,
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.constrainAs(editRowRef) {
+                        end.linkTo(parent.end)
+                        bottom.linkTo(imageRef.top)
+                    }
+                ) {
+                    ElevatedSmallIconButton(
+                        imageVector = Icons.Filled.Add,
+                        contentDescription = "Add labels",
+                        onClick = onLabelAddingClick
+                    )
+                    ElevatedSmallIconButton(
+                        imageVector = Icons.Filled.Done,
+                        contentDescription = "Submit",
+                        onClick = onLabelDone
+                    )
+                }
+                if (partImageLabelResult.isNullOrEmpty() && wholeImageLabelResult.isNullOrEmpty() && addedLabelList.isNullOrEmpty()) {
+                    Text(
+                        text = stringResource(R.string.no_label_found),
+                        style = MaterialTheme.typography.titleLarge.copy(fontSize = 18.sp),
+                        color = colorResource(R.color.colorAccent),
+                        modifier = Modifier.constrainAs(noLabelRef) {
+                            start.linkTo(parent.start)
+                            end.linkTo(parent.end)
+                            top.linkTo(imageRef.bottom)
+                        }.padding(vertical = 12.dp)
                     )
                 }
             }
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.constrainAs(editRowRef) {
-                    end.linkTo(parent.end)
-                    bottom.linkTo(imageRef.top)
-                }
-            ) {
-                ElevatedSmallIconButton(
-                    imageVector = Icons.Filled.Add,
-                    contentDescription = "Add labels",
-                    onClick = onLabelAddingClick
-                )
-                ElevatedSmallIconButton(
-                    imageVector = Icons.Filled.Done,
-                    contentDescription = "Submit",
-                    onClick = onLabelDone
-                )
-            }
-            if (partImageLabelResult.isNullOrEmpty() && wholeImageLabelResult.isNullOrEmpty() && addedLabelList.isNullOrEmpty()) {
-                Text(
-                    text = stringResource(R.string.no_label_found),
-                    style = MaterialTheme.typography.titleLarge.copy(fontSize = 18.sp),
-                    color = colorResource(R.color.colorAccent),
+            if (addedLabelList?.isNotEmpty() == true) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
                     modifier = Modifier.constrainAs(noLabelRef) {
                         start.linkTo(parent.start)
-                        end.linkTo(parent.end)
                         top.linkTo(imageRef.bottom)
-                    }.padding(vertical = 12.dp)
-                )
-            }
-        }
-        if (addedLabelList?.isNotEmpty() == true) {
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                modifier = Modifier.constrainAs(noLabelRef) {
-                    start.linkTo(parent.start)
-                    top.linkTo(imageRef.bottom)
-                }
-            ) {
-                addedLabelList.forEach { label ->
-                    // add a key here to get a smother visual effect when unselecting a label
-                    key(label) {
-                        LabelSelectionElement(
-                            label = label,
-                            initialSelected = true,
-                            onClick = onAddedLabelClick,
-                        )
+                    }
+                ) {
+                    addedLabelList.forEach { label ->
+                        // add a key here to get a smother visual effect when unselecting a label
+                        key(label) {
+                            LabelSelectionElement(
+                                label = label,
+                                initialSelected = true,
+                                onClick = onAddedLabelClick,
+                            )
+                        }
                     }
                 }
             }
@@ -309,7 +319,9 @@ fun SingleImagePageLabelingDone(
     partImageLabelResult: List<ImageLabelResult>?,
     otherImageLabelResult: List<ImageLabelResult>?,
     modifier: Modifier = Modifier,
+    pageScrolling: Boolean,
     isPreview: Boolean,
+    labelAddedCacheAvailable: Boolean,
     onDismiss: () -> Unit,
 ) {
     ConstraintLayout(
@@ -321,7 +333,7 @@ fun SingleImagePageLabelingDone(
         CustomImageLayout(
             originalWidth = originalImageSize.first,
             originalHeight = originalImageSize.second,
-            imageLabelList = partImageLabelResult ?: emptyList(),
+            imageLabelList = if(!pageScrolling) partImageLabelResult ?: emptyList() else emptyList(),
             image = @Composable {
                 Log.d(getCallSiteInfoFunc(), "AsyncImage() is called")
                 AsyncImage(
@@ -351,36 +363,38 @@ fun SingleImagePageLabelingDone(
                         .border(width = 1.dp, color = MaterialTheme.colorScheme.primary)
                 )
             },
-            placingStrategyWithCache = !isPreview
+            placingStrategyWithCache = labelAddedCacheAvailable
         )
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            modifier = Modifier.constrainAs(labelRef) {
-                start.linkTo(parent.start)
-                bottom.linkTo(imageRef.top)
+        if(!pageScrolling) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier.constrainAs(labelRef) {
+                    start.linkTo(parent.start)
+                    bottom.linkTo(imageRef.top)
+                }
+            ) {
+                otherImageLabelResult?.sortedBy { it.label }?.forEach { imageLabelResult ->
+                    LabelSelectionElement(
+                        label = imageLabelResult.label,
+                        initialSelected = true,
+                    )
+                }
             }
-        ) {
-            otherImageLabelResult?.sortedBy { it.label }?.forEach { imageLabelResult ->
-                LabelSelectionElement(
-                    label = imageLabelResult.label,
-                    initialSelected = true,
-                )
-            }
+            Text(
+                text = if (partImageLabelResult.isNullOrEmpty() && otherImageLabelResult.isNullOrEmpty()) {
+                    stringResource(R.string.no_label) + "!"
+                } else {
+                    if (!isPreview) stringResource(R.string.done) + "!" else ""
+                },
+                style = MaterialTheme.typography.titleLarge.copy(fontSize = 18.sp),
+                color = colorResource(R.color.colorAccent),
+                modifier = Modifier.constrainAs(resultRef) {
+                    start.linkTo(parent.start)
+                    end.linkTo(parent.end)
+                    top.linkTo(imageRef.bottom)
+                }.padding(vertical = 12.dp)
+            )
         }
-        Text(
-            text = if (partImageLabelResult.isNullOrEmpty() && otherImageLabelResult.isNullOrEmpty()) {
-                stringResource(R.string.no_label) + "!"
-            } else {
-                if (!isPreview) stringResource(R.string.done) + "!" else ""
-            },
-            style = MaterialTheme.typography.titleLarge.copy(fontSize = 18.sp),
-            color = colorResource(R.color.colorAccent),
-            modifier = Modifier.constrainAs(resultRef) {
-                start.linkTo(parent.start)
-                end.linkTo(parent.end)
-                top.linkTo(imageRef.bottom)
-            }.padding(vertical = 12.dp)
-        )
     }
 }
 

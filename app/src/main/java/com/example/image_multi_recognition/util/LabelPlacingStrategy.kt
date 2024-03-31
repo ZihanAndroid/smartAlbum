@@ -72,7 +72,7 @@ object LabelPlacingStrategy {
         widthProportion: Double,
         heightProportion: Double,
         boundaryWidth: Int,
-        boundaryHeight: Int
+        boundaryHeight: Int,
     ): List<Pair<Int, Int>> {
         return placingResultList.mapIndexed { index, placingResult ->
             when (placingResult.quadrant) {
@@ -101,7 +101,7 @@ object LabelPlacingStrategy {
         labelWidth: Int,
         labelHeight: Int,
         boundaryWidth: Int,
-        boundaryHeight: Int
+        boundaryHeight: Int,
     ): Pair<Int, Int> {
         val x = if (first < 0) 0
         else if (first + labelWidth > boundaryWidth) boundaryWidth - labelWidth
@@ -150,7 +150,7 @@ object LabelPlacingStrategy {
 data class PlacingResult(
     val x: Int,
     val y: Int,
-    val quadrant: Int
+    val quadrant: Int,
 )
 
 // Note the result from LabelPlacingStrategy is based on the original rects;
@@ -166,10 +166,14 @@ object CachedLabelPlacingStrategy {
         if (!rectList.isNullOrEmpty()) {
             with(LabelPlacingStrategy.placeLabels(rectList).mapIndexed { index, placingResult ->
                 labelList[index] to placingResult
-            }){
+            }) {
                 labelRectMap.putAll(this)
             }
         }
         return labelList.map { labelRectMap[it]!! }
+    }
+
+    fun clearLabels() {
+        labelRectMap.clear()
     }
 }

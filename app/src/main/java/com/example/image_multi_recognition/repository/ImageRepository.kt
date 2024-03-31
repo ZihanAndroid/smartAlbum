@@ -11,13 +11,11 @@ import android.util.Log
 import androidx.core.graphics.drawable.toBitmap
 import androidx.core.net.toUri
 import androidx.datastore.core.DataStore
-import androidx.lifecycle.viewModelScope
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
+import androidx.paging.PagingSource
 import androidx.room.withTransaction
-import coil.compose.AsyncImagePainter
-import coil.compose.ImagePainter
 import coil.imageLoader
 import coil.request.ImageRequest
 import com.example.image_multi_recognition.AppData
@@ -27,12 +25,13 @@ import com.example.image_multi_recognition.util.*
 import com.google.mlkit.vision.common.InputImage
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.*
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
-import java.sql.Timestamp
 import java.util.concurrent.Executors
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -44,7 +43,6 @@ class ImageRepository @Inject constructor(
     private val imageLabelDao: ImageLabelDao,
     private val imageInfoDao: ImageInfoDao,
     private val albumInfoDao: AlbumInfoDao,
-    // private val imageBoundDao: ImageBoundDao,
     @ApplicationContext private val context: Context,
 ) {
     init {
@@ -64,7 +62,7 @@ class ImageRepository @Inject constructor(
     // val dataReadyFlow =
     val backgroundThreadPool = Executors.newFixedThreadPool(1)
 
-    fun resetAllImages(){
+    fun resetAllImages() {
         _mediaStoreChangeFlow.value = !_mediaStoreChangeFlow.value
     }
 
@@ -99,7 +97,6 @@ class ImageRepository @Inject constructor(
     suspend fun deleteAndAddImages(
         deletedIds: List<Long>,
         addedFilePaths: List<File>,
-        // cachedImages: List<ByteArray>,
         album: Long,
     ): List<ImageInfo> {
         val createdDate = with(StorageHelper) {
@@ -179,6 +176,7 @@ class ImageRepository @Inject constructor(
             getAllOrderedLabelList()
         }
 
+    var prevImagePagingSource: PagingSource<Int, ImageInfo>? = null
 
     // Proto DataStore
     fun getImagePagingFlow(album: Long, initialKey: Int? = null): Flow<PagingData<ImageInfo>> = Pager(
@@ -187,16 +185,21 @@ class ImageRepository @Inject constructor(
             pageSize = DefaultConfiguration.PAGE_SIZE,
             enablePlaceholders = true
         ),
-        pagingSourceFactory = { imageInfoDao.getImageShowPagingSourceForAlbum(album) }
+        pagingSourceFactory = {
+            imageInfoDao.getImageShowPagingSourceForAlbum(album).apply { prevImagePagingSource = this }
+        }
     ).flow
 
+    var prevLabelImagePagingSource: PagingSource<Int, ImageInfo>? = null
     fun getImagePagingFlowByLabel(label: String, initialKey: Int? = null): Flow<PagingData<ImageInfo>> = Pager(
         initialKey = initialKey,
         config = PagingConfig(
             pageSize = DefaultConfiguration.PAGE_SIZE,
             enablePlaceholders = true
         ),
-        pagingSourceFactory = { imageInfoDao.getImagePagingSourceByLabel(label) }
+        pagingSourceFactory = {
+            imageInfoDao.getImagePagingSourceByLabel(label).apply { prevLabelImagePagingSource = this }
+        }
     ).flow
 
     fun getAlbumUnlabeledPagingFlow(album: Long, initialKey: Int? = null): Flow<PagingData<ImageInfo>> = Pager(
@@ -261,6 +264,7 @@ class ImageRepository @Inject constructor(
 
     fun getAllUnlabeledImages(): Flow<List<ImageInfo>> = imageInfoDao.getAllUnlabeledImages().distinctUntilChanged()
 
+    val unlabeledAlbumImagesFlow: Flow<List<ImageInfo>>? = null
     fun getUnlabeledImagesByAlbum(album: Long): Flow<List<ImageInfo>> =
         imageInfoDao.getUnlabeledImagesByAlbum(album).distinctUntilChanged()
 

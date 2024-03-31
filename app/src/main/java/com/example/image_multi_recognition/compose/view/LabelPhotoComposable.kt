@@ -39,7 +39,6 @@ fun LabelPhotoComposable(
 
     val waitForPreviousOperationString = stringResource(R.string.waiting_for_previous)
     val labelRemovedString = stringResource(R.string.label_removed)
-    val deletedImageIds = rememberSaveable { mutableSetOf<Long>() }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -59,7 +58,6 @@ fun LabelPhotoComposable(
                             onClick = {
                                 if (selectedImageInfoSet.isNotEmpty()) {
                                     selectedImageInfoSet.map { it }.apply {
-                                        deletedImageIds.addAll(this)
                                         viewModel.removeLabels(this) {
                                             // clear the selectedImageIdSet immediately after the deletion is completed
                                             selectedImageInfoSet.clear()
@@ -115,7 +113,7 @@ fun LabelPhotoComposable(
             pagingItems = pagingItems,
             onImageClick = { imageInfoId ->
                 onImageClick(
-                    viewModel.getValidOriginalIndexAfterDeletion(imageInfoId, deletedImageIds),
+                    viewModel.getValidOriginalIndex(imageInfoId),
                     viewModel.label
                 )
             },
@@ -140,7 +138,6 @@ fun LabelPhotoComposable(
             },
             enableLongPressAndDrag = true,
             selectedImageIdSet = selectedImageInfoSet,
-            deletedImageIds = deletedImageIds
         )
     }
 }

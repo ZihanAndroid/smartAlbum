@@ -5,8 +5,6 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -25,7 +23,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
@@ -43,6 +40,7 @@ import com.example.image_multi_recognition.DefaultConfiguration
 import com.example.image_multi_recognition.R
 import com.example.image_multi_recognition.compose.statelessElements.PagingItemImage
 import com.example.image_multi_recognition.compose.statelessElements.ToggleIcon
+import com.example.image_multi_recognition.compose.statelessElements.TopAppBarForNotRootDestination
 import com.example.image_multi_recognition.compose.view.imageShow.OffsetAnimationData
 import com.example.image_multi_recognition.compose.view.imageShow.ZoomAnimationData
 import com.example.image_multi_recognition.db.ImageInfo
@@ -53,6 +51,7 @@ import com.example.image_multi_recognition.viewmodel.LabelUiModel
 import com.example.image_multi_recognition.viewmodel.LabelingViewModel
 import com.example.image_multi_recognition.viewmodel.basic.LabelingSupportViewModel
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.MutableStateFlow
 import java.io.File
 import kotlin.math.absoluteValue
 
@@ -67,6 +66,7 @@ fun LabelingComposable(
     val labelingState by viewModel.labelingStateFlow.collectAsStateWithLifecycle()
     val labelAdding by viewModel.labelAddingStateFlow.collectAsStateWithLifecycle()
     val rootSnackBar by remember { derivedStateOf { rootSnackBarHostState } }
+    val unlabeledImageList by viewModel.unlabeledImageListFlow.collectAsStateWithLifecycle()
 
     val imageSelectedStateHolder: Map<String, Map<Long, MutableState<Boolean>>> = remember(labelingState) {
         // viewModel.labelImagesMap is the backing data of pagingItem from viewModel.labelImagesFlow
@@ -82,112 +82,130 @@ fun LabelingComposable(
     val coroutineScope = rememberCoroutineScope()
     val labelAddedString = stringResource(R.string.label_added)
 
-    // LaunchedEffect(labelAdding) {
-    //     if (labelAdding == false) {
-    //         // https://stackoverflow.com/questions/71471679/jetpack-compose-scaffold-possible-to-override-the-standard-durations-of-snackbar
-    //         val job = launch {
-    //             rootSnackBarHostState.showSnackbar(labelAddedString, duration = SnackbarDuration.Indefinite)
-    //         }
-    //         delay(1000)
-    //         job.cancel()
-    //         labelingClicked = false
-    //     }
-    // }
-
-    if (labelingClicked) {
-        if (labelingState.labelingDone) {
-            val pagingItems = viewModel.labelImagesFlow.collectAsLazyPagingItems()
-            Column {
-                Row(
-                    horizontalArrangement = Arrangement.End,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    IconButton(
-                        onClick = {
-                            if (!labelAdding) {
-                                coroutineScope.launch {
-                                    viewModel.onLabelingConfirm(imageSelectedStateHolder) {
-                                        // https://stackoverflow.com/questions/71471679/jetpack-compose-scaffold-possible-to-override-the-standard-durations-of-snackbar
-                                        val job = launch {
-                                            rootSnackBar.showSnackbar(
-                                                labelAddedString,
-                                                duration = SnackbarDuration.Indefinite
-                                            )
+    Scaffold(
+        topBar = {
+            TopAppBarForNotRootDestination(
+                title = if (labelingClicked) {
+                    if (labelingState.labelingDone) {
+                        stringResource(R.string.labeling_result)
+                    } else {
+                        "${stringResource(R.string.loading)}..."
+                    }
+                } else {
+                    stringResource(R.string.unlabeled_image_count, unlabeledImageList.size)
+                },
+                onBack = if (labelingClicked) {
+                    {
+                        if (labelingClicked && !labelingState.labelingDone) {
+                            viewModel.scanCancelled = true
+                            viewModel.resumeScanPaused()
+                        }
+                        labelingClicked = false
+                    }
+                } else null
+            ) {
+                if (labelingClicked && labelingState.labelingDone) {
+                    Row(
+                        horizontalArrangement = Arrangement.End,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        IconButton(
+                            onClick = {
+                                if (!labelAdding) {
+                                    coroutineScope.launch {
+                                        viewModel.onLabelingConfirm(imageSelectedStateHolder) {
+                                            // https://stackoverflow.com/questions/71471679/jetpack-compose-scaffold-possible-to-override-the-standard-durations-of-snackbar
+                                            val job = launch {
+                                                rootSnackBar.showSnackbar(
+                                                    labelAddedString,
+                                                    duration = SnackbarDuration.Indefinite
+                                                )
+                                            }
+                                            delay(1000)
+                                            job.cancel()
+                                            labelingClicked = false
                                         }
-                                        delay(1000)
-                                        job.cancel()
-                                        labelingClicked = false
                                     }
                                 }
-                            }
-                        }) {
-                        Icon(Icons.Filled.Check, "confirm_labels")
+                            }) {
+                            Icon(Icons.Filled.Check, "confirm_labels")
+                        }
                     }
+                } else if (!labelingClicked) {
                     IconButton(
-                        onClick = { labelingClicked = false }
+                        onClick = {
+                            viewModel.scanImages(unlabeledImageList)
+                            labelingClicked = true
+                        }
                     ) {
-                        Icon(Icons.Filled.Close, "cancel_labels")
+                        Icon(
+                            imageVector = ImageVector.vectorResource(R.drawable.baseline_new_label_24),
+                            contentDescription = "autoLabeling",
+                        )
                     }
                 }
-                ImageLabelingResultShow(
-                    pagingItemsEmpty = viewModel.labelImagesMap.isEmpty(),
-                    pagingItems = pagingItems,
-                    imageSelectedStateHolderParam = imageSelectedStateHolder,
-                    labelSelectedStateHolderParam = labelSelectedStateHolder
-                )
             }
-        } else {
-            val scanPaused by viewModel.scanPaused.collectAsStateWithLifecycle()
-            LabelingOnProgress(
-                progress = labelingState.labeledImageCount.toFloat() / viewModel.imageObjectsMap.size,
-                text = "${stringResource(R.string.loading)}...\t${labelingState.labeledImageCount}/${viewModel.imageObjectsMap.size}",
-                onResumePauseClicked = { viewModel.reverseScanPaused() },
-                onCancelClicked = {
-                    viewModel.scanCancelled = true
-                    // let the coroutine continue running to recognize the "scanCancelled" flag
-                    viewModel.resumeScanPaused()
-                    // change window content
-                    labelingClicked = false
-                },
-                scanPaused = scanPaused
-            )
         }
-    } else {
-        val unlabeledImageList by viewModel.unlabeledImageListFlow.collectAsStateWithLifecycle()
-        val albumPagingItems = viewModel.unlabeledImageAlbumFlow.collectAsLazyPagingItems()
-        val gridState = rememberLazyGridState()
+    ) {
+        Column(
+            modifier = Modifier.padding(it),
+            verticalArrangement = Arrangement.Center
+        ) {
+            if (labelingClicked) {
+                if (labelingState.labelingDone) {
+                    val pagingItems = viewModel.labelImagesFlow.collectAsLazyPagingItems()
+                    ImageLabelingResultShow(
+                        pagingItemsEmpty = viewModel.labelImagesMap.isEmpty(),
+                        pagingItems = pagingItems,
+                        imageSelectedStateHolderParam = imageSelectedStateHolder,
+                        labelSelectedStateHolderParam = labelSelectedStateHolder
+                    )
+                } else {
+                    val scanPaused by viewModel.scanPaused.collectAsStateWithLifecycle()
+                    LabelingOnProgress(
+                        progress = labelingState.labeledImageCount.toFloat() / viewModel.imageObjectsMap.size,
+                        text = "${stringResource(R.string.labeling)}...    ${labelingState.labeledImageCount}/${viewModel.imageObjectsMap.size}",
+                        onResumePauseClicked = { viewModel.reverseScanPaused() },
+                        onCancelClicked = {
+                            viewModel.scanCancelled = true
+                            // let the coroutine continue running to recognize the "scanCancelled" flag
+                            viewModel.resumeScanPaused()
+                            // change window content
+                            labelingClicked = false
+                        },
+                        scanPaused = scanPaused
+                    )
+                }
+            } else {
+                val albumPagingItems = viewModel.unlabeledImageAlbumFlow.collectAsLazyPagingItems()
+                val gridState = rememberLazyGridState()
 
-        Column {
-            UnlabeledInfo(unlabeledImageList.size) {
-                viewModel.scanImages(unlabeledImageList)
-                labelingClicked = true
-            }
-
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(DefaultConfiguration.ALBUM_PER_ROW),
-                state = gridState,
-                horizontalArrangement = Arrangement.spacedBy(DefaultConfiguration.ALBUM_INTERVAL.dp),
-                verticalArrangement = Arrangement.spacedBy(DefaultConfiguration.ALBUM_INTERVAL.dp),
-                modifier = modifier.padding(horizontal = DefaultConfiguration.ALBUM_INTERVAL.dp)
-            ) {
-                items(
-                    count = albumPagingItems.itemCount
-                ) { index ->
-                    albumPagingItems[index]?.let { albumWithLatestImage ->
-                        key(albumWithLatestImage.album) {
-                            AlbumPagingItem(
-                                // albumImage = albumWithLatestImage,
-                                imagePath = File(
-                                    AlbumPathDecoder.decode(albumWithLatestImage.album),
-                                    albumWithLatestImage.path
-                                ),
-                                title = "${AlbumPathDecoder.decodeAlbumName(albumWithLatestImage.album)} (${albumWithLatestImage.count})",
-                                contentDescription = albumWithLatestImage.album.toString(),
-                                sizeDp = ((LocalConfiguration.current.screenWidthDp - DefaultConfiguration.ALBUM_INTERVAL * 3) / 2).dp,
-                                onAlbumClick = {
-                                    onAlbumClick(albumWithLatestImage.album)
-                                }
-                            )
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(DefaultConfiguration.ALBUM_PER_ROW),
+                    state = gridState,
+                    horizontalArrangement = Arrangement.spacedBy(DefaultConfiguration.ALBUM_INTERVAL.dp),
+                    verticalArrangement = Arrangement.spacedBy(DefaultConfiguration.ALBUM_INTERVAL.dp),
+                    modifier = modifier.padding(horizontal = DefaultConfiguration.ALBUM_INTERVAL.dp)
+                ) {
+                    items(
+                        count = albumPagingItems.itemCount
+                    ) { index ->
+                        albumPagingItems[index]?.let { albumWithLatestImage ->
+                            key(albumWithLatestImage.album) {
+                                AlbumPagingItem(
+                                    // albumImage = albumWithLatestImage,
+                                    imagePath = File(
+                                        AlbumPathDecoder.decode(albumWithLatestImage.album),
+                                        albumWithLatestImage.path
+                                    ),
+                                    title = "${AlbumPathDecoder.decodeAlbumName(albumWithLatestImage.album)} (${albumWithLatestImage.count})",
+                                    contentDescription = albumWithLatestImage.album.toString(),
+                                    sizeDp = ((LocalConfiguration.current.screenWidthDp - DefaultConfiguration.ALBUM_INTERVAL * 3) / 2).dp,
+                                    onAlbumClick = {
+                                        onAlbumClick(albumWithLatestImage.album)
+                                    }
+                                )
+                            }
                         }
                     }
                 }
@@ -207,13 +225,19 @@ fun ImageLabelingResultShow(
     var doubleClickedImageInfo: ImageInfo? by remember { mutableStateOf(null) }
     val gridState = rememberLazyGridState()
 
-    var scrollingAmount by rememberSaveable { mutableStateOf(0f) }
+    var scrollingAmount by remember { mutableStateOf(0f) }
+    val scrolledFlow = remember { MutableStateFlow(false) }
 
     LaunchedEffect(scrollingAmount) {
         if (scrollingAmount != 0f) {
             while (isActive) {
+                // Note although you have scrolled the screen, if your finger stays still during the scrolling,
+                // no onDrag is triggered and longPressAndDragSelection() does not get notified
+                // As a result, during scrolling, no items are further selected if your finger stays still
                 gridState.scrollBy(scrollingAmount)
-                delay(10)
+                // To solve the problem above, we use a scrolledFlow and let the longPressAndDragSelection to access that flow
+                scrolledFlow.value = !scrolledFlow.value
+                delay(20)
             }
         }
     }
@@ -254,6 +278,7 @@ fun ImageLabelingResultShow(
             verticalArrangement = Arrangement.spacedBy(DefaultConfiguration.IMAGE_INTERVAL.dp),
             modifier = Modifier.longPressAndDragSelection(
                 lazyGridState = gridState,
+                scrolledFlow = scrolledFlow,
                 scrollingAmountSetter = { scrollingAmount = it },
                 autoScrollThreshold = with(LocalDensity.current) { DefaultConfiguration.DRAG_SCROLL_THRESHOLD.dp.toPx() },
                 provideDraggedKeys = { initialKey: Int?, prevKey: Int?, currentKey: Int? ->
@@ -429,8 +454,7 @@ fun FullScreenImage(
         }
     }
 
-
-    Column (
+    Column(
         modifier = Modifier.fillMaxSize()
             .background(colorResource(R.color.black).copy(alpha = 0.6f))
             .doubleClickZoomSupport(
@@ -523,7 +547,7 @@ fun LabelingOnProgress(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             LinearProgressIndicator(
-                progress = progress
+                progress = { progress },
             )
             Text(
                 text = text,
@@ -547,32 +571,6 @@ fun LabelingOnProgress(
     }
 }
 
-@Composable
-fun UnlabeledInfo(
-    unlabeledImageCount: Int,
-    modifier: Modifier = Modifier,
-    onLabelingClick: () -> Unit,
-) {
-    Row(
-        // horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = modifier.fillMaxWidth().padding(start = 12.dp)
-    ) {
-        Text(
-            text = stringResource(R.string.unlabeled_image_count, unlabeledImageCount)
-        )
-        IconButton(
-            onClick = onLabelingClick
-        ) {
-            Icon(
-                imageVector = ImageVector.vectorResource(R.drawable.baseline_new_label_24),
-                contentDescription = "autoLabeling",
-            )
-        }
-    }
-}
-
 internal suspend fun LabelingSupportViewModel.onLabelingConfirm(
     imageSelectedStateHolder: Map<String, Map<Long, MutableState<Boolean>>>,
     onComplete: suspend () -> Unit = {},
@@ -582,13 +580,13 @@ internal suspend fun LabelingSupportViewModel.onLabelingConfirm(
 }
 
 internal fun getSelectionResult(imageSelectedStateHolder: Map<String, Map<Long, MutableState<Boolean>>>) =
-    mapOf(*imageSelectedStateHolder.map { labelImages ->
+    imageSelectedStateHolder.map { labelImages ->
         labelImages.key to labelImages.value
             .filter { it.value.value }    // selected
             .map { it.key }
     }.filter {
         it.second.isNotEmpty()
-    }.toTypedArray())
+    }.toMap()
 
 private data class ImageIdAndLabel(
     val imageId: Long,

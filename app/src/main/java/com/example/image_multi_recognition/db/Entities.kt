@@ -62,7 +62,7 @@ data class ImageInfo(
             if (!thumbnailFile.exists() || thumbnailFile.length() == 0L) {
                 FileOutputStream(thumbnailFile).use { outputStream ->
                     // it seems that compressing to WEBP_LOSSY is much slower than JPEG
-                    if (!bitmap.compress(Bitmap.CompressFormat.JPEG, 10, outputStream)) {
+                    if (!bitmap.compress(Bitmap.CompressFormat.JPEG, 15, outputStream)) {
                         throw IOException("Failed to compress bitmap!")
                     }
                     Log.d(

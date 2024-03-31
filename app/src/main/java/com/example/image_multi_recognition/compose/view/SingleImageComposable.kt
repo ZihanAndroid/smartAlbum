@@ -74,6 +74,7 @@ fun SingleImageComposable(
     // if no label is detected, then we receive empty lists here,
     val imageLabelLists by viewModel.imageLabelStateFlow.collectAsStateWithLifecycle()
     var addLabelClicked by rememberSaveable { mutableStateOf(false) }
+    val labelAddedCacheAvailable by viewModel.labelAddedCacheAvailable.collectAsStateWithLifecycle()
     var renamingImageOngoing by rememberSaveable { mutableStateOf(false) }
 
     val snackbarHostState = remember { SnackbarHostState() }
@@ -106,7 +107,7 @@ fun SingleImageComposable(
         viewModel.clearPage(pagerState.currentPage)
     }
     val pageScrolling by remember { derivedStateOf { pagerState.isScrollInProgress } }
-    val showAppBar by remember { mutableStateOf(true) }
+    // val showAppBar by remember { mutableStateOf(true) }
     // a strange behavior, once I access "pagerState.pageCount" instead of "pagingItems.itemCount" here, it causes infinite recomposition
     // Log.d(getCallSiteInfoFunc(), "currentPage: ${pagerState.pageCount}")
     // Log.d(getCallSiteInfoFunc(), "currentPage: ${pagingItems.itemCount}")
@@ -164,13 +165,14 @@ fun SingleImageComposable(
                     }
                 }
             }),
-            moreVertItems = listOf(
-                stringResource(R.string.move_to),
-                stringResource(R.string.copy_to),
-                stringResource(R.string.delete),
-                stringResource(R.string.rename)
-            ),
-            moreVertItemOnClicks = listOf({
+            moreVertItems = if (viewModel.argumentType == 1)
+                listOf(
+                    stringResource(R.string.move_to),
+                    stringResource(R.string.copy_to),
+                    stringResource(R.string.delete),
+                    stringResource(R.string.rename)
+                ) else emptyList(),
+            moreVertItemOnClicks = if (viewModel.argumentType == 1) listOf({
                 currentImageInfo?.id?.let { imageId ->
                     // set albums shown to the user
                     viewModel.setAlbumListStateFlow(excludedAlbum = viewModel.currentAlbum!!)
@@ -208,7 +210,7 @@ fun SingleImageComposable(
                     fileNamesInAlbum = viewModel.getAllFileNamesByCurrentAlbum(viewModel.currentAlbum!!)
                     renamingImageOngoing = true
                 }
-            })
+            }) else emptyList()
         ) { paddingValues ->
             Log.d(getCallSiteInfoFunc(), "paddingValues: $paddingValues")
             HorizontalPager(
@@ -220,7 +222,7 @@ fun SingleImageComposable(
                     pagerState,
                     snapAnimationSpec = tween(Spring.StiffnessLow.toInt(), 0)
                 ),
-                key = { pagingItems[it]?.id ?: -1 }
+                // key = { pagingItems[it]?.id ?: (-1) }
             ) { itemIndex ->
                 pagingItems[itemIndex]?.let { imageInfo ->
                     if (!imageLabelLists.labelingDone) {
@@ -232,6 +234,8 @@ fun SingleImageComposable(
                             addedLabelList = imageLabelLists.addedLabelList,
                             originalImageSize = viewModel.imageSize,
                             pageScrolling = pageScrolling,
+                            // when pageScrolling is canceled, we need to recover the user's previous selection
+                            labelSelected = { it in viewModel.selectedLabelSet },
                             onLabelClick = { label, selected ->
                                 if (selected) viewModel.selectedLabelSet.add(label)
                                 else viewModel.selectedLabelSet.remove(label)
@@ -266,22 +270,39 @@ fun SingleImageComposable(
                                 }
                                 // show selected labels
                                 Log.d(getCallSiteInfoFunc(), "selected labels: ${viewModel.selectedLabelSet}")
-                                viewModel.resetImageLabelFlow(
-                                    partImageLabelResult = imageLabelLists.partImageLabelList?.filter { it.label in viewModel.selectedLabelSet },
-                                    wholeImageLabelResult = imageLabelLists.wholeImageLabelList?.filter { it.label in viewModel.selectedLabelSet }
-                                        ?.toMutableList()?.apply {
-                                            imageLabelLists.addedLabelList?.filter { it !in viewModel.selectedLabelSet }
-                                                ?.map { label -> ImageLabelResult(imageInfo.id, null, label) }
-                                                .let { addedLabels ->
-                                                    if (!addedLabels.isNullOrEmpty()) {
-                                                        addAll(addedLabels)
-                                                    }
-                                                }
-                                        },
-                                    addedLabelList = imageLabelLists.addedLabelList,
-                                    labelingDone = true,
-                                    preview = false
-                                )
+                                val partImageResult =
+                                    imageLabelLists.partImageLabelList?.filter { it.label in viewModel.selectedLabelSet }
+                                val wholeImageResult = imageLabelLists.wholeImageLabelList?.filter {
+                                    it.label in viewModel.selectedLabelSet
+                                }?.toMutableList()?.apply {
+                                    imageLabelLists.addedLabelList?.filter { it !in viewModel.selectedLabelSet }
+                                        ?.map { label ->
+                                            ImageLabelResult(imageInfo.id, null, label)
+                                        }.let { addedLabels ->
+                                            if (!addedLabels.isNullOrEmpty()) {
+                                                addAll(addedLabels)
+                                            }
+                                        }
+                                }
+                                val newLabels = ((partImageResult ?: emptyList()) + (wholeImageResult ?: emptyList()))
+                                    .map { it.label }.toSet()
+                                // the image may have a label, and change its label can cause changes in PagingSource from DB, we need to check that by this "originalLabel"
+                                if (viewModel.currentLabel == null || viewModel.currentLabel in newLabels) {
+                                    // when currentLabel is set to "", it will always fail the conditions and no result is shown except a snackBar
+                                    viewModel.resetImageLabelFlow(
+                                        partImageLabelResult = partImageResult,
+                                        wholeImageLabelResult = wholeImageResult,
+                                        addedLabelList = imageLabelLists.addedLabelList,
+                                        labelingDone = true,
+                                        preview = false
+                                    )
+                                    viewModel.setLabelAddedCacheAvailable()
+                                } else {
+                                    // show a snack instead of the labeling result because the page has gone after labeling
+                                    coroutineScope.launch {
+                                        showSnackBar(snackbarHostState, context.getString(R.string.labeling_done) + "!")
+                                    }
+                                }
                             },
                             onLabelAddingClick = { addLabelClicked = true },
                             onAddedLabelClick = { label, selected ->
@@ -302,18 +323,19 @@ fun SingleImageComposable(
                             partImageLabelResult = imageLabelLists.partImageLabelList,
                             // the added label has been put into wholeImageLabelList when labeling done button is pressed
                             otherImageLabelResult = imageLabelLists.wholeImageLabelList,
+                            pageScrolling = pageScrolling,
                             onDismiss = {
                                 viewModel.resetImageLabelFlow()
-                                // viewModel.labelingStart = false
                             },
-                            // labelingClicked = viewModel.labelingClicked,
                             isPreview = imageLabelLists.preview,
+                            labelAddedCacheAvailable = labelAddedCacheAvailable,
                             modifier = Modifier.fillMaxSize()
                         )
                     }
                 }
             }
         }
+        // Add custom labels
         if (addLabelClicked) {
             InputView(
                 userAddedLabelList = imageLabelLists.addedLabelList ?: emptyList(),
@@ -361,6 +383,7 @@ fun SingleImageComposable(
                 )
             }
         }
+        // show photo's exif information
         if (promptWindowShow) {
             SimpleInfoView(
                 items = imageExif.mapIndexed { index, s ->
