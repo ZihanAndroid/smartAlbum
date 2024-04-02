@@ -240,7 +240,10 @@ class ImageRepository @Inject constructor(
 
     fun getInputImage(file: File): InputImage? {
         return try {
+            // InputImage.fromBitmap(BitmapFactory.decodeFile(file.absolutePath), 0)
             InputImage.fromFilePath(context, file.toUri())
+            // val bitmap = BitmapFactory.decodeFile(file.absolutePath)
+            // InputImage.fromByteArray(file.readBytes(), bitmap.width, bitmap.height, 0,  ImageFormat.YUV_420_888)
         } catch (e: IOException) {
             Log.e(getCallSiteInfo(), e.stackTraceToString())
             null

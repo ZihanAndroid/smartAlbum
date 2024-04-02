@@ -169,23 +169,16 @@ open class PhotoViewModel @Inject constructor(
             // let the thumbnails from DCIM generated first
             prevJob?.join()
 
-            allImageInfoList.forEach { imageInfoList ->
-                imageInfoList.forEach { imageInfo ->
-                    if (!imageInfo.isThumbnailAvailable) {
-                        // launch {
-                        //     imageInfo.fullImageFile.inputStream().use {
-                        //         val bitmap = BitmapFactory.decodeStream(it)
-                        //         imageInfo.setImageCache(bitmap)
-                        //     }
-                        // }
-
-                        requestThumbnail(imageInfo.fullImageFile, imageInfo)
-                        // avoid getting ImageLoader overwhelmed so that it cannot handle the request from UI right away
-                        // (The onSuccess of "genImageRequest" runs in the UI main thread)
-                        delay(100)
-                    }
-                }
-            }
+            // allImageInfoList.forEach { imageInfoList ->
+            //     imageInfoList.forEach { imageInfo ->
+            //         if (!imageInfo.isThumbnailAvailable) {
+            //             requestThumbnail(imageInfo.fullImageFile, imageInfo)
+            //             // avoid getting ImageLoader overwhelmed so that it cannot handle the request from UI right away
+            //             // (The onSuccess of "genImageRequest" runs in the UI main thread)
+            //             delay(100)
+            //         }
+            //     }
+            // }
         }
     }
 

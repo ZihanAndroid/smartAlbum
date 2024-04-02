@@ -32,8 +32,8 @@
     <string name="no_recognized_image">No recognized image</string>
     <string name="adding_image_labels">Adding Image Labels</string>
     <string name="waiting_for_previous">Waiting for the previous operation</string>
-    <string name="label_removed">Label removed!</string>
-    <string name="label_added">Label added!</string>
+    <string name="label_removed">Label Removed!</string>
+    <string name="label_added">Label Added!</string>
     <string name="removing">Removing (%d selected)</string>
     <string name="selected_count">%d selected</string>
     <string name="move_to">Move to</string>
@@ -56,7 +56,7 @@
     <string name="move_fail">Failed to move images</string>
     <string name="rename_success">Image renamed</string>
     <string name="rename_fail">Failed to rename images</string>
-    <string name="same_name_exist">Failed, duplicated file names</string>
+    <string name="same_name_exist">Duplicated file names</string>
     <string name="copy_success">Image copied</string>
     <string name="copy_fail">Failed to copy images</string>
     <string name="name">Name</string>

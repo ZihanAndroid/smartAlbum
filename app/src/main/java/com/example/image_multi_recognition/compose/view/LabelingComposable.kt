@@ -476,6 +476,8 @@ fun FullScreenImage(
                         rememberedTransformOrigin = it
                     }
                     // set animation zoom offset when transformByAnimation is set to true
+                    // Note you cannot use "updateTransition()" here because it does not support reset the initial state,
+                    // You can only change the target state in transition.animateXxx()
                     animatedZoomOffset.snapTo(
                         ZoomOffsetData(
                             zoomAnimationData.left,

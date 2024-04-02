@@ -37,6 +37,7 @@ import com.example.image_multi_recognition.util.getCallSiteInfoFunc
 import com.example.image_multi_recognition.util.showSnackBar
 import com.example.image_multi_recognition.util.splitLastBy
 import com.example.image_multi_recognition.viewmodel.ImageLabelResult
+import com.example.image_multi_recognition.viewmodel.RotationDegree
 import com.example.image_multi_recognition.viewmodel.SingleImageViewModel
 import com.example.image_multi_recognition.viewmodel.basic.ImageFileOperationComposableSupport
 import kotlinx.coroutines.launch
@@ -97,7 +98,7 @@ fun SingleImageComposable(
         snackbarHostState = snackbarHostState,
         imageIdList = imageIdList
     )
-
+    var rotationDegree by remember { mutableStateOf(RotationDegree.D0) }
     // Note if you use "LaunchedEffect{...}" it will run after the current recomposition
     // As a result, when switching to the next page, the previous rectangle shows in the new page then disappears.
     // However, by using "remember(pagerState.currentPage){...}", we can clear imageLabelResult first.
@@ -107,7 +108,7 @@ fun SingleImageComposable(
         viewModel.clearPage(pagerState.currentPage)
     }
     val pageScrolling by remember { derivedStateOf { pagerState.isScrollInProgress } }
-    // val showAppBar by remember { mutableStateOf(true) }
+
     // a strange behavior, once I access "pagerState.pageCount" instead of "pagingItems.itemCount" here, it causes infinite recomposition
     // Log.d(getCallSiteInfoFunc(), "currentPage: ${pagerState.pageCount}")
     // Log.d(getCallSiteInfoFunc(), "currentPage: ${pagingItems.itemCount}")
@@ -126,6 +127,7 @@ fun SingleImageComposable(
             topRightOnClicks = listOf({
                 // labeling start
                 pagingItems[pagerState.currentPage]?.let { imageInfo ->
+                    rotationDegree = RotationDegree.D0
                     viewModel.detectAndLabelImage(imageInfo)
                 }
             }, {
@@ -154,7 +156,15 @@ fun SingleImageComposable(
                     promptWindowShow = true
                 }
             }, {
-
+                if (!pageScrolling && imageLabelLists.partImageLabelList == null && imageLabelLists.wholeImageLabelList == null) {
+                    rotationDegree = when (rotationDegree) {
+                        RotationDegree.D0 -> RotationDegree.D90
+                        RotationDegree.D90 -> RotationDegree.D180
+                        RotationDegree.D180 -> RotationDegree.D270
+                        RotationDegree.D270 -> RotationDegree.D360
+                        RotationDegree.D360 -> RotationDegree.D90
+                    }
+                }
             }, {
 
             }, {
@@ -215,7 +225,6 @@ fun SingleImageComposable(
             Log.d(getCallSiteInfoFunc(), "paddingValues: $paddingValues")
             HorizontalPager(
                 state = pagerState,
-                // userScrollEnabled = false, // control the scrolling behavior by pointer input programmatically
                 modifier = Modifier.padding(paddingValues),
                 // Default is 400ms, which is a little longer than expected
                 flingBehavior = PagerDefaults.flingBehavior(
@@ -311,6 +320,8 @@ fun SingleImageComposable(
                                     viewModel.setAddedLabelList(imageLabelLists.addedLabelList?.minus(label))
                                 }
                             },
+                            // defer the read of the state to defer recomposition
+                            provideRotationDegree = { rotationDegree.toFloat() },
                             onDismiss = {
                                 viewModel.resetImageLabelFlow()
                             },

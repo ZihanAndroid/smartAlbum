@@ -36,6 +36,7 @@ android {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
     compileOptions {
@@ -73,13 +74,13 @@ android {
 }
 
 val roomVersion = "2.6.1"
-val hiltVersion = "2.50"
-val daggerVersion = "2.50"
+val hiltVersion = "2.51"
+val daggerVersion = "2.51"
 val pagingVersion = "3.2.1"
 val glideVersion = "4.16.0"
 val lifecycleVersion = "2.7.0"
 val navigationVersion = "2.7.7"
-val coilVersion = "2.5.0"
+val coilVersion = "2.6.0"
 
 dependencies {
 
@@ -89,7 +90,6 @@ dependencies {
     implementation("com.google.android.material:material:1.11.0")
     implementation("androidx.activity:activity-ktx:1.8.2")
     implementation("androidx.fragment:fragment-ktx:1.6.2")
-    // implementation("androidx.compose.material:material:1.6.1")
     // Navigation drawer & Bottom navigation
     implementation("androidx.navigation:navigation-fragment-ktx:$navigationVersion")
     implementation("androidx.navigation:navigation-ui-ktx:$navigationVersion")
@@ -162,12 +162,17 @@ dependencies {
     // ml-kit
     implementation("com.google.mlkit:object-detection:17.0.1")
     implementation("com.google.mlkit:image-labeling:17.0.8")
+    // implementation("com.google.mediapipe:tasks-vision:latest.release")
     // Glide for image
     // implementation("com.github.bumptech.glide:glide:$glideVersion")
     // ksp("com.github.bumptech.glide:compiler:$glideVersion")
     // Coil for loading image
     implementation("io.coil-kt:coil:$coilVersion")
     implementation("io.coil-kt:coil-compose:$coilVersion")
+    // implementation("io.coil-kt.coil3:coil:3.0.0-alpha06")
+    // implementation("io.coil-kt.coil3:coil-compose:3.0.0-alpha06")
+    // implementation("io.coil-kt.coil3:coil-core:3.0.0-alpha06")
+    // implementation("io.coil-kt.coil3:coil-compose-core:3.0.0-alpha06")
 
     // Kotest
     testImplementation("io.kotest:kotest-runner-junit5-jvm:5.8.0")
@@ -180,7 +185,7 @@ dependencies {
     testImplementation ("io.kotest.extensions:kotest-property-arbs:2.1.2")
     // Android Test
     androidTestImplementation("androidx.compose.ui:ui-test-junit4:1.6.4")
-    androidTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
+    androidTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.0")
     //Assertions
     testImplementation("org.assertj:assertj-core:3.25.1")
     androidTestImplementation("org.assertj:assertj-core:3.25.1")

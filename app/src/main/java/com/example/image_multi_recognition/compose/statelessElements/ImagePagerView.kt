@@ -305,7 +305,7 @@ fun PagingItemImage(
     } else {
         Log.d(getCallSiteInfoFunc(), "Loading image: ${imageInfo.path} from disk")
         // send cache request
-        onSendThumbnailRequest(imageInfo.fullImageFile, imageInfo)
+        // onSendThumbnailRequest(imageInfo.fullImageFile, imageInfo)
         imageInfo.fullImageFile
     }
     Box {

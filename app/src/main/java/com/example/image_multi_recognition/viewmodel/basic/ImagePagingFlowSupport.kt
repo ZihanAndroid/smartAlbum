@@ -39,7 +39,7 @@ class ImagePagingFlowSupportImpl @Inject constructor(
                 // prevLabelImagePagingSource has not been initialized yet, try to initialize it first
                 if(prevPagingSource == null) prevPagingSource = repository.prevLabelImagePagingSource
                 prevPagingSource?.invalid?.apply {
-                    Log.d("res","paging flow invalid: $this")
+                    // Log.d("res","paging flow invalid: $this")
                     if (this) {
                         prevPagingSource = repository.prevLabelImagePagingSource
                     }
@@ -64,12 +64,6 @@ class ImagePagingFlowSupportImpl @Inject constructor(
     override fun Flow<PagingData<ImageInfo>>.convertImageInfoPagingFlow(pagingSourceType: ImagePagingFlowSupport.PagingSourceType): Flow<PagingData<UiModel>> {
         var count = 0
         val epochTime = LocalDateTime.ofInstant(Instant.EPOCH, ZoneId.of("UTC"))
-        // init prevPagingSource
-        prevPagingSource = when (pagingSourceType) {
-            ImagePagingFlowSupport.PagingSourceType.UNLABELED_IMAGE -> null
-            ImagePagingFlowSupport.PagingSourceType.LABEL_IMAGE -> repository.prevLabelImagePagingSource
-            ImagePagingFlowSupport.PagingSourceType.IMAGE -> repository.prevImagePagingSource
-        }
 
         return this.map { pagingData ->
             // there are two ways to get more pagingData

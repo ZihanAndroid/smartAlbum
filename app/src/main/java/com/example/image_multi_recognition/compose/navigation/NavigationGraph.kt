@@ -104,6 +104,7 @@ fun NavigationGraph(
             arguments = Destination.ALBUM_PHOTO.arguments
         ) {
             // set all the parameters related to navigation in NavigationGraph
+
             PhotoComposable(
                 viewModel = hiltViewModel(),
                 onBack = {

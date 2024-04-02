@@ -40,7 +40,7 @@ class SingleImageViewModel @Inject constructor(
     private val objectDetector: ObjectDetector,
     private val imageLabeler: ImageLabeler,
     imageFileOperationSupportViewModel: ImageFileOperationSupportViewModel,
-    savedStateHandle: SavedStateHandle  // this parameter is set by hiltViewModel() automatically
+    savedStateHandle: SavedStateHandle,  // this parameter is set by hiltViewModel() automatically
 ) : ViewModel(), LabelSearchSupport, ImageFileOperationSupport by imageFileOperationSupportViewModel {
     // get navigation arguments
     val argumentType: Int = savedStateHandle.get<Int>("argumentType")!!
@@ -140,16 +140,17 @@ class SingleImageViewModel @Inject constructor(
             partImageLabelConfidenceMap.clear()
             selectedLabelSet.clear()
             val currentPageWhenRunning = currentPage
+            // ml-kit
             val imageHandled = withContext(Dispatchers.IO) {
+                Log.d("", "image files: ${imageInfo.fullImageFile.absolutePath}")
                 repository.getInputImage(imageInfo.fullImageFile)
             } ?: return@launch
             Log.d(
                 getCallSiteInfo(),
                 "image size for object detection: (width: ${imageHandled.width}, height: ${imageHandled.height})"
             )
-            // the imageSize used by object detection may different from the size of the image displayed in CustomLayout
             imageSize = imageHandled.width to imageHandled.height
-
+            // mlkit
             objectDetector.process(imageHandled)
                 .addOnSuccessListener { detectedObjects ->
                     // onSuccessListener can be called anytime in the main thread,
@@ -167,7 +168,6 @@ class SingleImageViewModel @Inject constructor(
                     val detectedRectList = detectedObjects.map { it.boundingBox }.toMutableList()
                     // if the user has already swiped to the next page, we just ignore the result
                     if (currentPageWhenRunning == currentPage) {
-                        // _rectListFlow.value = detectedRectList
                         val rootRect = Rect()   // a rect for the whole image, we also label the whole image
                         detectedRectList.add(rootRect)
                         // image labeling
@@ -189,7 +189,7 @@ class SingleImageViewModel @Inject constructor(
         imageHandled: InputImage,
         detectedRectList: List<Rect>,
         rootRect: Rect,
-        currentPageWhenRunning: Int
+        currentPageWhenRunning: Int,
     ) {
         imageHandled.bitmapInternal?.let { bitmap ->
             detectedRectList.forEach { rect ->
@@ -209,12 +209,12 @@ class SingleImageViewModel @Inject constructor(
                         if (rect != rootRect) {
                             labelList.filter { it.confidence >= DefaultConfiguration.ACCEPTED_CONFIDENCE }
                                 .maxByOrNull { it.confidence }?.let { label: ImageLabel ->
-                                // deduplication, choose the label with maximum confidence
-                                if (partImageLabelConfidenceMap[label.text] == null || label.confidence > partImageLabelConfidenceMap[label.text]!!) {
-                                    partImageLabelConfidenceMap[label.text] = label.confidence
-                                    partImageLabelMap[label.text] = ImageLabelResult(imageInfo.id, rect, label.text)
+                                    // deduplication, choose the label with maximum confidence
+                                    if (partImageLabelConfidenceMap[label.text] == null || label.confidence > partImageLabelConfidenceMap[label.text]!!) {
+                                        partImageLabelConfidenceMap[label.text] = label.confidence
+                                        partImageLabelMap[label.text] = ImageLabelResult(imageInfo.id, rect, label.text)
+                                    }
                                 }
-                            }
                         } else {
                             // set maximum 2 whole image labels
                             with(labelList.filter { it.confidence >= DefaultConfiguration.ACCEPTED_CONFIDENCE }
@@ -283,7 +283,7 @@ class SingleImageViewModel @Inject constructor(
         selectedLabelSet.clear()
     }
 
-    fun setLabelAddedCacheAvailable(){
+    fun setLabelAddedCacheAvailable() {
         _labelAddedCacheAvailable.value = true
     }
 
@@ -293,7 +293,7 @@ class SingleImageViewModel @Inject constructor(
         wholeImageLabelResult: List<ImageLabelResult>?,
         addedLabelList: List<String>?,
         labelingDone: Boolean,
-        preview: Boolean
+        preview: Boolean,
     ) {
         _imageLabelStateFlow.value = _imageLabelStateFlow.value.copy(
             partImageLabelList = partImageLabelResult,
@@ -369,7 +369,7 @@ class SingleImageViewModel @Inject constructor(
 data class ImageLabelResult(
     val imageId: Long,
     val rect: Rect?,
-    val label: String
+    val label: String,
 ) {
     companion object {
         fun fromImageLabel(imageLabel: com.example.image_multi_recognition.db.ImageLabel): ImageLabelResult {
@@ -388,7 +388,7 @@ data class ImageLabelLists(
     var wholeImageLabelList: List<ImageLabelResult>? = null,
     var addedLabelList: List<String>? = null,
     var labelingDone: Boolean = false,
-    var preview: Boolean = false
+    var preview: Boolean = false,
 ) {
     companion object {
         val InitialLists = ImageLabelLists()

@@ -18,7 +18,7 @@ sealed class UiModel {
         val year: Int,
         val month: Month,
         val dayOfMonth: Int,
-        val dayOfWeek: DayOfWeek
+        val dayOfWeek: DayOfWeek,
     ) : UiModel()
 
     data class Item(
@@ -29,23 +29,31 @@ sealed class UiModel {
 
 sealed class LabelUiModel {
     data class Label(
-        val label: String
+        val label: String,
     ) : LabelUiModel()
 
     data class Item(
         val imageInfo: ImageInfo,
-        val label: String
+        val label: String,
     ) : LabelUiModel()
 }
 
 // Before user labeling
 data class ObjectDetectedImageData(
     val imageInfo: ImageInfo,
-    val generatedLabels: Map<Rect, String>
+    val generatedLabels: Map<Rect, String>,
 )
 
 // After user labeling
 data class UserLabeledImageData(
     val imageInfo: ImageInfo,
-    val labels: List<String>
+    val labels: List<String>,
 )
+
+enum class RotationDegree(
+    private val degree: Float,
+) {
+    D0(0f), D90(90f), D180(180f), D270(270f), D360(360f);
+
+    fun toFloat(): Float = degree
+}

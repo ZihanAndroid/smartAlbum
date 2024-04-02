@@ -30,14 +30,8 @@ data class ImageInfo(
     @PrimaryKey(autoGenerate = true) @ColumnInfo(name = "id") val id: Long = 0,
     @ColumnInfo(name = "path") val path: String, // image file name
     @ColumnInfo(name = "album") val album: Long,  // directory, also used as album
-    // @ColumnInfo(name = "labeled") var labeled: Boolean,
-    // @ColumnInfo(name = "albumId") val albumId: Long,
     @ColumnInfo(name = "time_created") val timestamp: Long,
     @ColumnInfo(name = "favorite") val favorite: Boolean = false,
-    // cache thumbnail's path instead of thumbnail itself
-    // https://developer.android.com/topic/performance/sqlite-performance-best-practices#store-small
-    // @ColumnInfo(name = "cached_image", typeAffinity = ColumnInfo.BLOB) var cachedImage: ByteArray = ByteArray(0)
-
 ) {
     @Ignore
     val fullImageFile: File = File(AlbumPathDecoder.decode(album), path)
@@ -45,9 +39,6 @@ data class ImageInfo(
     @Ignore
     val thumbnailFile: File =
         File(ScopedThumbNailStorage.imageStorage, "${album}_${path.replace("/", "_")}")
-
-//    @Ignore
-//    val thumbnailSize: Size = ExifHelper.getImageSize(fullImageFile)
 
     val rotationDegree: Int
         get() = ExifHelper.getImageRotationDegree(fullImageFile)

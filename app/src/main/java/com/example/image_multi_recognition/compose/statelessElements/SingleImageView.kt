@@ -128,7 +128,7 @@ fun SingleImageView(
         },
         modifier = modifier
     ) {
-        content(it)
+        content(it, )
     }
 }
 

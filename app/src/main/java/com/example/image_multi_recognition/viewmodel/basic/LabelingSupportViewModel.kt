@@ -29,7 +29,7 @@ abstract class LabelingSupportViewModel(
     // imageId: object count
     val imageObjectsMap: MutableMap<Long, Int> = mutableMapOf()
     val labelImagesMap: MutableMap<String, MutableSet<ImageInfo>> = mutableMapOf()
-    val imageLabelConfidence: MutableMap<ImageLabelIdentity, Float> = mutableMapOf()
+    private val imageLabelConfidence: MutableMap<ImageLabelIdentity, Float> = mutableMapOf()
     val labelImagesFlow = Pager(
         initialKey = 0,
         config = PagingConfig(
@@ -165,9 +165,7 @@ abstract class LabelingSupportViewModel(
                     }
                 }
                 withContext(Dispatchers.IO) {
-                    val imageHandled = withContext(Dispatchers.IO) {
-                        repository.getInputImage(imageInfo.fullImageFile)
-                    }
+                    val imageHandled = repository.getInputImage(imageInfo.fullImageFile)
                     if (imageHandled == null) {
                         imageObjectsMapRemoval(imageInfo.id)
                     } else {

@@ -82,10 +82,7 @@ fun InputSearch(
                 }
             },
             singleLine = true,
-            keyboardActions = KeyboardActions(onDone = {
-                onSearchClick(inputText)
-                focusManager.clearFocus()
-            }),
+            keyboardActions = KeyboardActions(onDone = { onSearchClickNoFurther() }),
             colors = TextFieldDefaults.colors(
                 unfocusedContainerColor = MaterialTheme.colorScheme.surface,
                 focusedContainerColor = MaterialTheme.colorScheme.surface

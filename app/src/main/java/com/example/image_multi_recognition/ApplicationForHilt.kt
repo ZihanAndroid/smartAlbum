@@ -12,20 +12,16 @@ class ApplicationForHilt : Application(), ImageLoaderFactory {
     // Coil ImageLoader
     override fun newImageLoader(): ImageLoader {
         return ImageLoader.Builder(this)
-            // disable coil's disk cache because we already created thumbnail files in the disk
-            .diskCache(null)
             .crossfade(true)
             .memoryCache {
                 MemoryCache.Builder(this)
                     .maxSizePercent(0.25)
                     .build()
-            }
-           // .diskCache {
-           //     DiskCache.Builder()
-           //         .directory(this.cacheDir.resolve("image_cache"))
-           //         .maxSizePercent(0.02)
-           //         .build()
-           // }
-            .build()
+            }.diskCache {
+                DiskCache.Builder()
+                    .directory(this.cacheDir.resolve("image_cache"))
+                    .maxSizePercent(0.05)
+                    .build()
+            }.build()
     }
 }

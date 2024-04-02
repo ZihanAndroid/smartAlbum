@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntSize
@@ -31,11 +32,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.constraintlayout.compose.ConstraintLayout
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.example.image_multi_recognition.DefaultConfiguration
 import com.example.image_multi_recognition.R
 import com.example.image_multi_recognition.compose.statelessElements.ElevatedSmallIconButton
 import com.example.image_multi_recognition.compose.statelessElements.LabelSelectionElement
 import com.example.image_multi_recognition.db.ImageInfo
+import com.example.image_multi_recognition.util.RotateTransformation
 import com.example.image_multi_recognition.util.getCallSiteInfoFunc
 import com.example.image_multi_recognition.util.pointerInput.ZoomOffsetData
 import com.example.image_multi_recognition.util.pointerInput.doubleClickZoomSupport
@@ -44,7 +47,7 @@ import com.example.image_multi_recognition.viewmodel.ImageLabelResult
 import kotlinx.coroutines.launch
 
 // Support zoom in and zoom out for an image
-@OptIn(ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SingleImagePage(
     imageInfo: ImageInfo,
@@ -53,11 +56,12 @@ fun SingleImagePage(
     addedLabelList: List<String>?,
     originalImageSize: Pair<Int, Int>,
     modifier: Modifier = Modifier,
-    labelSelected: (String)->Boolean,
+    labelSelected: (String) -> Boolean,
     onLabelClick: (String, Boolean) -> Unit,
     onLabelDone: () -> Unit,
     onLabelAddingClick: () -> Unit,
     onAddedLabelClick: (String, Boolean) -> Unit,
+    provideRotationDegree: () -> Float,
     onDismiss: () -> Unit,
     pageScrolling: Boolean,
 ) {
@@ -100,8 +104,13 @@ fun SingleImagePage(
     val animatedZoomOffset = remember { Animatable(ZoomOffsetData(), ZoomOffsetData.VectorConverter) }
     var animationTriggered by remember { mutableStateOf<Boolean?>(null) }
     var animationOngoing by remember { mutableStateOf(false) }
+    // val rotationDegreeInt by rememberUpdatedState(provideRotationDegree())
+    var currentImageSize by remember { mutableStateOf(IntSize.Zero) }
+    var currentParentSize by remember { mutableStateOf(IntSize.Zero) }
+    val derivedPageSrcolling by rememberUpdatedState(pageScrolling)
+
     LaunchedEffect(animationTriggered) {
-        if (animationTriggered != null) {
+        if (animationTriggered != null && !animationOngoing) {
             animationOngoing = true
             animatedZoomOffset.animateTo(
                 targetValue = ZoomOffsetData(
@@ -116,9 +125,6 @@ fun SingleImagePage(
         }
     }
 
-    var currentImageSize by remember { mutableStateOf(IntSize.Zero) }
-    var currentParentSize by remember { mutableStateOf(IntSize.Zero) }
-    val derivedPageSrcolling by rememberUpdatedState(pageScrolling)
     Log.d(getCallSiteInfoFunc(), "Recomposition")
     ConstraintLayout(
         modifier = modifier.fillMaxSize().clipToBounds()
@@ -185,13 +191,21 @@ fun SingleImagePage(
             image = @Composable {
                 Log.d(getCallSiteInfoFunc(), "AsyncImage() is called")
                 AsyncImage(
-                    model = imageInfo.fullImageFile,
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(imageInfo.fullImageFile)
+                        // Note: to apply rotation transformation, we do not change graphicsLayer modifier,
+                        // instead rotate the image by setting Coil's transformations.
+                        // The original modifiers for zooming and panning image work seamlessly with rotated images
+                        .transformations(
+                            if (provideRotationDegree() == 0f || provideRotationDegree() == 360f) emptyList()
+                            else listOf(RotateTransformation(provideRotationDegree()))
+                        ).build(),
                     contentDescription = imageInfo.id.toString(),
                     modifier = Modifier.fillMaxWidth().let {
                         if (partImageLabelResult != null || wholeImageLabelResult != null) {
                             it.heightIn(max = (LocalConfiguration.current.screenHeightDp * DefaultConfiguration.IMAGE_MAX_HEIGHT_PROPORTION).dp)
                         } else it
-                    }
+                    },
                 )
             },
             labelDrawing = @Composable { label ->
@@ -238,7 +252,7 @@ fun SingleImagePage(
                 }
             }
         )
-        if(!pageScrolling) {
+        if (!pageScrolling) {
             // null means that the user has not clicked the "labeling" button
             if (partImageLabelResult != null || wholeImageLabelResult != null) {
                 Row(
@@ -333,11 +347,12 @@ fun SingleImagePageLabelingDone(
         CustomImageLayout(
             originalWidth = originalImageSize.first,
             originalHeight = originalImageSize.second,
-            imageLabelList = if(!pageScrolling) partImageLabelResult ?: emptyList() else emptyList(),
+            imageLabelList = if (!pageScrolling) partImageLabelResult ?: emptyList() else emptyList(),
             image = @Composable {
                 Log.d(getCallSiteInfoFunc(), "AsyncImage() is called")
                 AsyncImage(
                     model = imageInfo.fullImageFile,
+                    // .transformations(RotateTransformation(0f))
                     contentDescription = imageInfo.id.toString(),
                     modifier = Modifier.heightIn(
                         max = (LocalConfiguration.current.screenHeightDp * DefaultConfiguration.IMAGE_MAX_HEIGHT_PROPORTION).dp
@@ -365,7 +380,7 @@ fun SingleImagePageLabelingDone(
             },
             placingStrategyWithCache = labelAddedCacheAvailable
         )
-        if(!pageScrolling) {
+        if (!pageScrolling) {
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 modifier = Modifier.constrainAs(labelRef) {
@@ -407,3 +422,9 @@ data class OffsetAnimationData(
     val left: Offset = Offset.Zero,
     val right: Offset = Offset.Zero,
 )
+
+private fun IntSize.swapSize(): IntSize {
+    val oldWidth = width
+    val oldHeight = height
+    return IntSize(oldHeight, oldWidth)
+}

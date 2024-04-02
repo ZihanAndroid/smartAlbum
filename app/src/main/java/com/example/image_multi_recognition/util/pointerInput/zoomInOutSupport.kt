@@ -258,6 +258,7 @@ suspend fun PointerInputScope.detectTransformGesturesWithConsumeChoice(
 data class ZoomOffsetData(
     val zoom: Float = 1f,
     val offset: Offset = Offset.Zero,
+    val rotation: Float = 0f
 ) {
     companion object {
         val VectorConverter = TwoWayConverter<ZoomOffsetData, AnimationVector3D>(

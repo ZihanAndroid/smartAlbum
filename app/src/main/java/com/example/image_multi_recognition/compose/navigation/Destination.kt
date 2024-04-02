@@ -77,7 +77,7 @@ enum class Destination(
         get() = "$route${
             compulsoryArguments?.keys?.fold("") { acc, s -> "$acc/{$s}" } ?: ""
         }${
-            optionalArgument?.keys?.fold("") { acc, s ->
+            optionalArgument?.keys?.fold("") { acc, _ ->
                 if (acc.isEmpty()) "?$acc={$acc}"
                 else "&$acc={$acc}"
             } ?: ""
