@@ -1,4 +1,4 @@
-package com.example.image_multi_recognition.compose.view
+package com.example.image_multi_recognition.compose.view.settingScreen
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
@@ -10,7 +10,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Done
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -22,6 +21,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -29,10 +30,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.image_multi_recognition.AppData
 import com.example.image_multi_recognition.R
 import com.example.image_multi_recognition.compose.statelessElements.ImageItemRow
+import com.example.image_multi_recognition.compose.statelessElements.InputSearch
+import com.example.image_multi_recognition.compose.statelessElements.LabelSelectionElement
 import com.example.image_multi_recognition.compose.statelessElements.TopAppBarForNotRootDestination
 import com.example.image_multi_recognition.compose.statelessElements.settingChoices.MultiItemChoiceView
 import com.example.image_multi_recognition.dataStore.AppDataSerializer
 import com.example.image_multi_recognition.db.AlbumInfoWithLatestImage
+import com.example.image_multi_recognition.db.LabelInfo
 import com.example.image_multi_recognition.util.SliderColorsNoTicks
 import com.example.image_multi_recognition.viewmodel.ChoiceSettingItem
 import com.example.image_multi_recognition.viewmodel.SettingGroup
@@ -69,6 +73,7 @@ fun SettingScreen(
     var multipleChoiceItem by remember { mutableStateOf(MultipleChoiceItem.notOpen) }
     // Type.VIEW_CHOICE
     var viewChoiceItem by remember { mutableStateOf(ViewChoiceItem.notOpen) }
+    var fullScreenShow by remember { mutableStateOf(false) }
 
     // prepare setting data
     val settingGroupList = remember {
@@ -93,7 +98,7 @@ fun SettingScreen(
                         provideInitialChoice = { listOf(defaultAlbumPath) },
                         provideInitialChoiceString = {
                             File(defaultAlbumPath).name.let {
-                                if (it.length > 10) it.substring(0, 12) + "..." else it
+                                if (it.length > 12) it.substring(0, 12) + "..." else it
                             }
                         },
                         onValueChange = { viewModel.updateDefaultAlbumPath(it.first()) }
@@ -148,7 +153,6 @@ fun SettingScreen(
                         type = ChoiceSettingItem.Type.VIEW_CHOICE,
                         provideInitialChoice = { excludedAlbumPathsList },
                         provideInitialChoiceString = { "${excludedAlbumPathsList.size}" },
-                        // onValueChange = { viewModel.updateExcludedAlbumPaths(it) }
                         onValueChange = { viewModel.updateExcludedAlbumPaths(it) }
                     ),
                     ChoiceSettingItem<List<String>>(
@@ -257,7 +261,7 @@ fun SettingScreen(
                             viewChoiceItem.provideInitialSelection()
                         },
                         onSelectDone = { selected ->
-                            viewChoiceItem.onChoices(selected.map { it.toString() })
+                            viewChoiceItem.onChoices(selected)
                         },
                         onDismiss = {
                             coroutineScope.launch {
@@ -269,10 +273,115 @@ fun SettingScreen(
                 }
 
                 ViewChoiceItem.ViewChoicePurpose.EXCLUDED_LABEL -> {
-
+                    fullScreenShow = true
                 }
 
                 ViewChoiceItem.ViewChoicePurpose.NOT_OPEN -> {}
+            }
+        }
+        // fullScreenShow is enabled only for ViewChoicePurpose.EXCLUDED_LABEL
+        if (fullScreenShow) {
+            FullScreenSelectionView(
+                title = viewChoiceItem.title,
+                allLabels = viewModel.orderedLabelList,
+                provideInitialSelectedLabels = viewChoiceItem.provideInitialSelection,
+                onSelectDone = viewChoiceItem.onChoices,
+                onDismiss = {
+                    fullScreenShow = false
+                    viewChoiceItem = ViewChoiceItem.notOpen
+                },
+                onSearchTextChange = { viewModel.getLabelListByPrefix(it) }
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun FullScreenSelectionView(
+    title: String,
+    allLabels: List<LabelInfo>,
+    provideInitialSelectedLabels: () -> List<String>,
+    onSelectDone: (List<String>) -> Unit,
+    onSearchTextChange: (String) -> List<LabelInfo>,
+    onDismiss: () -> Unit,
+) {
+    val selectedAlbumSet = remember { provideInitialSelectedLabels().toMutableSet() }
+    var labelsInSearch by remember { mutableStateOf(onSearchTextChange("").map { it.label }) }
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
+
+    Scaffold(
+        topBar = {
+            TopAppBarForNotRootDestination(
+                title = title,
+                onBack = onDismiss
+            ) {
+                IconButton(onClick = { onSelectDone(selectedAlbumSet.toList()) }) {
+                    Icon(Icons.Filled.Done, "done")
+                }
+            }
+        }
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier.padding(paddingValues)
+        ) {
+            InputSearch(
+                onDropDownItemClick = { searchedLabel ->
+                    labelsInSearch = onSearchTextChange(searchedLabel).map { it.label }
+                },
+                onSearchClickNoFurther = {
+                    keyboardController?.hide()
+                    focusManager.clearFocus()
+                },
+                onSearchTextChange = { newText ->
+                    labelsInSearch = onSearchTextChange(newText).map { it.label }
+                    onSearchTextChange(newText)
+                }
+            )
+            // show labelsInSearch in a lazy FlowRow
+            // https://developer.android.com/reference/kotlin/androidx/compose/foundation/layout/package-summary#ContextualFlowRow
+            // https://slack-chats.kotlinlang.org/t/16754637/hey-there-folks-yesterday-i-built-an-app-with-a-macrobenchma
+            // https://developer.android.com/develop/ui/compose/layouts/flow#lazy-flow
+            // ContextualFlowRow(
+            //     itemCount = labels.size,
+            //     maxLines = 2,
+            //     overflow = ContextualFlowRowOverflow.expandIndicator {
+            //         val count = this.totalItemCount - shownItemCount
+            //         Text("+ $count")
+            //     }
+            // ) {
+            //     val index: Int = it
+            //     val label = labels[index]
+            //     HSLabel(text = label.text, style = label.style, maxLines = 1)
+            // }
+            ContextualFlowRow(
+                itemCount = labelsInSearch.size,
+                // horizontalArrangement = Arrangement.spacedBy(12.dp),
+                // verticalArrangement = Arrangement.Center,
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                maxLines = 10,
+                overflow = ContextualFlowRowOverflow.expandIndicator { }
+                //     .expandOrCollapseIndicator(
+                //     minRowsToShowCollapse = 4,
+                //     expandIndicator = moreOrCollapseIndicator,
+                //     collapseIndicator = moreOrCollapseIndicator
+                // )
+            ) { index ->
+                key(labelsInSearch[index]) {
+                    LabelSelectionElement(
+                        label = labelsInSearch[index],
+                        initialSelected = labelsInSearch[index] in selectedAlbumSet,
+                        onClick = { label, currentSelected ->
+                            if (currentSelected) {
+                                selectedAlbumSet.add(label)
+                            } else {
+                                selectedAlbumSet.remove(label)
+                            }
+                        },
+                    )
+                }
             }
         }
     }
@@ -293,7 +402,7 @@ fun BottomSheetSelectionView(
     onSelectDone: (List<String>) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    var selectedAlbumList by rememberSaveable { mutableStateOf(provideInitialSelectedAlbums()) }
+    var selectedAlbumList by remember { mutableStateOf(provideInitialSelectedAlbums()) }
 
     fun onClick(album: AlbumInfoWithLatestImage) {
         if (album.albumPath in selectedAlbumList) {
@@ -321,8 +430,17 @@ fun BottomSheetSelectionView(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp)
+                text = "$title: ${
+                    if (multiSelection) {
+                        selectedAlbumList.size
+                    } else {
+                        File(selectedAlbumList[0]).name.let { albumName ->
+                            if (albumName.length > 12) albumName.substring(0, 12) + "..."
+                            else albumName
+                        }
+                    }
+                }",
+                style = MaterialTheme.typography.titleLarge.copy(fontSize = 18.sp)
             )
             if (multiSelection) {
                 Row(
@@ -332,15 +450,9 @@ fun BottomSheetSelectionView(
                         onClick = {
                             onSelectDone(selectedAlbumList)
                             onDismiss()
-                        },
-                        enabled = selectedAlbumList.isNotEmpty()
+                        }
                     ) {
                         Icon(Icons.Filled.Done, "done")
-                    }
-                    IconButton(
-                        onClick = onDismiss
-                    ) {
-                        Icon(Icons.Filled.Close, "close")
                     }
                 }
             }
@@ -476,13 +588,21 @@ fun SettingGroupView(
                             explain = settingItem.explain,
                             onClick = {
                                 val purpose =
-                                    if (settingItem.title == context.getString(R.string.excluded_labels)) {
-                                        ViewChoiceItem.ViewChoicePurpose.EXCLUDED_LABEL
-                                    } else if (settingItem.title == context.getString(R.string.excluded_labeling_albums)) {
-                                        ViewChoiceItem.ViewChoicePurpose.EXCLUDED_ALBUM
-                                    } else if (settingItem.title == context.getString(R.string.default_album)) {
-                                        ViewChoiceItem.ViewChoicePurpose.DEFAULT_ALBUM
-                                    } else ViewChoiceItem.ViewChoicePurpose.NOT_OPEN
+                                    when (settingItem.title) {
+                                        context.getString(R.string.excluded_labels) -> {
+                                            ViewChoiceItem.ViewChoicePurpose.EXCLUDED_LABEL
+                                        }
+
+                                        context.getString(R.string.excluded_labeling_albums) -> {
+                                            ViewChoiceItem.ViewChoicePurpose.EXCLUDED_ALBUM
+                                        }
+
+                                        context.getString(R.string.default_album) -> {
+                                            ViewChoiceItem.ViewChoicePurpose.DEFAULT_ALBUM
+                                        }
+
+                                        else -> ViewChoiceItem.ViewChoicePurpose.NOT_OPEN
+                                    }
                                 onViewChoiceClick(
                                     ViewChoiceItem(
                                         title = settingItem.title,

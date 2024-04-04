@@ -6,15 +6,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.example.image_multi_recognition.AppData
 import com.example.image_multi_recognition.compose.view.*
+import com.example.image_multi_recognition.compose.view.settingScreen.SettingScreen
 import com.example.image_multi_recognition.util.getCallSiteInfoFunc
-import com.example.image_multi_recognition.viewmodel.PhotoViewModel
-import kotlinx.coroutines.async
 
 @Composable
 fun NavigationGraph(

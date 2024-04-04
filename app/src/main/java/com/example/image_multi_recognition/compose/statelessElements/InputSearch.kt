@@ -25,11 +25,12 @@ import com.example.image_multi_recognition.db.LabelInfo
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+// @Preview(showSystemUi = true)
 fun InputSearch(
     modifier: Modifier = Modifier,
     onStartFocused: Boolean = true,
     dropDownItemHeight: Int = 42,
-    onSearchClick: (String) -> Unit,
+    onDropDownItemClick: (String) -> Unit,
     onSearchClickNoFurther: () -> Unit,
     onSearchTextChange: (String) -> List<LabelInfo>,
 ) {
@@ -112,7 +113,7 @@ fun InputSearch(
                             }
                         },
                         onClick = {
-                            onSearchClick(dropDownItems[index].label)
+                            onDropDownItemClick(dropDownItems[index].label)
                             inputText = dropDownItems[index].label
                             focusManager.clearFocus()
                         },

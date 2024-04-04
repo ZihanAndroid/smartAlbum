@@ -82,9 +82,9 @@
     <string name="thumbnail_quality">Thumbnail quality</string>
     <string name="thumbnail_quality_explain">the higher, the better quality for cached image and more disk comsumption</string>
     <string name="image_labeling_confidence">Image Labeling Confidence</string>
-    <string name="image_labeling_confidence_explain">the higher, the more accurate of recognized labels and the fewer changes to find more labels</string>
-    <string name="excluded_labeling_albums">Excluded labeling albums</string>
-    <string name="excluded_labeling_albums_explains">Images in excluded labels are not the targets of image labeling</string>
+    <string name="image_labeling_confidence_explain">the higher, the more accurate of recognized labels and the fewer chances to find more labels</string>
+    <string name="excluded_labeling_albums">Excluded albums for labeling</string>
+    <string name="excluded_labeling_albums_explains">Images with excluded labels are not the targets of image labeling</string>
     <string name="excluded_labels">Excluded Labels</string>
     <string name="excluded_labels_explain">Excluded labels are not recognized during image labeling process</string>
 </resources>

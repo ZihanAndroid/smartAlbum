@@ -11,6 +11,7 @@ import com.example.image_multi_recognition.repository.ImageRepository
 import com.example.image_multi_recognition.repository.UserSettingRepository
 import com.example.image_multi_recognition.util.ControlledRunner
 import com.example.image_multi_recognition.util.listDistinct
+import com.example.image_multi_recognition.viewmodel.basic.LabelSearchSupport
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -20,7 +21,7 @@ import javax.inject.Inject
 class SettingScreenViewModel @Inject constructor(
     private val settingRepository: UserSettingRepository,
     private val imageRepository: ImageRepository,
-) : ViewModel() {
+) : ViewModel(), LabelSearchSupport {
     val themeSettingFlow: Flow<AppData.Theme> =
         settingRepository.settingFlow.map { it.themeSetting }.distinctUntilChanged()
     val defaultAlbumPathFlow: Flow<String> =
@@ -37,19 +38,16 @@ class SettingScreenViewModel @Inject constructor(
     val excludedAlbumPathsListFlow: Flow<List<String>> =
         settingRepository.settingFlow.map { it.excludedAlbumPathsList }.distinctUntilChanged(::listDistinct)
 
-    private val _albumListStateFlow: MutableStateFlow<List<AlbumInfoWithLatestImage>> = MutableStateFlow(emptyList())
-
     var allAlbums: List<AlbumInfoWithLatestImage> = emptyList()
-    var allLabels: List<LabelInfo> = emptyList()
+    override var orderedLabelList: List<LabelInfo> = emptyList()
+
     init {
         viewModelScope.launch {
             // setting page never modify albums, so we just get the list once instead of monitoring a flow
             allAlbums = imageRepository.getAlbumInfoWithLatestImage()
-            allLabels = imageRepository.getAllOrderedLabelList()
+            orderedLabelList = imageRepository.getAllOrderedLabelList()
         }
     }
-
-    suspend fun getInitialSetting(): AppData = settingRepository.settingFlow.first()
 
     fun updateThemeSetting(newTheme: AppData.Theme) {
         viewModelScope.launch { settingRepository.updateThemeSetting(newTheme) }

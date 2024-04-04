@@ -1,6 +1,5 @@
 package com.example.image_multi_recognition.compose.view
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -10,7 +9,6 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
@@ -20,7 +18,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.image_multi_recognition.DefaultConfiguration
 import com.example.image_multi_recognition.compose.statelessElements.InputSearch
-import com.example.image_multi_recognition.db.LabelInfo
 import com.example.image_multi_recognition.util.AlbumPathDecoder
 import com.example.image_multi_recognition.viewmodel.PhotoSearchViewModel
 import java.io.File
@@ -49,7 +46,7 @@ fun PhotoSearchComposable(
     ) {
         InputSearch(
             onStartFocused = false,
-            onSearchClick = {
+            onDropDownItemClick = {
                 viewModel.searchImagesByLabel(it)
                 onLabelClick(it)
             },

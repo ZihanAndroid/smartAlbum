@@ -137,7 +137,6 @@ fun TopAppBarForNotRootDestination(
     onBack: (() -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
-    Log.d("", " current title: $title")
     TopAppBar(
         title = {
             if (onBack == null) {

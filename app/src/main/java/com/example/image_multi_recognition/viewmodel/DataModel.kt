@@ -65,11 +65,14 @@ data class SettingGroup(
 
 class ChoiceSettingItem<T : Any>(
     val provideInitialChoice: () -> T,
+    // String to show the current choice in the right Text()
     val provideInitialChoiceString: () -> String = { "" },
+    // provide the value that selected by a user
     val onValueChange: (T) -> Unit,
     val title: String,
     val explain: String, // explain or the value of the item
     val type: Type,
+    // provide choices for Type: MULTI_CHOICE; endian values for SLIDER_CHOICE
     val choices: List<String> = emptyList(),
 ) {
     enum class Type {

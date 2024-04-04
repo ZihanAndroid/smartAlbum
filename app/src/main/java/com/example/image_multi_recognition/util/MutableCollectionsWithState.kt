@@ -1,5 +1,6 @@
 package com.example.image_multi_recognition.util
 
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 
 // Normally, the immutableSet is used as the state like:
@@ -18,70 +19,83 @@ import androidx.compose.runtime.mutableStateOf
 data class MutableSetWithState<E>(
     val mutableSet: MutableSet<E> = mutableSetOf()
 ) : MutableSet<E> by mutableSet {
-    val version = mutableStateOf(0)
+    val version = mutableIntStateOf(0)
 
-    // version.value * 0: causes a memory read to "version" State and when "version" state is changed,
+    // version.intValue * 0: causes a memory read to "version" State and when "version" state is changed,
     // the recomposition happens in the composable that calls MutableSetWithState.size
     // so that the composible can always get the updated size when mutableSet is modified
     override val size: Int
-        get() = version.value * 0 + mutableSet.size
+        get() = version.intValue * 0 + mutableSet.size
 
 
     override fun add(element: E): Boolean =
         mutableSet.add(element).apply {
-            version.value += 1
+            version.intValue += 1
             //Log.d(getCallSiteInfo(), "label changed to ${version.value}")
         }
 
     override fun remove(element: E): Boolean =
         mutableSet.remove(element).apply {
-            version.value += 1
+            version.intValue += 1
             //Log.d(getCallSiteInfo(), "label changed to ${version.value}")
         }
     // Bulk Modification Operations
 
     override fun addAll(elements: Collection<E>): Boolean =
         mutableSet.addAll(elements).apply {
-            version.value += 1
+            version.intValue += 1
             //Log.d(getCallSiteInfo(), "label changed to ${version.value}")
         }
 
     override fun removeAll(elements: Collection<E>): Boolean =
-        mutableSet.removeAll(elements).apply {
-            version.value += 1
+        mutableSet.removeAll(elements.toSet()).apply {
+            version.intValue += 1
             //Log.d(getCallSiteInfo(), "label changed to ${version.value}")
         }
 
     override fun retainAll(elements: Collection<E>): Boolean =
-        mutableSet.retainAll(elements).apply {
-            version.value += 1
+        mutableSet.retainAll(elements.toSet()).apply {
+            version.intValue += 1
             //Log.d(getCallSiteInfo(), "label changed to ${version.value}")
         }
 
     override fun clear(): Unit =
         mutableSet.clear().apply {
-            version.value += 1
+            version.intValue += 1
             //Log.d(getCallSiteInfo(), "label changed to ${version.value}")
         }
+
+    override fun contains(element: E): Boolean {
+        // access State for recomposition
+        version.intValue
+        return element in mutableSet
+    }
+    fun toList(): List<E> = mutableSet.toList()
 }
 
 data class MutableMapWithState<K, V>(
     val mutableMap: MutableMap<K, V> = mutableMapOf(),
 ) : MutableMap<K, V> by mutableMap {
-    val version = mutableStateOf(0)
+    val version = mutableIntStateOf(0)
 
     // override mutable methods
     override fun clear() {
-        mutableMap.clear().apply { version.value += 1 }
+        mutableMap.clear().apply { version.intValue += 1 }
     }
 
     override fun remove(key: K): V? =
-        mutableMap.remove(key).apply { version.value += 1 }
+        mutableMap.remove(key).apply { version.intValue += 1 }
 
     override fun putAll(from: Map<out K, V>) {
-        mutableMap.putAll(from).apply { version.value += 1 }
+        mutableMap.putAll(from).apply { version.intValue += 1 }
     }
 
     override fun put(key: K, value: V): V? =
-        mutableMap.put(key, value).apply { version.value += 1 }
+        mutableMap.put(key, value).apply { version.intValue += 1 }
+
+    override operator fun get(key: K): V? {
+        // access State for recomposition
+        version.intValue
+        return mutableMap[key]
+    }
 }
