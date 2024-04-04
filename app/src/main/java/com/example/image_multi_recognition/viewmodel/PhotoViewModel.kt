@@ -32,7 +32,7 @@ open class PhotoViewModel @Inject constructor(
     imagePagingFlowSupportImpl: ImagePagingFlowSupportImpl
 ) : ViewModel(), ImagePagingFlowSupport by imagePagingFlowSupportImpl,
     ImageFileOperationSupport by imageFileOperationSupportViewModel {
-    // "ImageFileOperationSupport by imageFileOperationSupportViewModel": you can use delegation to achieve something like multi-inheritance in Kotlin
+    // "ImageFileOperationSupport by imageFileOperationSupportViewModel": you can use delegation to do things like multi-inheritance in Kotlin
     private val backgroundThreadPool: ExecutorService = Executors.newCachedThreadPool()
 
     // for startDestination, the "album" is null by default

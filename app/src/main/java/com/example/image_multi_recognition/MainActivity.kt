@@ -9,18 +9,25 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.*
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.image_multi_recognition.compose.navigation.Home
+import com.example.image_multi_recognition.dataStore.AppDataSerializer
 import com.example.image_multi_recognition.permission.PermissionAccessor
 import com.example.image_multi_recognition.repository.ImageRepository
+import com.example.image_multi_recognition.repository.UserSettingRepository
 import com.example.image_multi_recognition.ui.theme.Image_multi_recognitionTheme
 import com.example.image_multi_recognition.util.ScopedThumbNailStorage
 import com.example.image_multi_recognition.util.getCallSiteInfo
 import com.example.image_multi_recognition.util.getCallSiteInfoFunc
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -30,6 +37,9 @@ class MainActivity : ComponentActivity() {
 
     @Inject
     lateinit var repository: ImageRepository
+
+    @Inject
+    lateinit var settingRepository: UserSettingRepository
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -75,15 +85,22 @@ class MainActivity : ComponentActivity() {
             }
         }
         Log.d(getCallSiteInfo(), "ScopedThumbNailStorage: ${ScopedThumbNailStorage.imageStorage}")
-        if (checkResult) {
-            setContent {
-                Image_multi_recognitionTheme {
-                    // A surface container using the 'background' color from the theme
-                    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                        Home(
-                            // photoViewModel = viewModel(),
-                            refreshAllImages = {repository.resetAllImages()}
-                        )
+        lifecycleScope.launch {
+            if (checkResult) {
+                setContent {
+                    // It seems that the only way to get the initial values in datastore file
+                    // is to set a flow in MainActivity to pass the latest value when "SettingScreen" composable is called
+                    val initialSetting by settingRepository.settingFlow.collectAsStateWithLifecycle(AppDataSerializer.defaultAppData)
+
+                    Image_multi_recognitionTheme {
+                        // A surface container using the 'background' color from the theme
+                        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                            Home(
+                                // photoViewModel = viewModel(),
+                                refreshAllImages = {repository.resetAllImages()},
+                                provideInitialSetting = {initialSetting}
+                            )
+                        }
                     }
                 }
             }

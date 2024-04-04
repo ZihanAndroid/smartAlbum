@@ -13,7 +13,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -50,8 +50,10 @@ import com.example.image_multi_recognition.util.pointerInput.*
 import com.example.image_multi_recognition.viewmodel.LabelUiModel
 import com.example.image_multi_recognition.viewmodel.LabelingViewModel
 import com.example.image_multi_recognition.viewmodel.basic.LabelingSupportViewModel
-import kotlinx.coroutines.*
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import java.io.File
 import kotlin.math.absoluteValue
 
@@ -60,6 +62,7 @@ fun LabelingComposable(
     modifier: Modifier = Modifier,
     viewModel: LabelingViewModel,
     rootSnackBarHostState: SnackbarHostState,
+    onSettingClick: () -> Unit,
     onAlbumClick: (Long) -> Unit,
 ) {
     var labelingClicked by rememberSaveable { mutableStateOf(false) }
@@ -92,7 +95,8 @@ fun LabelingComposable(
                         "${stringResource(R.string.loading)}..."
                     }
                 } else {
-                    stringResource(R.string.unlabeled_image_count, unlabeledImageList.size)
+                    // stringResource(R.string.unlabeled_image_count, unlabeledImageList.size)
+                    stringResource(R.string.app_name)
                 },
                 onBack = if (labelingClicked) {
                     {
@@ -143,6 +147,14 @@ fun LabelingComposable(
                             contentDescription = "autoLabeling",
                         )
                     }
+                    IconButton(
+                        onClick = onSettingClick
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "setting",
+                        )
+                    }
                 }
             }
         }
@@ -180,31 +192,54 @@ fun LabelingComposable(
                 val albumPagingItems = viewModel.unlabeledImageAlbumFlow.collectAsLazyPagingItems()
                 val gridState = rememberLazyGridState()
 
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(DefaultConfiguration.ALBUM_PER_ROW),
-                    state = gridState,
-                    horizontalArrangement = Arrangement.spacedBy(DefaultConfiguration.ALBUM_INTERVAL.dp),
-                    verticalArrangement = Arrangement.spacedBy(DefaultConfiguration.ALBUM_INTERVAL.dp),
-                    modifier = modifier.padding(horizontal = DefaultConfiguration.ALBUM_INTERVAL.dp)
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    items(
-                        count = albumPagingItems.itemCount
-                    ) { index ->
-                        albumPagingItems[index]?.let { albumWithLatestImage ->
-                            key(albumWithLatestImage.album) {
-                                AlbumPagingItem(
-                                    // albumImage = albumWithLatestImage,
-                                    imagePath = File(
-                                        AlbumPathDecoder.decode(albumWithLatestImage.album),
-                                        albumWithLatestImage.path
-                                    ),
-                                    title = "${AlbumPathDecoder.decodeAlbumName(albumWithLatestImage.album)} (${albumWithLatestImage.count})",
-                                    contentDescription = albumWithLatestImage.album.toString(),
-                                    sizeDp = ((LocalConfiguration.current.screenWidthDp - DefaultConfiguration.ALBUM_INTERVAL * 3) / 2).dp,
-                                    onAlbumClick = {
-                                        onAlbumClick(albumWithLatestImage.album)
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(DefaultConfiguration.ALBUM_PER_ROW),
+                        state = gridState,
+                        horizontalArrangement = Arrangement.spacedBy(DefaultConfiguration.ALBUM_INTERVAL.dp),
+                        verticalArrangement = Arrangement.spacedBy(DefaultConfiguration.ALBUM_INTERVAL.dp),
+                        modifier = modifier.padding(horizontal = DefaultConfiguration.ALBUM_INTERVAL.dp),
+                    ) {
+                        items(
+                            count = albumPagingItems.itemCount + 1,
+                            span = { index ->
+                                if (index == 0) GridItemSpan(DefaultConfiguration.ALBUM_PER_ROW)
+                                else GridItemSpan(1)
+                            }
+                        ) { index ->
+                            if (index == 0) {
+                                // It seems that applying an align(Alignment.CenterHorizontally) modifier to Text does not work.
+                                // So we use a Row to do that
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    Text(
+                                        text = stringResource(R.string.unlabeled_image_count, unlabeledImageList.size),
+                                        style = MaterialTheme.typography.titleMedium,
+                                        modifier = Modifier.padding(vertical = 8.dp)
+                                    )
+                                }
+                            } else {
+                                albumPagingItems[index - 1]?.let { albumWithLatestImage ->
+                                    key(albumWithLatestImage.album) {
+                                        AlbumPagingItem(
+                                            // albumImage = albumWithLatestImage,
+                                            imagePath = File(
+                                                AlbumPathDecoder.decode(albumWithLatestImage.album),
+                                                albumWithLatestImage.path
+                                            ),
+                                            title = "${AlbumPathDecoder.decodeAlbumName(albumWithLatestImage.album)} (${albumWithLatestImage.count})",
+                                            contentDescription = albumWithLatestImage.album.toString(),
+                                            sizeDp = ((LocalConfiguration.current.screenWidthDp - DefaultConfiguration.ALBUM_INTERVAL * 3) / 2).dp,
+                                            onAlbumClick = {
+                                                onAlbumClick(albumWithLatestImage.album)
+                                            }
+                                        )
                                     }
-                                )
+                                }
                             }
                         }
                     }

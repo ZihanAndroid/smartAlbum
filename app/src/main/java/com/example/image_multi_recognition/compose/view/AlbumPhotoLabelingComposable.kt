@@ -1,6 +1,5 @@
 package com.example.image_multi_recognition.compose.view
 
-import android.util.Log
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,7 +18,6 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import com.example.image_multi_recognition.R
 import com.example.image_multi_recognition.compose.statelessElements.ImagePagerView
 import com.example.image_multi_recognition.compose.statelessElements.TopAppBarForNotRootDestination
-import com.example.image_multi_recognition.util.getCallSiteInfo
 import com.example.image_multi_recognition.viewmodel.AlbumPhotoLabelingViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -47,23 +45,10 @@ fun AlbumPhotoLabelingComposable(
     val labelSelectedStateHolder: Map<String, MutableState<Boolean>> = remember(labelingState) {
         mapOf(*(viewModel.labelImagesMap.map { it.key to mutableStateOf(true) }).toTypedArray())
     }
-
     val labelAdding by viewModel.labelAddingStateFlow.collectAsStateWithLifecycle()
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val labelAddedString = stringResource(R.string.label_added)
-
-    // LaunchedEffect(labelAdding) {
-    //     if (labelAdding == false) {
-    //         // https://stackoverflow.com/questions/71471679/jetpack-compose-scaffold-possible-to-override-the-standard-durations-of-snackbar
-    //         val job = launch {
-    //             snackbarHostState.showSnackbar(labelAddedString, duration = SnackbarDuration.Indefinite)
-    //         }
-    //         delay(1000)
-    //         job.cancel()
-    //         labelingClicked = false
-    //     }
-    // }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -76,7 +61,8 @@ fun AlbumPhotoLabelingComposable(
                         "${stringResource(R.string.loading)}..."
                     }
                 } else {
-                    stringResource(R.string.unlabeled_image_count, imageInfoList.size)
+                    if(imageInfoList.isEmpty()) ""
+                    else stringResource(R.string.unlabeled_image_count, imageInfoList.size)
                 },
                 onBack = onBack,
                 actions = {

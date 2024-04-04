@@ -1,22 +1,17 @@
 package com.example.image_multi_recognition.util
 
 import android.util.Log
-import androidx.compose.foundation.gestures.*
+import androidx.compose.material3.SliderColors
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.runtime.remember
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.input.pointer.PointerInputScope
-import androidx.compose.ui.input.pointer.positionChanged
-import androidx.compose.ui.util.fastAny
-import androidx.compose.ui.util.fastForEach
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.paging.PagingSource
 import androidx.paging.PagingState
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlin.math.PI
-import kotlin.math.abs
 
 // Assume the List<T> is ordered by ascendant, return -1 if no element is found
 // "element" is passed as the first parameter of "comparator()"
@@ -215,3 +210,29 @@ fun String.splitLastBy(delimiter: Char = '.'): Pair<String, String> {
     val suffix = this.substring(lastIndex, length)
     return prefix to suffix
 }
+
+// deep equality for lists
+fun <T> listDistinct(oldList: List<T>, newList: List<T>): Boolean {
+    if (oldList.size != newList.size) return false
+    oldList.forEachIndexed { index, value ->
+        if (value is List<*>) {
+            val newValue = newList[index]
+            if (newValue is List<*>) {
+                if (!listDistinct(value, newValue)) return false
+            } else return false
+        } else {
+            if (!((value == null && newList[index] == null) || value?.equals(newList[index]) == true)) return false
+        }
+    }
+    return true
+}
+
+// https://piotrprus.medium.com/custom-slider-in-jetpack-compose-43ed08e2c338
+// Hide the original points(ticks) in Slider with steps
+@Composable
+fun SliderColorsNoTicks(): SliderColors = SliderDefaults.colors(
+    activeTickColor = Color.Transparent,
+    inactiveTickColor = Color.Transparent,
+    disabledActiveTickColor = Color.Transparent,
+    disabledInactiveTickColor = Color.Transparent
+)

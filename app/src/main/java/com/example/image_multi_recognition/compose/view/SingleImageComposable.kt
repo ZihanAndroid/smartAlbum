@@ -102,7 +102,8 @@ fun SingleImageComposable(
     // Note if you use "LaunchedEffect{...}" it will run after the current recomposition
     // As a result, when switching to the next page, the previous rectangle shows in the new page then disappears.
     // However, by using "remember(pagerState.currentPage){...}", we can clear imageLabelResult first.
-    remember(pagerState.currentPage) {
+    remember(pagerState.currentPage, pagingItems.itemCount) {
+        // pagingItems.itemCount may change because the user can move or delete an image shown by the pager.
         // the info in imageLabelResult has been shown in the previous screen,
         // we clear it so that when moving to the next page, the same imageLabelResult is not shown
         viewModel.clearPage(pagerState.currentPage)
@@ -138,7 +139,8 @@ fun SingleImageComposable(
             }),
             bottomItems = listOf(
                 SingleImageViewItem(Icons.Default.Info, "info"),
-                SingleImageViewItem(ImageVector.vectorResource(R.drawable.baseline_rotate_right_24), "rotate"),
+                SingleImageViewItem(ImageVector.vectorResource(R.drawable.baseline_rotate_left_24), "rotateLeft"),
+                SingleImageViewItem(ImageVector.vectorResource(R.drawable.baseline_rotate_right_24), "rotateRight"),
                 SingleImageViewItem(Icons.Default.Share, "share"),
                 SingleImageViewItem(
                     imageVector = Icons.Default.Favorite,
@@ -158,11 +160,19 @@ fun SingleImageComposable(
             }, {
                 if (!pageScrolling && imageLabelLists.partImageLabelList == null && imageLabelLists.wholeImageLabelList == null) {
                     rotationDegree = when (rotationDegree) {
+                        RotationDegree.D0 -> RotationDegree.D270
+                        RotationDegree.D270 -> RotationDegree.D180
+                        RotationDegree.D180 -> RotationDegree.D90
+                        RotationDegree.D90 -> RotationDegree.D0
+                    }
+                }
+            }, {
+                if (!pageScrolling && imageLabelLists.partImageLabelList == null && imageLabelLists.wholeImageLabelList == null) {
+                    rotationDegree = when (rotationDegree) {
                         RotationDegree.D0 -> RotationDegree.D90
                         RotationDegree.D90 -> RotationDegree.D180
                         RotationDegree.D180 -> RotationDegree.D270
-                        RotationDegree.D270 -> RotationDegree.D360
-                        RotationDegree.D360 -> RotationDegree.D90
+                        RotationDegree.D270 -> RotationDegree.D0
                     }
                 }
             }, {

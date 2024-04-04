@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">ImageSearch</string>
+    <string name="app_name">Smart Album</string>
     <string name="photos">Photos</string>
     <string name="sub_photos">Sub Photos</string>
     <string name="albums">Albums</string>
@@ -28,7 +28,7 @@
     <string name="labeling">Labeling</string>
     <string name="labeling_result">Labeling Result</string>
     <string name="labeling_done">Labeling Done</string>
-    <string name="unlabeled_image_count">Unlabeled Images: %d</string>
+    <string name="unlabeled_image_count">Unlabeled Images: %s</string>
     <string name="no_recognized_image">No recognized image</string>
     <string name="adding_image_labels">Adding Image Labels</string>
     <string name="waiting_for_previous">Waiting for the previous operation</string>
@@ -65,4 +65,26 @@
     <string name="resolution">Resolution</string>
     <string name="date_taken">Date taken</string>
     <string name="location">Location</string>
+
+    <!-- user settings -->
+    <string name="setting">Setting</string>
+    <string name="general_setting">General setting</string>
+    <string name="cache_setting">Cache setting</string>
+    <string name="image_labeling_setting">Image labeling setting</string>
+    <string name="theme">Theme</string>
+    <string name="theme_explain">App theme setting</string>
+    <string name="default_album">Default album</string>
+    <string name="default_album_explain">the album shown in the first window when app is started</string>
+    <string name="images_per_row">Images per row</string>
+    <string name="images_per_row_explain">Number of images shown per row in album window</string>
+    <string name="enable_image_cache">Enable Image Cache</string>
+    <string name="enable_image_cache_explain">Once enabled, gain faster loading speed with the tradeoff of more disk consumption and possibly worse image quality in image grid window</string>
+    <string name="thumbnail_quality">Thumbnail quality</string>
+    <string name="thumbnail_quality_explain">the higher, the better quality for cached image and more disk comsumption</string>
+    <string name="image_labeling_confidence">Image Labeling Confidence</string>
+    <string name="image_labeling_confidence_explain">the higher, the more accurate of recognized labels and the fewer changes to find more labels</string>
+    <string name="excluded_labeling_albums">Excluded labeling albums</string>
+    <string name="excluded_labeling_albums_explains">Images in excluded labels are not the targets of image labeling</string>
+    <string name="excluded_labels">Excluded Labels</string>
+    <string name="excluded_labels_explain">Excluded labels are not recognized during image labeling process</string>
 </resources>

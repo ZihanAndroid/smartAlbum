@@ -139,7 +139,7 @@ fun SingleImagePage(
                 // During scrolling, two pages are shown, and both of them contains doubleClickZoomSupport() modifier.
                 // As a result, if you do not restrict the modifier for the next page,
                 // you can still zoom in/out the next page when the current and next pages are scrolling together
-                shouldRun = { !derivedPageSrcolling }
+                shouldRun = { !derivedPageSrcolling && !animationOngoing }
             ) { newZoom, newOffset, newTransformOrigin, offsetRemained ->
                 // for animation
                 zoomAnimationData = ZoomAnimationData(left = zoom, right = newZoom)

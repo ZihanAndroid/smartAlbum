@@ -1,5 +1,6 @@
 package com.example.image_multi_recognition.compose.statelessElements
 
+import android.util.Log
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
@@ -12,6 +13,7 @@ import androidx.compose.material.icons.filled.Done
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
@@ -135,23 +137,41 @@ fun TopAppBarForNotRootDestination(
     onBack: (() -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
+    Log.d("", " current title: $title")
     TopAppBar(
         title = {
-            Text(
-                text = if (title.length > 30) {
-                    title.substring(0, 30) + "..."
-                } else {
-                    title
-                },
-                style = MaterialTheme.typography.titleLarge.copy(fontSize = 18.sp)
-            )
+            if (onBack == null) {
+                Text(
+                    text = if (title.length > 30) {
+                        title.substring(0, 30) + "..."
+                    } else {
+                        title
+                    },
+                    style = MaterialTheme.typography.titleLarge.copy(fontSize = 18.sp)
+                )
+            }
         },
         navigationIcon = {
-            if(onBack != null) {
-                IconButton(
-                    onClick = onBack
-                ) {
-                    Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "back")
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (onBack != null) {
+                    IconButton(
+                        onClick = onBack
+                    ) {
+                        Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "back")
+                    }
+                    // It seems that if we do not put the Text here, in some cases the text cannot show due to the change of navigationIcon
+                    // So we put the text as part of the navigationIcon
+                    Text(
+                        text = if (title.length > 30) {
+                            title.substring(0, 30) + "..."
+                        } else {
+                            title
+                        },
+                        style = MaterialTheme.typography.titleLarge.copy(fontSize = 18.sp)
+                    )
                 }
             }
         },
@@ -166,11 +186,14 @@ fun ImageItemRow(
     imageCount: Int,
     albumAbsolutePath: String,
     imageFilePath: String,
-    onClick: () -> Unit
+    onClick: (() -> Unit)? = null,
 ) {
     val imageSize = (LocalConfiguration.current.screenWidthDp / 5).dp
     Row(
-        modifier = modifier.fillMaxWidth().clickable { onClick() }
+        modifier = modifier.fillMaxWidth().let {
+            if (onClick != null) it.clickable { onClick() }
+            else it
+        }
     ) {
         AsyncImage(
             model = File(imageFilePath),

@@ -40,9 +40,11 @@ fun Modifier.doubleClickZoomSupport(
         // double tap to zoom in or zoom out
         // tapOffset is related to the Composable that the pointerInput is applied (like parent container)
         onDoubleTap = { tapOffset ->
+            if (!shouldRun()) {
+                return@detectTapGestures
+            }
             val zoom by zoomState
             val offset by offsetState
-            if (!shouldRun()) return@detectTapGestures
             val proportion = currentParentSize.height.toFloat() / currentImageSize.height
             val thresholdZoom = if (proportion < minimalZoom) minimalZoom else proportion
             val ty = (currentParentSize.height - currentImageSize.height) / 2f
@@ -110,7 +112,6 @@ fun Modifier.pinchZoomAndPanMoveSupport(
         val zoom by zoomState
         var offset = offsetState.value
         var newTransformOrigin: TransformOrigin? = null
-
         if (!shouldRun()) {
             // another task (like animation) is ongoing,
             // we consume the event to prevent the user trigger other pointer events during that task running

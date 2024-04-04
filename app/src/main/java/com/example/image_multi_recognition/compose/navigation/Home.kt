@@ -23,6 +23,7 @@ import androidx.navigation.NavDestination
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.example.image_multi_recognition.AppData
 import com.example.image_multi_recognition.R
 import com.example.image_multi_recognition.util.getCallSiteInfoFunc
 import com.example.image_multi_recognition.viewmodel.PhotoViewModel
@@ -31,6 +32,7 @@ import com.example.image_multi_recognition.viewmodel.PhotoViewModel
 fun Home(
     modifier: Modifier = Modifier,
     refreshAllImages: () -> Unit,
+    provideInitialSetting: ()->AppData,
     // photoViewModel: PhotoViewModel,
 ) {
 
@@ -58,7 +60,10 @@ fun Home(
                         onPopUpItemClick = listOf(
                             { contentShownBySnackBar = it }
                         ),
-                        refreshAllImages = refreshAllImages
+                        refreshAllImages = refreshAllImages,
+                        onSettingClick = {
+                            navController.navigate(Destination.SETTING.route)
+                        }
                     )
                 }
             },
@@ -79,6 +84,7 @@ fun Home(
                 // photoViewModel = photoViewModel,
                 rootSnackBarHostState = snackBarHostState,
                 onTopBottomBarHidden = { topBottomBarHidden = it },
+                provideInitialSetting = provideInitialSetting
             )
         }
     } else {
@@ -87,6 +93,7 @@ fun Home(
             // photoViewModel = photoViewModel,
             onTopBottomBarHidden = { topBottomBarHidden = it },
             rootSnackBarHostState = snackBarHostState,
+            provideInitialSetting = provideInitialSetting
         )
     }
 
@@ -118,16 +125,16 @@ fun ScaffoldTopBar(
         },
         actions = {
             // the refresh is done automatically, do not need to refresh manually
-            if (listOf(Destination.PHOTO, Destination.ALBUM, Destination.LABEL).includeRouteAs(destination)) {
-                IconButton(
-                    onClick = refreshAllImages
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Refresh,
-                        contentDescription = "topBarMoreOptions",
-                    )
-                }
-            }
+            // if (listOf(Destination.PHOTO, Destination.ALBUM, Destination.LABEL).includeRouteAs(destination)) {
+            //     IconButton(
+            //         onClick = refreshAllImages
+            //     ) {
+            //         Icon(
+            //             imageVector = Icons.Default.Refresh,
+            //             contentDescription = "topBarMoreOptions",
+            //         )
+            //     }
+            // }
             IconButton(
                 onClick = onSettingClick
             ) {

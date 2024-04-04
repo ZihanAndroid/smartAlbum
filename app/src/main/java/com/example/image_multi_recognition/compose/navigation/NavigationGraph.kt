@@ -3,15 +3,18 @@ package com.example.image_multi_recognition.compose.navigation
 import android.util.Log
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import com.example.image_multi_recognition.AppData
 import com.example.image_multi_recognition.compose.view.*
 import com.example.image_multi_recognition.util.getCallSiteInfoFunc
 import com.example.image_multi_recognition.viewmodel.PhotoViewModel
+import kotlinx.coroutines.async
 
 @Composable
 fun NavigationGraph(
@@ -21,8 +24,11 @@ fun NavigationGraph(
     // it can be seen as the global ViewModel for the app which has the same lifecycle as the Activity does
     // photoViewModel: PhotoViewModel,
     rootSnackBarHostState: SnackbarHostState,
-    onTopBottomBarHidden: (Boolean)->Unit,
+    onTopBottomBarHidden: (Boolean) -> Unit,
+    provideInitialSetting: () -> AppData,
 ) {
+    val coroutineScope = rememberCoroutineScope()
+
     NavHost(
         modifier = modifier,
         navController = navController,
@@ -38,11 +44,11 @@ fun NavigationGraph(
                     "${Destination.SINGLE_IMAGE.route}/1/${album}/$originalIndex".let { route ->
                         Log.d(getCallSiteInfoFunc(), "Navigation route: $route")
                         navController.navigate(route) {
-//                        launchSingleTop = true
-//                        popUpTo(navController.graph.findStartDestination().id) {
-//                            saveState = true
-//                        }
-//                        restoreState = true
+                       // launchSingleTop = true
+                       // popUpTo(navController.graph.findStartDestination().id) {
+                       //     saveState = true
+                       // }
+                       // restoreState = true
                         }
                     }
                 },
@@ -78,7 +84,10 @@ fun NavigationGraph(
         ) {
             LabelingComposable(
                 viewModel = hiltViewModel(),
-                rootSnackBarHostState = rootSnackBarHostState
+                rootSnackBarHostState = rootSnackBarHostState,
+                onSettingClick = {
+                    navController.navigate(Destination.SETTING.route)
+                }
             ) { albumId ->
                 "${Destination.ALBUM_PHOTO_LABELING}/${albumId}".let { route ->
                     navController.navigate(route) {
@@ -158,6 +167,17 @@ fun NavigationGraph(
                 onBack = {
                     navController.popBackStack()
                 }
+            )
+        }
+        composable(
+            route = Destination.SETTING.navRoute
+        ) {
+            SettingScreen(
+                viewModel = hiltViewModel(),
+                onBack = {
+                    navController.popBackStack()
+                },
+                provideInitialSetting = provideInitialSetting
             )
         }
     }

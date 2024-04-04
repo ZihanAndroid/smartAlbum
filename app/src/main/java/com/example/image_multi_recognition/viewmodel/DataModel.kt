@@ -53,7 +53,29 @@ data class UserLabeledImageData(
 enum class RotationDegree(
     private val degree: Float,
 ) {
-    D0(0f), D90(90f), D180(180f), D270(270f), D360(360f);
+    D0(0f), D90(90f), D180(180f), D270(270f);
 
     fun toFloat(): Float = degree
+}
+
+data class SettingGroup(
+    val title: String,
+    val items: List<ChoiceSettingItem<*>>,
+)
+
+class ChoiceSettingItem<T : Any>(
+    val provideInitialChoice: () -> T,
+    val provideInitialChoiceString: () -> String = { "" },
+    val onValueChange: (T) -> Unit,
+    val title: String,
+    val explain: String, // explain or the value of the item
+    val type: Type,
+    val choices: List<String> = emptyList(),
+) {
+    enum class Type {
+        TWO_CHOICE,     // Boolean
+        MULTI_CHOICE,   // String
+        SLIDER_CHOICE,  // Float
+        VIEW_CHOICE     // List<String>
+    }
 }

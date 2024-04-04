@@ -22,13 +22,11 @@ import com.example.image_multi_recognition.AppData
 import com.example.image_multi_recognition.DefaultConfiguration
 import com.example.image_multi_recognition.db.*
 import com.example.image_multi_recognition.util.*
+import com.example.image_multi_recognition.viewmodel.SettingGroup
 import com.google.mlkit.vision.common.InputImage
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
@@ -38,7 +36,6 @@ import javax.inject.Singleton
 
 @Singleton
 class ImageRepository @Inject constructor(
-    private val appDataStore: DataStore<AppData>,
     private val database: ImageInfoDatabase,
     private val imageLabelDao: ImageLabelDao,
     private val imageInfoDao: ImageInfoDao,
@@ -64,12 +61,6 @@ class ImageRepository @Inject constructor(
 
     fun resetAllImages() {
         _mediaStoreChangeFlow.value = !_mediaStoreChangeFlow.value
-    }
-
-    suspend fun updateMediaStoreVersion(newVersion: String) {
-        appDataStore.updateData { currentData ->
-            currentData.toBuilder().setMediaStoreVersion(newVersion).build()
-        }
     }
 
     fun getAllImageDir(): List<File> = with(MediaDirectoryFetcher) {
@@ -287,7 +278,7 @@ class ImageRepository @Inject constructor(
         imageInfoDao.deleteById(imageIds)
     }
 
-    suspend fun getAlbumInfoWithLatestImage(excludedAlbum: Long): List<AlbumInfoWithLatestImage> {
+    suspend fun getAlbumInfoWithLatestImage(excludedAlbum: Long = -1): List<AlbumInfoWithLatestImage> {
         return imageInfoDao.getAlbumInfoWithLatestImage(excludedAlbum).sortedBy { File(it.albumPath).name }
     }
 

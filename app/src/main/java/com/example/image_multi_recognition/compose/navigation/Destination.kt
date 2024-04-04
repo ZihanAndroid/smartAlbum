@@ -4,6 +4,7 @@ import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.res.stringResource
 import androidx.navigation.*
@@ -70,8 +71,11 @@ enum class Destination(
         route = "ALBUM_PHOTO_LABELING",
         compulsoryArguments = mapOf("album" to NavType.LongType),
         isRootDestination = false
+    ),
+    SETTING(
+        route = "SETTING",
+        isRootDestination = false
     );
-
 
     val navRoute: String
         get() = "$route${
