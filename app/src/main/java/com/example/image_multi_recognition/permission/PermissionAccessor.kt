@@ -18,7 +18,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.stringResource
 import androidx.core.content.ContextCompat
 import com.example.image_multi_recognition.R
-import com.example.image_multi_recognition.ui.theme.Image_multi_recognitionTheme
+import com.example.image_multi_recognition.ui.theme.AppTheme
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -69,7 +69,7 @@ class PermissionAccessor @Inject constructor() {
         positiveAction: () -> Unit
     ) {
         setContent {
-            Image_multi_recognitionTheme {
+            AppTheme {
                 var showPermissionDialog by rememberSaveable { mutableStateOf(1) }
 
                 if (showPermissionDialog == 1 && !permissionRequestDenied) {

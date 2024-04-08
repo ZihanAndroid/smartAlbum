@@ -39,11 +39,16 @@ import coil.compose.AsyncImage
 import com.example.image_multi_recognition.DefaultConfiguration
 import com.example.image_multi_recognition.R
 import com.example.image_multi_recognition.db.ImageInfo
-import com.example.image_multi_recognition.util.*
+import com.example.image_multi_recognition.model.UiModel
+import com.example.image_multi_recognition.ui.theme.md_theme_dark_onPrimaryContainer
+import com.example.image_multi_recognition.ui.theme.md_theme_dark_primary
+import com.example.image_multi_recognition.util.MutableSetWithState
+import com.example.image_multi_recognition.util.capitalizeFirstChar
+import com.example.image_multi_recognition.util.getCallSiteInfoFunc
+import com.example.image_multi_recognition.util.lowerCaseWithCapital
 import com.example.image_multi_recognition.util.pointerInput.longPressAndDragSelection
 import com.example.image_multi_recognition.util.pointerInput.onKeyProvided
 import com.example.image_multi_recognition.util.pointerInput.tapClick
-import com.example.image_multi_recognition.viewmodel.UiModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.isActive
@@ -58,12 +63,13 @@ fun ImagePagerView(
     selectionMode: Boolean = false,
     // onClickSelect: (Long) -> Unit = {},
     onLongPress: (Long) -> Unit = {},
+    provideImagePerRow: () -> Int,
     enableLongPressAndDrag: Boolean = false, // enable drag selection
     // we use MutableSetWithState<Long> instead of MutableSetWithState<ImageInfo>
     // because ImageInfo may change like creating a new ImageInfo to change the "favorite" property
     // but the id will not change
     selectedImageIdSet: MutableSetWithState<Long> = MutableSetWithState(),
-    deletedImageIds: Set<Long> = emptySet()
+    deletedImageIds: Set<Long> = emptySet(),
 ) {
     Log.d(getCallSiteInfoFunc(), "Recomposition")
     val lazyGridState = rememberLazyGridState()
@@ -86,7 +92,7 @@ fun ImagePagerView(
     val addedImageIdKeyMap = rememberSaveable { mutableMapOf<Long, Int>() }
 
     LazyVerticalGrid(
-        columns = GridCells.Fixed(DefaultConfiguration.IMAGE_PER_ROW),
+        columns = GridCells.Fixed(provideImagePerRow()),
         horizontalArrangement = Arrangement.spacedBy(DefaultConfiguration.IMAGE_INTERVAL.dp),
         verticalArrangement = Arrangement.spacedBy(DefaultConfiguration.IMAGE_INTERVAL.dp),
         modifier = modifier.let { currentModifier ->
@@ -157,11 +163,11 @@ fun ImagePagerView(
                 pagingItems[index]?.let { pageItem ->
                     when (pageItem) {
                         is UiModel.ItemHeaderYearMonth -> {
-                            GridItemSpan(DefaultConfiguration.IMAGE_PER_ROW)
+                            GridItemSpan(provideImagePerRow())
                         }
 
                         is UiModel.ItemHeaderDay -> {
-                            GridItemSpan(DefaultConfiguration.IMAGE_PER_ROW)
+                            GridItemSpan(provideImagePerRow())
                         }
 
                         else -> GridItemSpan(1)
@@ -218,7 +224,8 @@ fun ImagePagerView(
                                 availableScreenWidth = availableScreenWidth,
                                 onSendThumbnailRequest = onSendThumbnailRequest,
                                 selectionMode = selectionMode,
-                                selected = if (selectionMode) selected else false
+                                selected = if (selectionMode) selected else false,
+                                provideImagePerRow = provideImagePerRow
                             )
                         }
                 }
@@ -289,14 +296,15 @@ fun PagingItemImage(
     imageInfo: ImageInfo,
     onImageClick: (() -> Unit)? = null,
     onImageLongClick: (() -> Unit)? = null,
-    onImageDoubleClick: (()->Unit)? = null,
+    onImageDoubleClick: (() -> Unit)? = null,
+    provideImagePerRow: () -> Int,
     availableScreenWidth: Int,
     onSendThumbnailRequest: (File, ImageInfo) -> Unit,
     selectionMode: Boolean = false,
-    selected: Boolean = false
+    selected: Boolean = false,
 ) {
     val imageSize = remember(availableScreenWidth) {
-        (availableScreenWidth - (DefaultConfiguration.IMAGE_PER_ROW - 1) * DefaultConfiguration.IMAGE_INTERVAL) / DefaultConfiguration.IMAGE_PER_ROW
+        (availableScreenWidth - (provideImagePerRow() - 1) * DefaultConfiguration.IMAGE_INTERVAL) / provideImagePerRow()
     }
 
     val imagePath = if (imageInfo.isThumbnailAvailable) {
@@ -348,8 +356,8 @@ fun PagingItemImage(
                 // Note the position of padding() and size() modifier, apply padding() first then size(), the size will not change
                 // while applying size() first then padding(), the size is changed by padding change
                 modifier = Modifier.align(Alignment.TopEnd).padding(4.dp + paddingValue).size(16.dp - paddingValue / 4),
-                contentDescription = "icon_${imageInfo.id}"
-
+                contentDescription = "icon_${imageInfo.id}",
+                tint = md_theme_dark_primary
             )
         }
     }
@@ -360,14 +368,14 @@ fun ToggleIcon(selected: Boolean) {
     if (selected) {
         Icon(
             imageVector = ImageVector.vectorResource(R.drawable.baseline_check_circle_outline_24),
-            tint = MaterialTheme.colorScheme.primary,
+            tint = MaterialTheme.colorScheme.primaryContainer,
             contentDescription = null,
             modifier = Modifier
                 .padding(4.dp)
-                .border(1.dp, colorResource(R.color.colorAccent), CircleShape)
+                .border(1.dp, MaterialTheme.colorScheme.onPrimaryContainer, CircleShape)
                 .size(20.dp)
                 .clip(CircleShape)
-                .background(colorResource(R.color.colorAccent))
+                .background(MaterialTheme.colorScheme.onPrimaryContainer)
         )
     } else {
         Icon(
@@ -382,11 +390,11 @@ fun ToggleIcon(selected: Boolean) {
 private fun PageTitleYearMonth(
     year: Int,
     month: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Text(
         text = "$month $year",
-        modifier = modifier.padding(top = 16.dp, bottom = 8.dp),
+        modifier = modifier.padding(top = 16.dp, bottom = 8.dp, start = 8.dp),
         style = MaterialTheme.typography.titleLarge
     )
 }
@@ -396,11 +404,11 @@ private fun PageTitleDay(
     month: String,
     dayOfMonth: Int,
     dayOfWeek: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Text(
-        text = "$dayOfWeek, $month $dayOfMonth",
-        modifier = modifier.padding(vertical = 8.dp),
+        text = "${dayOfWeek.lowerCaseWithCapital()}, ${month.lowerCaseWithCapital()} $dayOfMonth",
+        modifier = modifier.padding(top = 8.dp, bottom = 8.dp, start = 8.dp),
         style = MaterialTheme.typography.titleMedium
     )
 }

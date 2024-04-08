@@ -88,6 +88,7 @@ dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
     // ContextualFlowRow, ...
     implementation("androidx.compose.foundation:foundation-layout-android:1.7.0-alpha06")
+    // implementation("androidx.compose.runtime:runtime-android:1.7.0-alpha06")
     // material 3
     implementation("com.google.android.material:material:1.11.0")
     implementation("androidx.activity:activity-ktx:1.8.2")

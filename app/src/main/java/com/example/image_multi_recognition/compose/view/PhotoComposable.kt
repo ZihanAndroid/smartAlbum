@@ -1,9 +1,6 @@
 package com.example.image_multi_recognition.compose.view
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
@@ -16,9 +13,11 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.collectAsLazyPagingItems
+import com.example.image_multi_recognition.AppData
 import com.example.image_multi_recognition.R
 import com.example.image_multi_recognition.compose.statelessElements.ImagePagerView
 import com.example.image_multi_recognition.compose.statelessElements.TopAppBarForNotRootDestination
@@ -41,10 +40,12 @@ fun PhotoComposable(
     customTopBar: Boolean = false,
     rootSnackBarHostState: SnackbarHostState? = null,
     onTopBottomBarHidden: (Boolean) -> Unit = {},
-    onBack: () -> Unit = {}
+    onBack: () -> Unit = {},
+    provideInitialSetting: () -> AppData,
 ) {
     val pagingDataFlow by viewModel.pagingFlow.collectAsStateWithLifecycle()
     val pagingItems = pagingDataFlow.collectAsLazyPagingItems()
+    val imagesPerRowFlow by viewModel.imagePerRowFlow.collectAsStateWithLifecycle(provideInitialSetting().imagesPerRow)
 
     var selectionMode by rememberSaveable { mutableStateOf(false) }
     val selectedImageIdSet = remember { MutableSetWithState<Long>() }
@@ -158,7 +159,16 @@ fun PhotoComposable(
                 )
             }
         }, modifier = modifier
-    ) { paddingValues ->
+    ) { originalPaddingValues ->
+        // handle the padding problem for applying enableEdgeToEdge() when multiple Scaffolds exist
+        // https://slack-chats.kotlinlang.org/t/16057136/with-enableedgetoedge-the-height-of-the-system-navbar-gestur
+        val paddingValues = PaddingValues(
+            start = originalPaddingValues.calculateStartPadding(LayoutDirection.Ltr),
+            end = originalPaddingValues.calculateEndPadding(LayoutDirection.Ltr),
+            // the condition that TopAppBar exists in this Scaffold
+            top = if (!selectionMode && customTopBar || selectionMode) originalPaddingValues.calculateTopPadding() else 0.dp,
+            bottom = if (customTopBar) originalPaddingValues.calculateBottomPadding() else 0.dp
+        )
         if (pagingItems.itemCount == 0) {
             Box(
                 modifier = Modifier.padding(paddingValues).fillMaxSize(),
@@ -170,6 +180,7 @@ fun PhotoComposable(
             ImagePagerView(
                 modifier = modifier.padding(paddingValues),
                 pagingItems = pagingItems,
+                provideImagePerRow = { imagesPerRowFlow },
                 onImageClick = { imageInfoId ->
                     onImageClick(
                         viewModel.currentAlbum!!,

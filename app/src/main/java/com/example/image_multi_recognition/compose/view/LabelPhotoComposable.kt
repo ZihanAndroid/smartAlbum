@@ -13,6 +13,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.collectAsLazyPagingItems
+import com.example.image_multi_recognition.AppData
 import com.example.image_multi_recognition.R
 import com.example.image_multi_recognition.compose.statelessElements.ImagePagerView
 import com.example.image_multi_recognition.compose.statelessElements.TopAppBarForNotRootDestination
@@ -26,8 +27,9 @@ import kotlinx.coroutines.launch
 fun LabelPhotoComposable(
     viewModel: LabelPhotoViewModel,
     modifier: Modifier = Modifier,
+    provideInitialSetting: () -> AppData,
     onImageClick: (Int, String) -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
@@ -36,6 +38,7 @@ fun LabelPhotoComposable(
     val selectedImageInfoSet = remember { MutableSetWithState<Long>() }
     var selectionMode by rememberSaveable { mutableStateOf(false) }
     val labelRemoving by viewModel.labelRemoving.collectAsStateWithLifecycle()
+    val imagesPerRow by viewModel.imagesPerRowFlow.collectAsStateWithLifecycle(provideInitialSetting().imagesPerRow)
 
     val waitForPreviousOperationString = stringResource(R.string.waiting_for_previous)
     val labelRemovedString = stringResource(R.string.label_removed)
@@ -119,13 +122,6 @@ fun LabelPhotoComposable(
             },
             onSendThumbnailRequest = viewModel::requestThumbnail,
             selectionMode = selectionMode,
-            // onClickSelect = {
-            //     if (selectedImageInfoSet.contains(it)) {
-            //         selectedImageInfoSet -= it
-            //     } else {
-            //         selectedImageInfoSet += it
-            //     }
-            // },
             onLongPress = { imageId ->
                 if (!selectionMode && labelRemoving != true) selectionMode = true
                 if (labelRemoving != true) {
@@ -138,6 +134,7 @@ fun LabelPhotoComposable(
             },
             enableLongPressAndDrag = true,
             selectedImageIdSet = selectedImageInfoSet,
+            provideImagePerRow = { imagesPerRow }
         )
     }
 }

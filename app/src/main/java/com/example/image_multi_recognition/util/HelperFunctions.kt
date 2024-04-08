@@ -212,19 +212,22 @@ fun String.splitLastBy(delimiter: Char = '.'): Pair<String, String> {
 }
 
 // deep equality for lists
-fun <T> listDistinct(oldList: List<T>, newList: List<T>): Boolean {
-    if (oldList.size != newList.size) return false
-    oldList.forEachIndexed { index, value ->
-        if (value is List<*>) {
-            val newValue = newList[index]
+fun <T> collectionDistinct(oldC: Collection<T>, newC: Collection<T>): Boolean {
+    if (oldC.size != newC.size) return false
+    val oldIterator = oldC.iterator()
+    val newIterator = newC.iterator()
+    while(oldIterator.hasNext() && newIterator.hasNext()){
+        val oldValue = oldIterator.next()
+        val newValue = newIterator.next()
+        if (oldValue is List<*>) {
             if (newValue is List<*>) {
-                if (!listDistinct(value, newValue)) return false
+                if (!collectionDistinct(oldValue, newValue)) return false
             } else return false
         } else {
-            if (!((value == null && newList[index] == null) || value?.equals(newList[index]) == true)) return false
+            if (!((oldValue == null && newValue == null) || oldValue?.equals(newValue) == true)) return false
         }
     }
-    return true
+    return oldIterator.hasNext() == newIterator.hasNext()
 }
 
 // https://piotrprus.medium.com/custom-slider-in-jetpack-compose-43ed08e2c338
@@ -236,3 +239,5 @@ fun SliderColorsNoTicks(): SliderColors = SliderDefaults.colors(
     disabledActiveTickColor = Color.Transparent,
     disabledInactiveTickColor = Color.Transparent
 )
+
+fun String.lowerCaseWithCapital(): String = lowercase().capitalizeFirstChar()

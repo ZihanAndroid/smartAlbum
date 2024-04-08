@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -83,11 +84,7 @@ fun InputSearch(
                 }
             },
             singleLine = true,
-            keyboardActions = KeyboardActions(onDone = { onSearchClickNoFurther() }),
-            colors = TextFieldDefaults.colors(
-                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                focusedContainerColor = MaterialTheme.colorScheme.surface
-            )
+            keyboardActions = KeyboardActions(onDone = { onSearchClickNoFurther() })
         )
         if (dropDownItems.isNotEmpty()) {
             DropdownMenu(
@@ -104,7 +101,7 @@ fun InputSearch(
                                 Text(
                                     text = dropDownItems[index].label.substring(0, inputText.length),
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color = colorResource(R.color.IndianRed)
+                                    color = colorResource(R.color.colorAccent)
                                 )
                                 Text(
                                     text = dropDownItems[index].label.substring(inputText.length),
@@ -123,4 +120,51 @@ fun InputSearch(
             }
         }
     }
+}
+
+@Composable
+fun InputSearchWithoutDropdownMenu(
+    modifier: Modifier = Modifier,
+    // inputText change caused by user input
+    onSearchTextChange: (String) -> Unit,
+    onSearchClick: ()->Unit
+) {
+    var inputText by rememberSaveable { mutableStateOf("") }
+
+    OutlinedTextField(
+        value = inputText,
+        onValueChange = {
+            inputText = it
+            onSearchTextChange(inputText)
+        },
+        label = {
+            Text(text = stringResource(R.string.input_label))
+        },
+        modifier = modifier.fillMaxWidth(),
+        leadingIcon = {
+            IconButton(
+                onClick = { onSearchClick() }
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Search,
+                    contentDescription = "search"
+                )
+            }
+        },
+        trailingIcon = {
+            IconButton(
+                onClick = {
+                    inputText = ""
+                    onSearchTextChange("")
+                }
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Clear,
+                    contentDescription = "clear"
+                )
+            }
+        },
+        singleLine = true,
+        keyboardActions = KeyboardActions(onDone = { onSearchClick() })
+    )
 }

@@ -1,4 +1,4 @@
-package com.example.image_multi_recognition.viewmodel
+package com.example.image_multi_recognition.model
 
 import android.graphics.Rect
 import com.example.image_multi_recognition.db.ImageInfo
@@ -80,5 +80,44 @@ class ChoiceSettingItem<T : Any>(
         MULTI_CHOICE,   // String
         SLIDER_CHOICE,  // Float
         VIEW_CHOICE     // List<String>
+    }
+}
+
+sealed class ContextualFlowItem<T> {
+    data class Title<T>(
+        val title: String,
+    ) : ContextualFlowItem<T>()
+
+    data class Item<T>(
+        val item: T,
+    ) : ContextualFlowItem<T>()
+
+    companion object {
+        fun <T> mapToContextualFlowItemWithTitle(
+            items: Iterable<T>,
+            emptyItem: T,
+            // return an empty String if you do not want a title between prev and current
+            onNewTitle: (prev: T, current: T) -> String,
+        ): List<ContextualFlowItem<T>> {
+            var prev = emptyItem
+            return mutableListOf<ContextualFlowItem<T>>().apply {
+                items.forEach { curItem ->
+                    onNewTitle(prev, curItem).let { title ->
+                        if (title.isNotEmpty()) {
+                            add(Title(title))
+                        }
+                    }
+                    add(Item(curItem))
+                    prev = curItem
+                }
+            }
+        }
+
+        // No title mapped
+        fun <T> mapToContextualFlowItem(items: Iterable<T>): List<ContextualFlowItem<T>> {
+            return mutableListOf<ContextualFlowItem<T>>().apply {
+                items.forEach { add(Item(it)) }
+            }
+        }
     }
 }

@@ -1,6 +1,5 @@
 package com.example.image_multi_recognition.compose.view
 
-import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -9,9 +8,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
@@ -24,19 +21,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.paging.compose.collectAsLazyPagingItems
 import coil.compose.AsyncImage
 import com.example.image_multi_recognition.DefaultConfiguration
 import com.example.image_multi_recognition.R
-import com.example.image_multi_recognition.db.AlbumWithLatestImage
-import com.example.image_multi_recognition.db.ImageInfo
+import com.example.image_multi_recognition.ui.theme.md_theme_dark_onPrimaryContainer
 import com.example.image_multi_recognition.util.AlbumPathDecoder
-import com.example.image_multi_recognition.util.getCallSiteInfoFunc
 import com.example.image_multi_recognition.viewmodel.AlbumViewModel
-import com.example.image_multi_recognition.viewmodel.PhotoViewModel
 import java.io.File
-import java.util.regex.Pattern
 
 @Composable
 fun AlbumComposable(
@@ -103,6 +95,7 @@ fun AlbumPagingItem(
             text = title,
             style = MaterialTheme.typography.labelLarge.copy(fontSize = 16.sp),
             textAlign = TextAlign.Center,
+            color = md_theme_dark_onPrimaryContainer
         )
     }
 }

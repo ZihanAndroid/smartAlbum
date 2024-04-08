@@ -146,7 +146,7 @@ fun TopAppBarForNotRootDestination(
                     } else {
                         title
                     },
-                    style = MaterialTheme.typography.titleLarge.copy(fontSize = 18.sp)
+                    style = MaterialTheme.typography.titleLarge.copy(fontSize = 18.sp),
                 )
             }
         },

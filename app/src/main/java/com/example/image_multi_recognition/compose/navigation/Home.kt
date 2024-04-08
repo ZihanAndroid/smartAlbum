@@ -1,21 +1,19 @@
 package com.example.image_multi_recognition.compose.navigation
 
 import android.util.Log
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
@@ -25,14 +23,14 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.image_multi_recognition.AppData
 import com.example.image_multi_recognition.R
+import com.example.image_multi_recognition.compose.statelessElements.crop
 import com.example.image_multi_recognition.util.getCallSiteInfoFunc
-import com.example.image_multi_recognition.viewmodel.PhotoViewModel
 
 @Composable
 fun Home(
     modifier: Modifier = Modifier,
     refreshAllImages: () -> Unit,
-    provideInitialSetting: ()->AppData,
+    provideInitialSetting: () -> AppData,
     // photoViewModel: PhotoViewModel,
 ) {
 
@@ -55,12 +53,11 @@ fun Home(
                 // show different topBar based on current destination
                 if (!topBottomBarHidden && !Destination.LABEL.sameRouteAs(currentDestination)) {
                     ScaffoldTopBar(
-                        destination = currentDestination,
+                        refreshAllImages = refreshAllImages,
                         popUpItems = listOf(stringResource(R.string.NavPopUpItem_NotDone)),
                         onPopUpItemClick = listOf(
                             { contentShownBySnackBar = it }
                         ),
-                        refreshAllImages = refreshAllImages,
                         onSettingClick = {
                             navController.navigate(Destination.SETTING.route)
                         }
@@ -78,9 +75,16 @@ fun Home(
             },
             modifier = modifier
         ) { suggestedPadding ->
+            val paddingValues = PaddingValues(
+                start = suggestedPadding.calculateStartPadding(LayoutDirection.Ltr),
+                end = suggestedPadding.calculateEndPadding(LayoutDirection.Ltr),
+                top = if (!topBottomBarHidden && !Destination.LABEL.sameRouteAs(currentDestination)) suggestedPadding.calculateTopPadding() else 0.dp,
+                bottom = suggestedPadding.calculateBottomPadding() + 20.dp,
+            )
+
             NavigationGraph(
                 navController = navController,
-                modifier = Modifier.padding(suggestedPadding),
+                modifier = Modifier.padding(paddingValues),
                 // photoViewModel = photoViewModel,
                 rootSnackBarHostState = snackBarHostState,
                 onTopBottomBarHidden = { topBottomBarHidden = it },
@@ -107,7 +111,6 @@ fun Home(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ScaffoldTopBar(
-    destination: NavDestination?,
     refreshAllImages: () -> Unit,
     popUpItems: List<String> = emptyList(),
     onPopUpItemClick: List<(String) -> Unit> = emptyList(),
@@ -175,7 +178,7 @@ fun ScaffoldBottomBar(
     currentDestination: NavDestination?,
 ) {
     BottomAppBar(
-        // modifier = Modifier.crop(vertical = 10.dp)
+        modifier = Modifier.crop(vertical = 20.dp)
     ) {
         items.forEach { destination ->
             NavigationBarItem(
@@ -206,7 +209,12 @@ fun ScaffoldBottomBar(
                         restoreState = true
                     }
                 },
-                alwaysShowLabel = false
+                alwaysShowLabel = false,
+                modifier = Modifier.graphicsLayer {
+                    // It seems that Modifier.align(CenterVertically) has no effect to NavigationBarItem here,
+                    // manually set the NavigationBarItem at the center height of BottomAppBar
+                    translationY = -(10.dp).toPx()
+                }
             )
         }
     }

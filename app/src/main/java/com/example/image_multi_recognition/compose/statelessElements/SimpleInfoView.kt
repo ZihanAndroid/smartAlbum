@@ -12,6 +12,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.unit.dp
 import com.example.image_multi_recognition.R
+import com.example.image_multi_recognition.ui.theme.md_theme_dark_onPrimaryContainer
+import com.example.image_multi_recognition.ui.theme.md_theme_dark_onSurfaceVariant
 
 @Composable
 fun SimpleInfoView(
@@ -38,11 +40,13 @@ fun SimpleInfoView(
                     Text(
                         text = "${item.first}:",
                         style = MaterialTheme.typography.titleMedium,
+                        // the reason we set fixed color here is that the color of images does not change by the theme change
+                        color = md_theme_dark_onPrimaryContainer
                     )
                     Text(
                         text = item.second,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.secondary
+                        color = md_theme_dark_onSurfaceVariant
                     )
                 }
             }

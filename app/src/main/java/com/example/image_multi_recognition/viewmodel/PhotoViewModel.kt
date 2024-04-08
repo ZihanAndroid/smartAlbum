@@ -9,7 +9,9 @@ import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import com.example.image_multi_recognition.db.AlbumInfo
 import com.example.image_multi_recognition.db.ImageInfo
+import com.example.image_multi_recognition.model.UiModel
 import com.example.image_multi_recognition.repository.ImageRepository
+import com.example.image_multi_recognition.repository.UserSettingRepository
 import com.example.image_multi_recognition.util.*
 import com.example.image_multi_recognition.viewmodel.basic.ImageFileOperationSupport
 import com.example.image_multi_recognition.viewmodel.basic.ImageFileOperationSupportViewModel
@@ -27,9 +29,10 @@ import javax.inject.Inject
 @HiltViewModel
 open class PhotoViewModel @Inject constructor(
     private val repository: ImageRepository,
+    settingRepository: UserSettingRepository,
     imageFileOperationSupportViewModel: ImageFileOperationSupportViewModel,
     savedStateHandle: SavedStateHandle,
-    imagePagingFlowSupportImpl: ImagePagingFlowSupportImpl
+    imagePagingFlowSupportImpl: ImagePagingFlowSupportImpl,
 ) : ViewModel(), ImagePagingFlowSupport by imagePagingFlowSupportImpl,
     ImageFileOperationSupport by imageFileOperationSupportViewModel {
     // "ImageFileOperationSupport by imageFileOperationSupportViewModel": you can use delegation to do things like multi-inheritance in Kotlin
@@ -41,8 +44,11 @@ open class PhotoViewModel @Inject constructor(
     private val _pagingFlow: MutableStateFlow<Flow<PagingData<UiModel>>> = MutableStateFlow(emptyFlow())
     val pagingFlow: StateFlow<Flow<PagingData<UiModel>>>
         get() = _pagingFlow
+
+    val imagePerRowFlow = settingRepository.imagesPerRowFlow
+
     private var isFirstLoad: Boolean = true
-    val scanRunner = ControlledRunner<Unit>()
+    private val scanRunner = ControlledRunner<Unit>()
 
     init {
         // check the argument of navigation route to decide on what purpose the PhotoViewModel is used
@@ -51,8 +57,9 @@ open class PhotoViewModel @Inject constructor(
         if (currentAlbum == null) {
             viewModelScope.launch {
                 // DCIM, the album shown in the "photos" screen (the first screen) when the app is started
-                val dcimCameraDir =
-                    File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM), "Camera")
+                // val dcimCameraDir =
+                //     File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM), "Camera")
+                val dcimCameraDir = File(settingRepository.defaultAlbumPathFlow.first())  // use can set default albums
                 Log.d(getCallSiteInfo(), "DCIMAlbum: DCIMAlbum")
                 // load DCIM first to avoid keeping users waiting
                 currentAlbum = repository.addAlbumInfoIfNotExist(AlbumInfo(path = dcimCameraDir.absolutePath))
@@ -60,6 +67,18 @@ open class PhotoViewModel @Inject constructor(
                 val job = launch {
                     withContext(Dispatchers.IO) {
                         scanImages(listOf(currentAlbum!!), currentAlbum)
+                    }
+                }
+                // allow changing default album shown in the first window
+                viewModelScope.launch {
+                    // we start tracking the changes of the default album after the first scan is finished
+                    job.join()
+                    settingRepository.defaultAlbumPathFlow.collectLatest { albumPath ->
+                        val albumId = repository.getAlbumByPath(albumPath)
+                        albumId?.let { id ->
+                            setImagePagingFlow(id)
+                        }
+                        currentAlbum = albumId
                     }
                 }
 

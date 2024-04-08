@@ -9,7 +9,7 @@ import com.example.image_multi_recognition.db.ImageInfo
 import com.example.image_multi_recognition.repository.ImageRepository
 import com.example.image_multi_recognition.util.ExifHelper
 import com.example.image_multi_recognition.util.getCallSiteInfo
-import com.example.image_multi_recognition.viewmodel.UiModel
+import com.example.image_multi_recognition.model.UiModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.time.Instant

@@ -10,7 +10,6 @@ import android.provider.MediaStore
 import android.util.Log
 import androidx.core.graphics.drawable.toBitmap
 import androidx.core.net.toUri
-import androidx.datastore.core.DataStore
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
@@ -18,11 +17,9 @@ import androidx.paging.PagingSource
 import androidx.room.withTransaction
 import coil.imageLoader
 import coil.request.ImageRequest
-import com.example.image_multi_recognition.AppData
 import com.example.image_multi_recognition.DefaultConfiguration
 import com.example.image_multi_recognition.db.*
 import com.example.image_multi_recognition.util.*
-import com.example.image_multi_recognition.viewmodel.SettingGroup
 import com.google.mlkit.vision.common.InputImage
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -158,14 +155,14 @@ class ImageRepository @Inject constructor(
 
     suspend fun getAlbumByPath(path: String): Long? = albumInfoDao.getAlbumByPath(path)
 
-    suspend fun getAllOrderedLabelList(): List<LabelInfo> = imageLabelDao.getAllOrderedLabels()
+    fun getAllOrderedLabelListFlow(): Flow<List<LabelInfo>> = imageLabelDao.getAllOrderedLabels()
 
-    suspend fun updateImageLabelAndGetAllOrderedLabelList(imageLabelList: List<ImageLabel>) =
+    suspend fun updateImageLabelAndGetAllOrderedLabelList(imageLabelList: List<ImageLabel>) {
         database.withTransaction {
             imageLabelDao.deleteById(imageLabelList.first().id)
             imageLabelDao.insert(*imageLabelList.toTypedArray())
-            getAllOrderedLabelList()
         }
+    }
 
     var prevImagePagingSource: PagingSource<Int, ImageInfo>? = null
 

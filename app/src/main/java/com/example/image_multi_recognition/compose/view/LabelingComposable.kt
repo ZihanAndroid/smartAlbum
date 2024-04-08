@@ -30,12 +30,14 @@ import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import coil.compose.AsyncImage
+import com.example.image_multi_recognition.AppData
 import com.example.image_multi_recognition.DefaultConfiguration
 import com.example.image_multi_recognition.R
 import com.example.image_multi_recognition.compose.statelessElements.PagingItemImage
@@ -44,10 +46,10 @@ import com.example.image_multi_recognition.compose.statelessElements.TopAppBarFo
 import com.example.image_multi_recognition.compose.view.imageShow.OffsetAnimationData
 import com.example.image_multi_recognition.compose.view.imageShow.ZoomAnimationData
 import com.example.image_multi_recognition.db.ImageInfo
+import com.example.image_multi_recognition.model.LabelUiModel
 import com.example.image_multi_recognition.util.AlbumPathDecoder
 import com.example.image_multi_recognition.util.getCallSiteInfo
 import com.example.image_multi_recognition.util.pointerInput.*
-import com.example.image_multi_recognition.viewmodel.LabelUiModel
 import com.example.image_multi_recognition.viewmodel.LabelingViewModel
 import com.example.image_multi_recognition.viewmodel.basic.LabelingSupportViewModel
 import kotlinx.coroutines.delay
@@ -62,6 +64,7 @@ fun LabelingComposable(
     modifier: Modifier = Modifier,
     viewModel: LabelingViewModel,
     rootSnackBarHostState: SnackbarHostState,
+    provideInitialSetting: () -> AppData,
     onSettingClick: () -> Unit,
     onAlbumClick: (Long) -> Unit,
 ) {
@@ -70,6 +73,7 @@ fun LabelingComposable(
     val labelAdding by viewModel.labelAddingStateFlow.collectAsStateWithLifecycle()
     val rootSnackBar by remember { derivedStateOf { rootSnackBarHostState } }
     val unlabeledImageList by viewModel.unlabeledImageListFlow.collectAsStateWithLifecycle()
+    val imagesPerRow by viewModel.imagesPerRowFlow.collectAsStateWithLifecycle(provideInitialSetting().imagesPerRow)
 
     val imageSelectedStateHolder: Map<String, Map<Long, MutableState<Boolean>>> = remember(labelingState) {
         // viewModel.labelImagesMap is the backing data of pagingItem from viewModel.labelImagesFlow
@@ -95,7 +99,6 @@ fun LabelingComposable(
                         "${stringResource(R.string.loading)}..."
                     }
                 } else {
-                    // stringResource(R.string.unlabeled_image_count, unlabeledImageList.size)
                     stringResource(R.string.app_name)
                 },
                 onBack = if (labelingClicked) {
@@ -158,9 +161,16 @@ fun LabelingComposable(
                 }
             }
         }
-    ) {
+    ) { originalPaddingValues ->
+        val paddingValues = PaddingValues(
+            start = originalPaddingValues.calculateStartPadding(LayoutDirection.Ltr),
+            end = originalPaddingValues.calculateEndPadding(LayoutDirection.Ltr),
+            top = originalPaddingValues.calculateTopPadding(),
+            bottom = 0.dp
+        )
+
         Column(
-            modifier = Modifier.padding(it),
+            modifier = Modifier.padding(paddingValues),
             verticalArrangement = Arrangement.Center
         ) {
             if (labelingClicked) {
@@ -170,7 +180,8 @@ fun LabelingComposable(
                         pagingItemsEmpty = viewModel.labelImagesMap.isEmpty(),
                         pagingItems = pagingItems,
                         imageSelectedStateHolderParam = imageSelectedStateHolder,
-                        labelSelectedStateHolderParam = labelSelectedStateHolder
+                        labelSelectedStateHolderParam = labelSelectedStateHolder,
+                        provideImagePerRow = { imagesPerRow }
                     )
                 } else {
                     val scanPaused by viewModel.scanPaused.collectAsStateWithLifecycle()
@@ -226,7 +237,6 @@ fun LabelingComposable(
                                 albumPagingItems[index - 1]?.let { albumWithLatestImage ->
                                     key(albumWithLatestImage.album) {
                                         AlbumPagingItem(
-                                            // albumImage = albumWithLatestImage,
                                             imagePath = File(
                                                 AlbumPathDecoder.decode(albumWithLatestImage.album),
                                                 albumWithLatestImage.path
@@ -256,6 +266,7 @@ fun ImageLabelingResultShow(
     modifier: Modifier = Modifier,
     imageSelectedStateHolderParam: Map<String, Map<Long, MutableState<Boolean>>>,
     labelSelectedStateHolderParam: Map<String, MutableState<Boolean>>,
+    provideImagePerRow: () -> Int,
 ) {
     var doubleClickedImageInfo: ImageInfo? by remember { mutableStateOf(null) }
     val gridState = rememberLazyGridState()
@@ -307,7 +318,7 @@ fun ImageLabelingResultShow(
         modifier = modifier.fillMaxSize()
     ) {
         LazyVerticalGrid(
-            columns = GridCells.Fixed(DefaultConfiguration.IMAGE_PER_ROW),
+            columns = GridCells.Fixed(provideImagePerRow()),
             state = gridState,
             horizontalArrangement = Arrangement.spacedBy(DefaultConfiguration.IMAGE_INTERVAL.dp),
             verticalArrangement = Arrangement.spacedBy(DefaultConfiguration.IMAGE_INTERVAL.dp),
@@ -364,7 +375,7 @@ fun ImageLabelingResultShow(
                     pagingItems[index]?.let { item ->
                         when (item) {
                             is LabelUiModel.Label -> {
-                                GridItemSpan(DefaultConfiguration.IMAGE_PER_ROW)
+                                GridItemSpan(provideImagePerRow())
                             }
 
                             is LabelUiModel.Item -> {
@@ -420,7 +431,8 @@ fun ImageLabelingResultShow(
                                 onSendThumbnailRequest = { _, _ -> },
                                 selectionMode = true,
                                 selected = imageSelectedStateHolder[item.label]?.get(item.imageInfo.id)?.value
-                                    ?: false
+                                    ?: false,
+                                provideImagePerRow = provideImagePerRow
                             )
                         }
                     }

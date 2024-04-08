@@ -37,7 +37,9 @@ import com.example.image_multi_recognition.util.getCallSiteInfoFunc
 import com.example.image_multi_recognition.util.showSnackBar
 import com.example.image_multi_recognition.util.splitLastBy
 import com.example.image_multi_recognition.viewmodel.ImageLabelResult
-import com.example.image_multi_recognition.viewmodel.RotationDegree
+import com.example.image_multi_recognition.model.RotationDegree
+import com.example.image_multi_recognition.ui.theme.md_theme_dark_onPrimaryContainer
+import com.example.image_multi_recognition.ui.theme.md_theme_dark_primary
 import com.example.image_multi_recognition.viewmodel.SingleImageViewModel
 import com.example.image_multi_recognition.viewmodel.basic.ImageFileOperationComposableSupport
 import kotlinx.coroutines.launch
@@ -146,7 +148,7 @@ fun SingleImageComposable(
                     imageVector = Icons.Default.Favorite,
                     contentDescription = "favorite",
                     tint = if (pagingItems.itemSnapshotList.size > pagerState.currentPage && pagingItems.itemSnapshotList[pagerState.currentPage]?.favorite == true) {
-                        colorResource(R.color.colorAccent)
+                        md_theme_dark_primary
                     } else {
                         null
                     }

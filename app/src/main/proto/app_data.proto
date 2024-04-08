@@ -20,7 +20,7 @@ message AppData{
 
   enum Theme{
     DARK = 0;
-    NOT_DARK = 1;
+    LIGHT = 1;
     SYSTEM_DEFAULT = 2;
   }
 }

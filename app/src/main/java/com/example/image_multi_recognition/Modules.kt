@@ -33,10 +33,9 @@ object DefaultConfiguration {
     // SQLITE_MAX_VARIABLE_NUMBER in SQLite is 999 by default, set "DB_BATCH_SIZE" to a value smaller than that
     const val DB_BATCH_SIZE = 950
     const val IMAGE_MAX_HEIGHT_PROPORTION = 0.62
-    const val IMAGE_PER_ROW = 4
     const val ALBUM_PER_ROW = 2
-    const val IMAGE_INTERVAL = 4
-    const val ALBUM_INTERVAL = 10
+    const val IMAGE_INTERVAL = 2
+    const val ALBUM_INTERVAL = 6
     const val APP_DATASTORE = "APP_DATASTORE"
 
     const val ACCEPTED_CONFIDENCE = 0.7f

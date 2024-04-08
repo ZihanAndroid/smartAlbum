@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.paging.cachedIn
 import com.example.image_multi_recognition.db.ImageInfo
 import com.example.image_multi_recognition.repository.ImageRepository
+import com.example.image_multi_recognition.repository.UserSettingRepository
 import com.example.image_multi_recognition.viewmodel.basic.ImagePagingFlowSupport
 import com.example.image_multi_recognition.viewmodel.basic.ImagePagingFlowSupportImpl
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -19,6 +20,7 @@ import javax.inject.Inject
 @HiltViewModel
 class LabelPhotoViewModel @Inject constructor(
     val repository: ImageRepository,
+    val settingRepository: UserSettingRepository,
     savedStateHandle: SavedStateHandle,
     imagePagingFlowSupportImpl: ImagePagingFlowSupportImpl,
 ) : ViewModel(), ImagePagingFlowSupport by imagePagingFlowSupportImpl {
@@ -32,6 +34,8 @@ class LabelPhotoViewModel @Inject constructor(
     fun requestThumbnail(file: File, imageInfo: ImageInfo) {
         repository.genImageRequest(file, imageInfo)
     }
+
+    val imagesPerRowFlow = settingRepository.imagesPerRowFlow
 
     // after deletion, you can do some cleanup to make sure the UI shows the right info
     fun removeLabels(imageIds: List<Long>, onComplete: suspend () -> Unit) {

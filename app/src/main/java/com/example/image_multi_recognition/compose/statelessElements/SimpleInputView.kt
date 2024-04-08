@@ -23,11 +23,9 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.example.image_multi_recognition.R
-import com.example.image_multi_recognition.util.splitLastBy
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -137,10 +135,6 @@ fun SimpleInputView(
                         },
                         singleLine = true,
                         keyboardActions = KeyboardActions(onDone = { onConfirmClick(input.text) }),
-                        colors = TextFieldDefaults.colors(
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                            focusedContainerColor = MaterialTheme.colorScheme.surface
-                        ),
                         // textStyle = LocalTextStyle.current.copy(textAlign = TextAlign.End),
                         modifier = Modifier.focusRequester(textFieldFocusRequester).padding(8.dp)
                     )

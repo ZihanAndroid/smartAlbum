@@ -23,7 +23,7 @@ fun NavigationGraph(
     // photoViewModel: PhotoViewModel,
     rootSnackBarHostState: SnackbarHostState,
     onTopBottomBarHidden: (Boolean) -> Unit,
-    provideInitialSetting: () -> AppData,
+    provideInitialSetting: () -> AppData
 ) {
     val coroutineScope = rememberCoroutineScope()
 
@@ -52,6 +52,7 @@ fun NavigationGraph(
                 },
                 onTopBottomBarHidden = onTopBottomBarHidden,
                 rootSnackBarHostState = rootSnackBarHostState,
+                provideInitialSetting = provideInitialSetting
             )
         }
         composable(
@@ -69,7 +70,10 @@ fun NavigationGraph(
             route = Destination.SEARCH.navRoute
         ) {
             // PhotoComposable(navController = navController, viewModel = photoViewModel)
-            PhotoSearchComposable(viewModel = hiltViewModel()) { label ->
+            PhotoSearchComposable(
+                viewModel = hiltViewModel(),
+                provideInitialSetting = provideInitialSetting
+            ) { label ->
                 "${Destination.LABEL_PHOTO.route}/${label}".let { route ->
                     navController.navigate(route) {
                         // Not done yet!
@@ -83,6 +87,7 @@ fun NavigationGraph(
             LabelingComposable(
                 viewModel = hiltViewModel(),
                 rootSnackBarHostState = rootSnackBarHostState,
+                provideInitialSetting = provideInitialSetting,
                 onSettingClick = {
                     navController.navigate(Destination.SETTING.route)
                 }
@@ -128,7 +133,8 @@ fun NavigationGraph(
                         }
                     }
                 },
-                customTopBar = true
+                customTopBar = true,
+                provideInitialSetting = provideInitialSetting
             )
         }
         composable(
@@ -146,7 +152,8 @@ fun NavigationGraph(
                 },
                 onBack = {
                     navController.popBackStack()
-                }
+                },
+                provideInitialSetting = provideInitialSetting
             )
         }
         composable(
@@ -164,7 +171,8 @@ fun NavigationGraph(
                 },
                 onBack = {
                     navController.popBackStack()
-                }
+                },
+                provideInitialSetting = provideInitialSetting
             )
         }
         composable(

@@ -8,7 +8,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
@@ -16,6 +19,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.image_multi_recognition.AppData
 import com.example.image_multi_recognition.DefaultConfiguration
 import com.example.image_multi_recognition.compose.statelessElements.InputSearch
 import com.example.image_multi_recognition.util.AlbumPathDecoder
@@ -27,9 +31,15 @@ import java.io.File
 fun PhotoSearchComposable(
     viewModel: PhotoSearchViewModel,
     modifier: Modifier = Modifier,
+    provideInitialSetting: () -> AppData,
     onLabelClick: (String) -> Unit,
 ) {
-    val labelImages by viewModel.labelImagesFlow.collectAsStateWithLifecycle()
+    val originalLabelImages by viewModel.labelImagesFlow.collectAsStateWithLifecycle()
+    val excludedLabelsSet by viewModel.excludedLabelsSetFlow.collectAsStateWithLifecycle(provideInitialSetting().excludedLabelsList.toSet())
+    val labelImages = remember(originalLabelImages, excludedLabelsSet) {
+        originalLabelImages.filter { it.label !in excludedLabelsSet }
+    }
+
     val gridState = rememberLazyGridState()
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current

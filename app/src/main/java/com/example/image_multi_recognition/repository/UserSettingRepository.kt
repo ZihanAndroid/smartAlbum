@@ -3,10 +3,12 @@ package com.example.image_multi_recognition.repository
 import android.util.Log
 import androidx.datastore.core.DataStore
 import com.example.image_multi_recognition.AppData
+import com.example.image_multi_recognition.util.collectionDistinct
 import com.example.image_multi_recognition.util.getCallSiteInfoFunc
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -22,7 +24,27 @@ class UserSettingRepository @Inject constructor(
         } else {
             throw e
         }
-    }
+    }.distinctUntilChanged()
+
+    val themeSettingFlow: Flow<AppData.Theme> =
+        settingFlow.map { it.themeSetting }.distinctUntilChanged()
+    val defaultAlbumPathFlow: Flow<String> =
+        settingFlow.map { it.defaultAlbumPath }.distinctUntilChanged()
+    val imagesPerRowFlow: Flow<Int> = settingFlow.map { it.imagesPerRow }.distinctUntilChanged()
+    val imageCacheEnabledFlow: Flow<Boolean> =
+        settingFlow.map { it.imageCacheEnabled }.distinctUntilChanged()
+    val thumbNailQualityFlow: Flow<Float> =
+        settingFlow.map { it.thumbNailQuality }.distinctUntilChanged()
+    val imageLabelingConfidenceFlow: Flow<Float> =
+        settingFlow.map { it.imageLabelingConfidence }.distinctUntilChanged()
+    val excludedLabelsListFlow: Flow<List<String>> =
+        settingFlow.map { it.excludedLabelsList }.distinctUntilChanged(::collectionDistinct)
+    val excludedLabelsSetFlow: Flow<Set<String>> =
+        settingFlow.map { it.excludedLabelsList.toSet() }.distinctUntilChanged(::collectionDistinct)
+    val excludedAlbumPathsListFlow: Flow<List<String>> =
+        settingFlow.map { it.excludedAlbumPathsList }.distinctUntilChanged(::collectionDistinct)
+    val excludedAlbumPathsSetFlow: Flow<Set<String>> =
+        settingFlow.map { it.excludedAlbumPathsList.toSet() }.distinctUntilChanged(::collectionDistinct)
 
     suspend fun updateThemeSetting(newTheme: AppData.Theme) {
         appDataStore.updateData { it.toBuilder().setThemeSetting(newTheme).build() }

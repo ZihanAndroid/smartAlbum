@@ -12,6 +12,7 @@ import com.example.image_multi_recognition.DefaultConfiguration
 import com.example.image_multi_recognition.db.ImageInfo
 import com.example.image_multi_recognition.db.LabelInfo
 import com.example.image_multi_recognition.repository.ImageRepository
+import com.example.image_multi_recognition.repository.UserSettingRepository
 import com.example.image_multi_recognition.util.ControlledRunner
 import com.example.image_multi_recognition.util.ExifHelper
 import com.example.image_multi_recognition.util.getCallSiteInfo
@@ -25,10 +26,7 @@ import com.google.mlkit.vision.label.ImageLabeler
 import com.google.mlkit.vision.objects.ObjectDetector
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -37,6 +35,7 @@ import javax.inject.Inject
 @HiltViewModel
 class SingleImageViewModel @Inject constructor(
     private val repository: ImageRepository,
+    private val settingRepository: UserSettingRepository,
     private val objectDetector: ObjectDetector,
     private val imageLabeler: ImageLabeler,
     imageFileOperationSupportViewModel: ImageFileOperationSupportViewModel,
@@ -44,12 +43,10 @@ class SingleImageViewModel @Inject constructor(
 ) : ViewModel(), LabelSearchSupport, ImageFileOperationSupport by imageFileOperationSupportViewModel {
     // get navigation arguments
     val argumentType: Int = savedStateHandle.get<Int>("argumentType")!!
-    val argumentValue: String = savedStateHandle.get<String>("argumentValue")!!
+    private val argumentValue: String = savedStateHandle.get<String>("argumentValue")!!
     val initialKey: Int = savedStateHandle.get<Int>("initialKey")!!
     var currentAlbum: Long? = null
     var currentLabel: String? = null
-
-    private val controlledLabelingDoneRunner = ControlledRunner<Unit>()
 
     private val _pagingFlow: MutableStateFlow<Flow<PagingData<ImageInfo>>> = MutableStateFlow(emptyFlow())
     val pagingFlow: StateFlow<Flow<PagingData<ImageInfo>>>
@@ -63,7 +60,7 @@ class SingleImageViewModel @Inject constructor(
     val labelAddedCacheAvailable: StateFlow<Boolean>
         get() = _labelAddedCacheAvailable
 
-    var labelingClicked = false
+    private var labelingClicked = false
     private var currentPage: Int = initialKey
     private var labelingFinished = true
 
@@ -78,7 +75,9 @@ class SingleImageViewModel @Inject constructor(
     var selectedLabelSet = mutableSetOf<String>()
 
     // For InputView, ordered by label name first, then its count
+    private var orderedLabelListFlow: Flow<List<LabelInfo>> = repository.getAllOrderedLabelListFlow()
     override var orderedLabelList: List<LabelInfo> = emptyList()
+    private var excludedLabelsSetFlow = settingRepository.excludedLabelsSetFlow
 
     init {
         when (argumentType) {
@@ -102,8 +101,11 @@ class SingleImageViewModel @Inject constructor(
             else -> throw RuntimeException("Unrecognized argument type: $argumentType")
         }
         viewModelScope.launch {
-            orderedLabelList = repository.getAllOrderedLabelList()
-            Log.d(getCallSiteInfoFunc(), "initial popup labels: ${orderedLabelList.map { it.label }}")
+            excludedLabelsSetFlow.collectLatest { excludedLabels ->
+                orderedLabelListFlow.collectLatest { labelList ->
+                    orderedLabelList = labelList.filter { it.label !in excludedLabels }
+                }
+            }
         }
     }
 
@@ -129,6 +131,8 @@ class SingleImageViewModel @Inject constructor(
         labelingFinished = false
         labelingClicked = true
         viewModelScope.launch {
+            val imageLabelingConfidence = settingRepository.imageLabelingConfidenceFlow.first()
+            val excludedLabels = settingRepository.excludedLabelsSetFlow.first()
             // Note using "joinPreviousOrRun()" does not work here,
             // because the following tasks starts other asynchronous tasks (detecting and labeling images),
             // which cannot be controlled by joinPreviousOrRun()!
@@ -171,7 +175,15 @@ class SingleImageViewModel @Inject constructor(
                         val rootRect = Rect()   // a rect for the whole image, we also label the whole image
                         detectedRectList.add(rootRect)
                         // image labeling
-                        labelingImage(imageInfo, imageHandled, detectedRectList, rootRect, currentPageWhenRunning)
+                        labelingImage(
+                            imageInfo,
+                            imageHandled,
+                            detectedRectList,
+                            rootRect,
+                            currentPageWhenRunning,
+                            excludedLabels,
+                            imageLabelingConfidence
+                        )
                     } else {
                         Log.d(
                             getCallSiteInfoFunc(),
@@ -190,6 +202,8 @@ class SingleImageViewModel @Inject constructor(
         detectedRectList: List<Rect>,
         rootRect: Rect,
         currentPageWhenRunning: Int,
+        excludedLabels: Set<String>,
+        confidence: Float
     ) {
         imageHandled.bitmapInternal?.let { bitmap ->
             detectedRectList.forEach { rect ->
@@ -202,12 +216,14 @@ class SingleImageViewModel @Inject constructor(
                             imageInfo.rotationDegree
                         )
                     }
-                ).addOnSuccessListener { labelList: List<ImageLabel>? ->
+                ).addOnSuccessListener { originalLabelList: List<ImageLabel>? ->
+                    Log.d("", "excludedLabels: $excludedLabels, label: ${originalLabelList?.joinToString { it.text }}")
+                    val labelList = originalLabelList?.filter { it.text !in excludedLabels }
                     // choose the label with max confidence and confidence >= ACCEPTED_CONFIDENCE
                     if (!labelList.isNullOrEmpty()) {
                         Log.d(getCallSiteInfoFunc(), "recognized label: $labelList")
                         if (rect != rootRect) {
-                            labelList.filter { it.confidence >= DefaultConfiguration.ACCEPTED_CONFIDENCE }
+                            labelList.filter { it.confidence >= confidence }
                                 .maxByOrNull { it.confidence }?.let { label: ImageLabel ->
                                     // deduplication, choose the label with maximum confidence
                                     if (partImageLabelConfidenceMap[label.text] == null || label.confidence > partImageLabelConfidenceMap[label.text]!!) {
@@ -217,7 +233,7 @@ class SingleImageViewModel @Inject constructor(
                                 }
                         } else {
                             // set maximum 2 whole image labels
-                            with(labelList.filter { it.confidence >= DefaultConfiguration.ACCEPTED_CONFIDENCE }
+                            with(labelList.filter { it.confidence >= confidence }
                                 .sortedBy { it.confidence }.reversed()) {
                                 if (isNotEmpty()) {
                                     subList(0, if (size > 1) 2 else size).forEach { label ->
@@ -317,10 +333,7 @@ class SingleImageViewModel @Inject constructor(
 
     fun updateLabelAndResetOrderedList(imageLabels: List<com.example.image_multi_recognition.db.ImageLabel>) {
         viewModelScope.launch {
-            controlledLabelingDoneRunner.joinPreviousOrRun {
-                orderedLabelList = repository.updateImageLabelAndGetAllOrderedLabelList(imageLabels)
-                Log.d(getCallSiteInfoFunc(), "reset popup labels: ${orderedLabelList.map { it.label }}")
-            }
+            repository.updateImageLabelAndGetAllOrderedLabelList(imageLabels)
         }
     }
 
@@ -342,11 +355,13 @@ class SingleImageViewModel @Inject constructor(
     fun setLabelPreview(imageInfo: ImageInfo) {
         viewModelScope.launch {
             // get original image size
-            val imageHandled = withContext(Dispatchers.IO) {
+            withContext(Dispatchers.IO) {
                 repository.getInputImage(imageInfo.fullImageFile)
             }?.let { inputImage ->
                 imageSize = inputImage.width to inputImage.height
-                repository.getLabelsByImageId(imageInfo.id).let { imageLabels ->
+                repository.getLabelsByImageId(imageInfo.id).let { originalImageLabels ->
+                    val excludedLabels = settingRepository.excludedLabelsSetFlow.first()
+                    val imageLabels = originalImageLabels.filter { it.label !in excludedLabels }
                     val partImageLabelList =
                         imageLabels.filter { it.rect != null }.map { ImageLabelResult.fromImageLabel(it) }
                     val wholeImageLabelList =

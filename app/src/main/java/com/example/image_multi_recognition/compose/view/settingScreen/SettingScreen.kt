@@ -1,5 +1,6 @@
 package com.example.image_multi_recognition.compose.view.settingScreen
 
+import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -7,7 +8,9 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Done
@@ -30,16 +33,18 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.image_multi_recognition.AppData
 import com.example.image_multi_recognition.R
 import com.example.image_multi_recognition.compose.statelessElements.ImageItemRow
-import com.example.image_multi_recognition.compose.statelessElements.InputSearch
+import com.example.image_multi_recognition.compose.statelessElements.InputSearchWithoutDropdownMenu
 import com.example.image_multi_recognition.compose.statelessElements.LabelSelectionElement
 import com.example.image_multi_recognition.compose.statelessElements.TopAppBarForNotRootDestination
 import com.example.image_multi_recognition.compose.statelessElements.settingChoices.MultiItemChoiceView
 import com.example.image_multi_recognition.dataStore.AppDataSerializer
 import com.example.image_multi_recognition.db.AlbumInfoWithLatestImage
 import com.example.image_multi_recognition.db.LabelInfo
+import com.example.image_multi_recognition.model.ChoiceSettingItem
+import com.example.image_multi_recognition.model.ContextualFlowItem
+import com.example.image_multi_recognition.model.SettingGroup
+import com.example.image_multi_recognition.util.MutableSetWithState
 import com.example.image_multi_recognition.util.SliderColorsNoTicks
-import com.example.image_multi_recognition.viewmodel.ChoiceSettingItem
-import com.example.image_multi_recognition.viewmodel.SettingGroup
 import com.example.image_multi_recognition.viewmodel.SettingScreenViewModel
 import kotlinx.coroutines.launch
 import java.io.File
@@ -178,8 +183,8 @@ fun SettingScreen(
     }
 
     Box(
-        modifier = Modifier.fillMaxSize().pointerInput(Unit) {
-            detectTapGestures { dismiss() }
+        modifier = Modifier.fillMaxSize().pointerInput(fullScreenShow) {
+            if(!fullScreenShow) detectTapGestures { dismiss() }
         },
     ) {
         Scaffold(
@@ -195,6 +200,7 @@ fun SettingScreen(
                 modifier = Modifier.fillMaxSize().padding(paddingValues),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(24.dp),
+                contentPadding = PaddingValues(bottom = 24.dp)
             ) {
                 items(
                     count = settingGroupList.size,
@@ -303,11 +309,28 @@ fun FullScreenSelectionView(
     allLabels: List<LabelInfo>,
     provideInitialSelectedLabels: () -> List<String>,
     onSelectDone: (List<String>) -> Unit,
+    // onSearchTextChange returns emptyList for empty String, we can use allLabels instead
     onSearchTextChange: (String) -> List<LabelInfo>,
     onDismiss: () -> Unit,
 ) {
-    val selectedAlbumSet = remember { provideInitialSelectedLabels().toMutableSet() }
-    var labelsInSearch by remember { mutableStateOf(onSearchTextChange("").map { it.label }) }
+    fun titleConverter(prev: String, current: String): String {
+        return if (prev.isEmpty() || prev.first() != current.first()) {
+            current.first().toString()
+        } else {
+            ""
+        }
+    }
+
+    val mappedAllLabels = remember {
+        ContextualFlowItem.mapToContextualFlowItemWithTitle(
+            items = allLabels.map { it.label },
+            emptyItem = "",
+            onNewTitle = ::titleConverter
+        )
+    }
+    val selectedAlbumSet = remember { MutableSetWithState(provideInitialSelectedLabels().toMutableSet()) }
+    var labelsInSearch by remember { mutableStateOf(mappedAllLabels) }
+    var currentInputTextEmpty by remember { mutableStateOf(true) }
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
 
@@ -317,7 +340,12 @@ fun FullScreenSelectionView(
                 title = title,
                 onBack = onDismiss
             ) {
-                IconButton(onClick = { onSelectDone(selectedAlbumSet.toList()) }) {
+                IconButton(
+                    onClick = {
+                        onSelectDone(selectedAlbumSet.toList())
+                        onDismiss()
+                    }
+                ) {
                     Icon(Icons.Filled.Done, "done")
                 }
             }
@@ -326,61 +354,65 @@ fun FullScreenSelectionView(
         Column(
             modifier = Modifier.padding(paddingValues)
         ) {
-            InputSearch(
-                onDropDownItemClick = { searchedLabel ->
-                    labelsInSearch = onSearchTextChange(searchedLabel).map { it.label }
+            InputSearchWithoutDropdownMenu(
+                onSearchTextChange = { searchText ->
+                    onSearchTextChange(searchText).let { labels ->
+                        if (currentInputTextEmpty != searchText.isEmpty()) {
+                            currentInputTextEmpty = !currentInputTextEmpty
+                        }
+
+                        labelsInSearch = if (!currentInputTextEmpty) {
+                            ContextualFlowItem.mapToContextualFlowItem(labels.map { it.label })
+                        } else mappedAllLabels
+                    }
                 },
-                onSearchClickNoFurther = {
+                onSearchClick = {
                     keyboardController?.hide()
                     focusManager.clearFocus()
                 },
-                onSearchTextChange = { newText ->
-                    labelsInSearch = onSearchTextChange(newText).map { it.label }
-                    onSearchTextChange(newText)
-                }
+                modifier = Modifier.padding(horizontal = 18.dp)
             )
             // show labelsInSearch in a lazy FlowRow
             // https://developer.android.com/reference/kotlin/androidx/compose/foundation/layout/package-summary#ContextualFlowRow
             // https://slack-chats.kotlinlang.org/t/16754637/hey-there-folks-yesterday-i-built-an-app-with-a-macrobenchma
             // https://developer.android.com/develop/ui/compose/layouts/flow#lazy-flow
-            // ContextualFlowRow(
-            //     itemCount = labels.size,
-            //     maxLines = 2,
-            //     overflow = ContextualFlowRowOverflow.expandIndicator {
-            //         val count = this.totalItemCount - shownItemCount
-            //         Text("+ $count")
-            //     }
-            // ) {
-            //     val index: Int = it
-            //     val label = labels[index]
-            //     HSLabel(text = label.text, style = label.style, maxLines = 1)
-            // }
             ContextualFlowRow(
+                modifier = Modifier.safeDrawingPadding().padding(18.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
                 itemCount = labelsInSearch.size,
-                // horizontalArrangement = Arrangement.spacedBy(12.dp),
-                // verticalArrangement = Arrangement.Center,
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                maxLines = 10,
-                overflow = ContextualFlowRowOverflow.expandIndicator { }
-                //     .expandOrCollapseIndicator(
-                //     minRowsToShowCollapse = 4,
-                //     expandIndicator = moreOrCollapseIndicator,
-                //     collapseIndicator = moreOrCollapseIndicator
-                // )
+                maxItemsInEachRow = 4
             ) { index ->
-                key(labelsInSearch[index]) {
-                    LabelSelectionElement(
-                        label = labelsInSearch[index],
-                        initialSelected = labelsInSearch[index] in selectedAlbumSet,
-                        onClick = { label, currentSelected ->
-                            if (currentSelected) {
-                                selectedAlbumSet.add(label)
-                            } else {
-                                selectedAlbumSet.remove(label)
+                if (index !in labelsInSearch.indices) return@ContextualFlowRow
+                labelsInSearch[index].let { item ->
+                    when (item) {
+                        is ContextualFlowItem.Title -> {
+                            Text(
+                                text = item.title,
+                                style = MaterialTheme.typography.titleMedium,
+                                // occupy the whole row in the ContextualFlowRow
+                                modifier = Modifier.fillMaxWidth(1f)
+                            )
+                        }
+
+                        is ContextualFlowItem.Item -> {
+                            key(item.item, item.item in selectedAlbumSet) {
+                                LabelSelectionElement(
+                                    label = item.item,
+                                    initialSelected = item.item in selectedAlbumSet,
+                                    onClick = { label, currentSelected ->
+                                        if (currentSelected) {
+                                            Log.d("", "added label: $label")
+                                            selectedAlbumSet.add(label)
+                                        } else {
+                                            selectedAlbumSet.remove(label)
+                                        }
+                                    }
+                                )
                             }
-                        },
-                    )
+                        }
+                    }
                 }
             }
         }
@@ -440,7 +472,7 @@ fun BottomSheetSelectionView(
                         }
                     }
                 }",
-                style = MaterialTheme.typography.titleLarge.copy(fontSize = 18.sp)
+                style = MaterialTheme.typography.titleMedium
             )
             if (multiSelection) {
                 Row(
@@ -448,6 +480,7 @@ fun BottomSheetSelectionView(
                 ) {
                     IconButton(
                         onClick = {
+                            Log.d("", "selectedAlbumList: $selectedAlbumList")
                             onSelectDone(selectedAlbumList)
                             onDismiss()
                         }
@@ -518,7 +551,9 @@ fun SettingGroupView(
             else it
         },
         shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer
+        ),
     ) {
         Column(
             verticalArrangement = Arrangement.spacedBy(24.dp),
@@ -527,8 +562,8 @@ fun SettingGroupView(
             // title
             Text(
                 text = title,
-                style = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp),
-                color = MaterialTheme.colorScheme.primary
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
             )
             // content
             items.forEach { settingItem ->
@@ -805,12 +840,12 @@ fun TextColumn(
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.secondary
+                color = MaterialTheme.colorScheme.onSecondaryContainer
             )
             Text(
                 text = explain,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.tertiary
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
         Box(

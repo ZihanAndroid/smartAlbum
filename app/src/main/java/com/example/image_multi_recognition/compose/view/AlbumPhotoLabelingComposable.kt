@@ -15,6 +15,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.collectAsLazyPagingItems
+import com.example.image_multi_recognition.AppData
 import com.example.image_multi_recognition.R
 import com.example.image_multi_recognition.compose.statelessElements.ImagePagerView
 import com.example.image_multi_recognition.compose.statelessElements.TopAppBarForNotRootDestination
@@ -26,8 +27,9 @@ import kotlinx.coroutines.launch
 fun AlbumPhotoLabelingComposable(
     viewModel: AlbumPhotoLabelingViewModel,
     modifier: Modifier = Modifier,
+    provideInitialSetting: () -> AppData,
     onImageClick: (Long, Int) -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
 ) {
     val imageInfoList by viewModel.unlabeledImageInAlbumStateFlow.collectAsStateWithLifecycle()
     var labelingClicked by rememberSaveable { mutableStateOf(false) }
@@ -46,6 +48,7 @@ fun AlbumPhotoLabelingComposable(
         mapOf(*(viewModel.labelImagesMap.map { it.key to mutableStateOf(true) }).toTypedArray())
     }
     val labelAdding by viewModel.labelAddingStateFlow.collectAsStateWithLifecycle()
+    val imagesPerRow by viewModel.imagesPerRowFlow.collectAsStateWithLifecycle(provideInitialSetting().imagesPerRow)
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val labelAddedString = stringResource(R.string.label_added)
@@ -61,7 +64,7 @@ fun AlbumPhotoLabelingComposable(
                         "${stringResource(R.string.loading)}..."
                     }
                 } else {
-                    if(imageInfoList.isEmpty()) ""
+                    if (imageInfoList.isEmpty()) ""
                     else stringResource(R.string.unlabeled_image_count, imageInfoList.size)
                 },
                 onBack = onBack,
@@ -82,7 +85,7 @@ fun AlbumPhotoLabelingComposable(
                         if (labelingState.labelingDone) {
                             IconButton(
                                 onClick = {
-                                    if(!labelAdding) {
+                                    if (!labelAdding) {
                                         coroutineScope.launch {
                                             viewModel.onLabelingConfirm(imageSelectedStateHolder) {
                                                 val job = launch {
@@ -121,7 +124,8 @@ fun AlbumPhotoLabelingComposable(
                             pagingItemsEmpty = viewModel.labelImagesMap.isEmpty(),
                             pagingItems = pagingItems,
                             imageSelectedStateHolderParam = imageSelectedStateHolder,
-                            labelSelectedStateHolderParam = labelSelectedStateHolder
+                            labelSelectedStateHolderParam = labelSelectedStateHolder,
+                            provideImagePerRow = { imagesPerRow }
                         )
                     }
 
@@ -152,7 +156,8 @@ fun AlbumPhotoLabelingComposable(
                             viewModel.getValidOriginalIndex(imageInfoId)
                         )
                     },
-                    onSendThumbnailRequest = viewModel::requestThumbnail
+                    onSendThumbnailRequest = viewModel::requestThumbnail,
+                    provideImagePerRow = { imagesPerRow }
                 )
             }
         }

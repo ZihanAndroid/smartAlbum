@@ -7,12 +7,16 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.image_multi_recognition.compose.navigation.ScaffoldBottomBar
 
 // A stateless SingleImageView
 @OptIn(ExperimentalMaterial3Api::class)
@@ -39,7 +43,7 @@ fun SingleImageView(
     Scaffold(
         snackbarHost = { SnackbarHost(handledSnackbarHostState) },
         topBar = {
-            if(showAppBar) {
+            if (showAppBar) {
                 TopAppBar(
                     title = {
                         Text(
@@ -64,7 +68,7 @@ fun SingleImageView(
                                         imageVector = item.imageVector,
                                         contentDescription = item.contentDescription,
                                         modifier = item.modifier.size(22.dp),
-                                        tint = item.tint ?: LocalContentColor.current
+                                        tint = item.tint ?: MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }
@@ -106,29 +110,40 @@ fun SingleImageView(
             }
         },
         bottomBar = {
-            if(showAppBar) {
-                Row(
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    modifier = Modifier.fillMaxWidth()
+            if (showAppBar) {
+                BottomAppBar(
+                    modifier = Modifier.crop(vertical = 24.dp),
                 ) {
-                    bottomItems.forEachIndexed { index, item ->
-                        IconButton(
-                            onClick = bottomOnClicks[index]
-                        ) {
-                            Icon(
-                                imageVector = item.imageVector,
-                                contentDescription = item.contentDescription,
-                                modifier = item.modifier,
-                                tint = item.tint ?: LocalContentColor.current
-                            )
+                    Row(
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        modifier = Modifier.fillMaxSize().align(Alignment.CenterVertically)
+                    ) {
+                        bottomItems.forEachIndexed { index, item ->
+                            IconButton(
+                                onClick = bottomOnClicks[index]
+                            ) {
+                                Icon(
+                                    imageVector = item.imageVector,
+                                    contentDescription = item.contentDescription,
+                                    modifier = item.modifier,
+                                    tint = item.tint ?: MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     }
                 }
             }
         },
         modifier = modifier
-    ) {
-        content(it, )
+    ) { originalPaddingValues ->
+        val paddingValues = PaddingValues(
+            start = originalPaddingValues.calculateStartPadding(LayoutDirection.Ltr),
+            end = originalPaddingValues.calculateEndPadding(LayoutDirection.Ltr),
+            top = if (showAppBar) originalPaddingValues.calculateTopPadding() else 0.dp,
+            // we crop the BottomAppBar, so calculate the crop manually here
+            bottom = if (showAppBar) originalPaddingValues.calculateTopPadding() - 12.dp else 0.dp,
+        )
+        content(paddingValues)
     }
 }
 
@@ -137,5 +152,5 @@ data class SingleImageViewItem(
     val contentDescription: String,
     // you can add some changing effect to the icon by providing a modifier
     val modifier: Modifier = Modifier,
-    val tint: Color? = null
+    val tint: Color? = null,
 )

@@ -4,7 +4,6 @@ import android.util.Log
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -25,7 +24,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -38,6 +36,7 @@ import com.example.image_multi_recognition.R
 import com.example.image_multi_recognition.compose.statelessElements.ElevatedSmallIconButton
 import com.example.image_multi_recognition.compose.statelessElements.LabelSelectionElement
 import com.example.image_multi_recognition.db.ImageInfo
+import com.example.image_multi_recognition.ui.theme.md_theme_light_secondaryContainer
 import com.example.image_multi_recognition.util.RotateTransformation
 import com.example.image_multi_recognition.util.getCallSiteInfoFunc
 import com.example.image_multi_recognition.util.pointerInput.ZoomOffsetData
@@ -139,7 +138,7 @@ fun SingleImagePage(
                 // During scrolling, two pages are shown, and both of them contains doubleClickZoomSupport() modifier.
                 // As a result, if you do not restrict the modifier for the next page,
                 // you can still zoom in/out the next page when the current and next pages are scrolling together
-                shouldRun = { !derivedPageSrcolling && !animationOngoing }
+                shouldRun = { !derivedPageSrcolling && !animationOngoing && (partImageLabelResult == null && wholeImageLabelResult == null)}
             ) { newZoom, newOffset, newTransformOrigin, offsetRemained ->
                 // for animation
                 zoomAnimationData = ZoomAnimationData(left = zoom, right = newZoom)
@@ -170,7 +169,7 @@ fun SingleImagePage(
                 zoomState = zoomState,
                 offsetState = offsetState,
                 transformOriginState = rememberedTransformOriginState,
-                shouldRun = { !animationOngoing && !derivedPageSrcolling },
+                shouldRun = { !animationOngoing && !derivedPageSrcolling && partImageLabelResult == null && wholeImageLabelResult == null },
                 shouldEventConsumedForShouldRunFalse = { animationOngoing }
             ) { newZoom, newOffset, newTransformOrigin ->
                 if (transformByAnimation) transformByAnimation = false
@@ -221,7 +220,10 @@ fun SingleImagePage(
             rectDrawing = @Composable {
                 Box(
                     modifier = Modifier.background(Color.Transparent)
-                        .border(width = 1.dp, color = MaterialTheme.colorScheme.primary)
+                        .border(
+                            width = 1.dp,
+                            color = md_theme_light_secondaryContainer
+                        )
                 )
             },
             modifier = Modifier.constrainAs(imageRef) {
@@ -290,8 +292,8 @@ fun SingleImagePage(
                 if (partImageLabelResult.isNullOrEmpty() && wholeImageLabelResult.isNullOrEmpty() && addedLabelList.isNullOrEmpty()) {
                     Text(
                         text = stringResource(R.string.no_label_found),
-                        style = MaterialTheme.typography.titleLarge.copy(fontSize = 18.sp),
-                        color = colorResource(R.color.colorAccent),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.tertiary,
                         modifier = Modifier.constrainAs(noLabelRef) {
                             start.linkTo(parent.start)
                             end.linkTo(parent.end)
@@ -375,7 +377,10 @@ fun SingleImagePageLabelingDone(
             rectDrawing = @Composable {
                 Box(
                     modifier = Modifier.background(Color.Transparent)
-                        .border(width = 1.dp, color = MaterialTheme.colorScheme.primary)
+                        .border(
+                            width = 1.dp,
+                            color = md_theme_light_secondaryContainer
+                        )
                 )
             },
             placingStrategyWithCache = labelAddedCacheAvailable
@@ -401,8 +406,8 @@ fun SingleImagePageLabelingDone(
                 } else {
                     if (!isPreview) stringResource(R.string.done) + "!" else ""
                 },
-                style = MaterialTheme.typography.titleLarge.copy(fontSize = 18.sp),
-                color = colorResource(R.color.colorAccent),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.tertiary,
                 modifier = Modifier.constrainAs(resultRef) {
                     start.linkTo(parent.start)
                     end.linkTo(parent.end)

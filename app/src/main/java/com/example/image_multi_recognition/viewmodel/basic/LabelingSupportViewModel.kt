@@ -6,12 +6,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
-import com.example.image_multi_recognition.DefaultConfiguration
 import com.example.image_multi_recognition.db.ImageInfo
 import com.example.image_multi_recognition.db.ImageLabel
+import com.example.image_multi_recognition.model.LabelUiModel
 import com.example.image_multi_recognition.repository.ImageRepository
+import com.example.image_multi_recognition.repository.UserSettingRepository
 import com.example.image_multi_recognition.util.*
-import com.example.image_multi_recognition.viewmodel.LabelUiModel
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.label.ImageLabeler
 import com.google.mlkit.vision.objects.ObjectDetector
@@ -19,10 +19,12 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.internal.synchronized
 
 abstract class LabelingSupportViewModel(
     private val repository: ImageRepository,
+    private val settingRepository: UserSettingRepository,
     private val objectDetector: ObjectDetector,
     private val imageLabeler: ImageLabeler,
 ) : ViewModel() {
@@ -46,7 +48,7 @@ abstract class LabelingSupportViewModel(
             )
         }
     ).flow
-    val controlledRunner = ControlledRunner<Unit>()
+    private val controlledRunner = ControlledRunner<Unit>()
 
     private val rectMap = mutableMapOf<RectKey, Rect?>()
     private val _labelingStateFlow = MutableStateFlow(LabelingState(0, false))
@@ -64,6 +66,10 @@ abstract class LabelingSupportViewModel(
     private val _labelAdding: MutableStateFlow<Boolean> = MutableStateFlow(false)
     val labelAddingStateFlow: StateFlow<Boolean>
         get() = _labelAdding
+    // updated when scanImages is called
+    private var excludedLabels: Set<String> = emptySet()
+    private var labelingConfidence: Float = 0.7f
+    val imagesPerRowFlow = settingRepository.imagesPerRowFlow
 
     init {
         viewModelScope.launch {
@@ -88,7 +94,8 @@ abstract class LabelingSupportViewModel(
                             }
                         }?.let { inputImage ->
                             imageLabeler.process(inputImage)
-                                .addOnSuccessListener { labelList ->
+                                .addOnSuccessListener { originalLabelList ->
+                                    val labelList = originalLabelList.filter { it.text !in excludedLabels }
                                     if (scanCancelled) {
                                         return@addOnSuccessListener
                                     }
@@ -98,7 +105,7 @@ abstract class LabelingSupportViewModel(
                                         Log.d(getCallSiteInfoFunc(), "labelList: ${labelList.joinToString()}")
                                         if (inputImage == detectedImage.inputImage) {
                                             // pick at most two labels for a whole image
-                                            labelList.filter { it.confidence >= DefaultConfiguration.ACCEPTED_CONFIDENCE }
+                                            labelList.filter { it.confidence >= labelingConfidence }
                                                 .sortedBy { it.confidence }.reversed().let { list ->
                                                     list.subList(0, if (list.size > 1) 2 else list.size)
                                                         .forEach { label ->
@@ -111,7 +118,7 @@ abstract class LabelingSupportViewModel(
                                         } else {
                                             labelList.maxBy { it.confidence }.let { label ->
                                                 val identity = ImageLabelIdentity(detectedImage.imageInfo, label.text)
-                                                if (label.confidence >= DefaultConfiguration.ACCEPTED_CONFIDENCE) {
+                                                if (label.confidence >= labelingConfidence) {
                                                     if (labelImagesMap[label.text] == null || detectedImage.imageInfo !in labelImagesMap[label.text]!! ||
                                                         // for the whole image, its confidence does not in imageLabelConfidence (represented by 0)
                                                         // so we always override a whole image label by a partial image label
@@ -159,6 +166,9 @@ abstract class LabelingSupportViewModel(
         scanCancelled = false
         imageObjectsMap.putAll(imageInfoList.map { it.id to -1 })
         viewModelScope.launch {
+            // update the excludedLabels for any possible changes
+            excludedLabels = settingRepository.excludedLabelsSetFlow.first()
+            labelingConfidence = settingRepository.imageLabelingConfidenceFlow.first()
             imageInfoList.forEach { imageInfo ->
                 if (scanCancelled) {
                     return@launch

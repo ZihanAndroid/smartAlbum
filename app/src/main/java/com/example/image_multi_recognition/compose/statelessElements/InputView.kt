@@ -166,7 +166,7 @@ fun InputView(
                                                 Text(
                                                     text = dropDownItemList[index].label.substring(0, input.length),
                                                     style = MaterialTheme.typography.bodyMedium,
-                                                    color = colorResource(R.color.IndianRed)
+                                                    color = colorResource(R.color.colorAccent)
                                                 )
                                                 Text(
                                                     text = dropDownItemList[index].label.substring(input.length),
