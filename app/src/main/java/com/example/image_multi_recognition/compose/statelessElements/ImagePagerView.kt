@@ -59,7 +59,6 @@ fun ImagePagerView(
     pagingItems: LazyPagingItems<UiModel>,
     onImageClick: (Long) -> Unit,  // user wants to view a selected image
     modifier: Modifier = Modifier,
-    onSendThumbnailRequest: (File, ImageInfo) -> Unit,
     selectionMode: Boolean = false,
     // onClickSelect: (Long) -> Unit = {},
     onLongPress: (Long) -> Unit = {},
@@ -69,7 +68,7 @@ fun ImagePagerView(
     // because ImageInfo may change like creating a new ImageInfo to change the "favorite" property
     // but the id will not change
     selectedImageIdSet: MutableSetWithState<Long> = MutableSetWithState(),
-    deletedImageIds: Set<Long> = emptySet(),
+    deletedImageIds: Set<Long> = emptySet()
 ) {
     Log.d(getCallSiteInfoFunc(), "Recomposition")
     val lazyGridState = rememberLazyGridState()
@@ -222,7 +221,6 @@ fun ImagePagerView(
                                     { onLongPress(pageItem.imageInfo.id) }
                                 },
                                 availableScreenWidth = availableScreenWidth,
-                                onSendThumbnailRequest = onSendThumbnailRequest,
                                 selectionMode = selectionMode,
                                 selected = if (selectionMode) selected else false,
                                 provideImagePerRow = provideImagePerRow
@@ -299,7 +297,6 @@ fun PagingItemImage(
     onImageDoubleClick: (() -> Unit)? = null,
     provideImagePerRow: () -> Int,
     availableScreenWidth: Int,
-    onSendThumbnailRequest: (File, ImageInfo) -> Unit,
     selectionMode: Boolean = false,
     selected: Boolean = false,
 ) {
@@ -308,12 +305,10 @@ fun PagingItemImage(
     }
 
     val imagePath = if (imageInfo.isThumbnailAvailable) {
-        // Log.d(getCallSiteInfoFunc(), "Loading image: ${imageInfo.path} from cache")
+        Log.d(getCallSiteInfoFunc(), "Loading image: ${imageInfo.path} from cache")
         imageInfo.thumbnailFile
     } else {
         Log.d(getCallSiteInfoFunc(), "Loading image: ${imageInfo.path} from disk")
-        // send cache request
-        // onSendThumbnailRequest(imageInfo.fullImageFile, imageInfo)
         imageInfo.fullImageFile
     }
     Box {

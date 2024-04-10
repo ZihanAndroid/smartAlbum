@@ -59,12 +59,15 @@
     <string name="same_name_exist">Duplicated file names</string>
     <string name="copy_success">Image copied</string>
     <string name="copy_fail">Failed to copy images</string>
+    <string name="no_image">No image</string>
+    <string name="album_create_fail">Failed to create the album</string>
     <string name="name">Name</string>
     <string name="size">Size</string>
     <string name="path">Path</string>
     <string name="resolution">Resolution</string>
     <string name="date_taken">Date taken</string>
     <string name="location">Location</string>
+    <string name="unknown_date">Unknown Date</string>
 
     <!-- user settings -->
     <string name="setting">Setting</string>

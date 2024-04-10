@@ -2,6 +2,7 @@ package com.example.image_multi_recognition.viewmodel.basic
 
 import android.app.Activity
 import android.app.PendingIntent
+import android.os.Environment
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
@@ -12,18 +13,17 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.image_multi_recognition.R
 import com.example.image_multi_recognition.db.AlbumInfo
 import com.example.image_multi_recognition.db.AlbumInfoWithLatestImage
 import com.example.image_multi_recognition.db.ImageInfo
 import com.example.image_multi_recognition.repository.ImageRepository
-import com.example.image_multi_recognition.util.StorageHelper
-import com.example.image_multi_recognition.util.getCallSiteInfo
-import com.example.image_multi_recognition.util.getCallSiteInfoFunc
-import com.example.image_multi_recognition.util.showSnackBar
+import com.example.image_multi_recognition.util.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -42,7 +42,7 @@ interface ImageFileOperationSupport {
     fun resetDeleteImagesState()
     fun resetMoveImagesState()
     fun resetRenameImagesState()
-    fun requestImagesDeletion(imageIdList: List<Long>, onRequestFail: suspend () -> Unit)
+    fun requestImagesDeletion(imageIdList: List<Long>, currentAlbum: Long, onRequestFail: suspend () -> Unit)
     fun deleteImages(imageIdList: List<Long>, onComplete: suspend () -> Unit)
     fun requestImagesMove(
         imageIdList: List<Long>,
@@ -51,6 +51,7 @@ interface ImageFileOperationSupport {
         onRequestFail: suspend () -> Unit,
     )
 
+    fun removeEmptyAlbum()
     fun moveImagesTo(onComplete: suspend (List<Pair<ImageInfo, StorageHelper.ImageCopyError>>) -> Unit)
     fun copyImagesTo(
         newAlbum: AlbumInfo,
@@ -58,6 +59,17 @@ interface ImageFileOperationSupport {
         imageIdList: List<Long>,
         onComplete: suspend (List<Pair<String, StorageHelper.ImageCopyError>>) -> Unit,
     )
+
+
+    // return null if failed to create the dir
+    fun createAlbumSharedDir(newAlbumName: String): File? {
+        return File(
+            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES),
+            newAlbumName
+        ).let { dir ->
+            if (dir.mkdirs() || dir.exists()) dir else null
+        }
+    }
 
     fun changeFavoriteImages(imageIdList: List<Long>)
     fun shareImages(imageIdList: List<Long>)
@@ -124,11 +136,14 @@ class ImageFileOperationSupportViewModel @Inject constructor(
 
     lateinit var imageMoveRequest: ImageMoveRequest
 
+    private var albumOfDeletedImages: AlbumInfo? = null
+
     // step1 for deleting images, ask user permission
-    override fun requestImagesDeletion(imageIdList: List<Long>, onRequestFail: suspend () -> Unit) {
+    override fun requestImagesDeletion(imageIdList: List<Long>, currentAlbum: Long, onRequestFail: suspend () -> Unit) {
         _deleteImagesStateFlow.value = true
         viewModelScope.launch {
             val imageInfoList = repository.getImageInfoById(imageIdList)
+            albumOfDeletedImages = repository.getAlbumById(currentAlbum)
             repository.getDeleteImagesRequest(imageInfoList).let { pendingIntent ->
                 if (pendingIntent == null) {
                     Log.e(getCallSiteInfoFunc(), "PendingIntent is null!")
@@ -144,9 +159,20 @@ class ImageFileOperationSupportViewModel @Inject constructor(
     // step2 for deleting images
     override fun deleteImages(imageIdList: List<Long>, onComplete: suspend () -> Unit) {
         viewModelScope.launch {
+            // We have already monitored the MediaStore change and respond to it in PhotoViewModel,
+            // no need to change the database manually here
             repository.deleteImagesById(imageIdList)
             _deleteImagesStateFlow.value = false
             onComplete()
+        }
+    }
+
+    override fun removeEmptyAlbum() {
+        viewModelScope.launch {
+            albumOfDeletedImages?.let { albumInfo ->
+                File(albumInfo.path).delete()
+                AlbumPathDecoder.removeAlbum(albumInfo.album)
+            }
         }
     }
 
@@ -195,12 +221,11 @@ class ImageFileOperationSupportViewModel @Inject constructor(
                 repository.deleteImageFiles(imageMoveRequest.request.mediaStoreItems
                     .filter { it.absolutePath !in failedAbsolutePaths }.map { it.contentUri })
                 // create new album in the database if necessary
-                repository.updateImageAlbum(
-                    newAlbum = if (imageMoveRequest.isAlbumNew) imageMoveRequest.newAlbum else null,
-                    imageInfoList = imageMoveRequest.imageInfoList
-                        .filter { it.fullImageFile.absolutePath !in failedAbsolutePaths }
-                        .map { it.copy(album = imageMoveRequest.newAlbum.album) }
-                )
+                // repository.updateImageAlbum(
+                //     newAlbum = imageMoveRequest.newAlbum,
+                //     imageInfoList = imageMoveRequest.imageInfoList.filter { it.fullImageFile.absolutePath !in failedAbsolutePaths },
+                //     isImageMove = true
+                // )
             }
             _moveImagesStateFlow.value = false
             onComplete(
@@ -228,13 +253,11 @@ class ImageFileOperationSupportViewModel @Inject constructor(
             })
             // create new ImageInfo in the database
             if (failedPaths.size != imageInfoList.size) {
-                repository.createImageAlbum(
-                    newAlbum = if (isAlbumNew) newAlbum else null,
-                    imageInfoList = imageInfoList.filter { it.fullImageFile.absolutePath !in failedPaths }
-                        // Note: you need to set the id to 0 to tell Room that the ImageInfo does not exist in the database (id not set yet)
-                        // set it to any other value causes a conflict when inserting (resolved by something like: @Insert(onConflict = OnConflictStrategy.IGNORE))
-                        .map { it.copy(album = newAlbum.album, id = 0) }
-                )
+                // repository.updateImageAlbum(
+                //     newAlbum = newAlbum,
+                //     imageInfoList = imageInfoList.filter { it.fullImageFile.absolutePath !in failedPaths },
+                //     isImageMove = false
+                // )
             }
             _copyImagesStateFlow.value = false
             onComplete(failedPaths.toList())
@@ -356,8 +379,8 @@ fun ImageFileOperationComposableSupport(
                 if (activityResult.resultCode == Activity.RESULT_OK) {
                     support.deleteImages(handledImageIdList) {
                         showSnackBar(handledSnackbarHostState, "${context.getString(R.string.deletion_success)}!")
+                        onDeleteSuccessExtra()
                     }
-                    onDeleteSuccessExtra()
                 } else {
                     // failed to delete images, user may deny our deletion request
                     coroutineScope.launch {

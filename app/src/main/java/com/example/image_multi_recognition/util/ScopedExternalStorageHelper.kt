@@ -19,8 +19,8 @@ import java.io.IOException
 
 // app-specific external storage
 object ScopedThumbNailStorage {
-    lateinit var imageStorage: File
-    const val dirName = ".thumbnailsOfApp"
+    lateinit var thumbnailStorage: File
+    private const val dirName = ".thumbnailsOfApp"
 
     // https://developer.android.com/training/data-storage/app-specific#external-verify-availability
     private fun isExternalStorageWritable(): Boolean {
@@ -35,10 +35,10 @@ object ScopedThumbNailStorage {
 
     // initialize external imageStorage and check availability
     private fun Context.isExternalStorageAvailable(): Boolean {
-        imageStorage = File(getExternalFilesDir(Environment.DIRECTORY_PICTURES), dirName)
+        thumbnailStorage = File(getExternalFilesDir(Environment.DIRECTORY_PICTURES), dirName)
         return if (isExternalStorageWritable()) {
-            if (!imageStorage.exists()) {
-                imageStorage.mkdir()
+            if (!thumbnailStorage.exists()) {
+                thumbnailStorage.mkdir()
             } else true
         } else false
     }
@@ -47,11 +47,22 @@ object ScopedThumbNailStorage {
     fun Context.setupScopedStorage(): Boolean {
         return if (!isExternalStorageAvailable()) {
             // use internal storage instead
-            imageStorage = File(filesDir, dirName)
-            if (!imageStorage.exists()) {
-                imageStorage.mkdir()
+            thumbnailStorage = File(filesDir, dirName)
+            if (!thumbnailStorage.exists()) {
+                thumbnailStorage.mkdir()
             } else true
         } else true
+    }
+
+    fun removeAllThumbnails(): Boolean {
+        return try {
+            thumbnailStorage.listFiles()?.fold(true) { prev, file ->
+                file.deleteRecursively() && prev
+            } ?: true
+        } catch (e: Throwable) {
+            Log.e(getCallSiteInfo(), e.stackTraceToString())
+            false
+        }
     }
 }
 

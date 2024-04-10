@@ -42,7 +42,12 @@ class AlbumPhotoLabelingViewModel @Inject constructor(
     val unlabeledImagePagingFlow: StateFlow<Flow<PagingData<UiModel>>>
         get() = _unlabeledImagePagingFlow
 
+    private val thumbnailQualityFlow = settingRepository.thumbNailQualityFlow
+    private var thumbnailQuality: Float = 0.1f
     init {
+        viewModelScope.launch {
+            thumbnailQualityFlow.collectLatest { thumbnailQuality = it }
+        }
         viewModelScope.launch {
             // convert the list to pagingSource
             unlabeledImageInAlbumStateFlow.collect { imageInfoList ->
@@ -56,9 +61,5 @@ class AlbumPhotoLabelingViewModel @Inject constructor(
                     .cachedIn(viewModelScope)
             }
         }
-    }
-
-    fun requestThumbnail(file: File, imageInfo: ImageInfo) {
-        repository.genImageRequest(file, imageInfo)
     }
 }

@@ -428,7 +428,6 @@ fun ImageLabelingResultShow(
                                 onImageClick = { modifySelectedState(item.toImageIdAndLabel(), null) },
                                 onImageDoubleClick = { doubleClickedImageInfo = item.imageInfo },
                                 availableScreenWidth = LocalConfiguration.current.screenWidthDp,
-                                onSendThumbnailRequest = { _, _ -> },
                                 selectionMode = true,
                                 selected = imageSelectedStateHolder[item.label]?.get(item.imageInfo.id)?.value
                                     ?: false,

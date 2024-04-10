@@ -2,6 +2,7 @@ package com.example.image_multi_recognition.compose.view
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.rememberScrollableState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -38,12 +39,13 @@ fun AlbumComposable(
 ) {
     val albumPagingItems = viewModel.albumPagingFlow.collectAsLazyPagingItems()
     val gridState = rememberLazyGridState()
+
     LazyVerticalGrid(
         modifier = modifier.padding(horizontal = DefaultConfiguration.ALBUM_INTERVAL.dp),
         state = gridState,
         columns = GridCells.Fixed(DefaultConfiguration.ALBUM_PER_ROW),
         horizontalArrangement = Arrangement.spacedBy(DefaultConfiguration.ALBUM_INTERVAL.dp),
-        verticalArrangement = Arrangement.spacedBy(DefaultConfiguration.ALBUM_INTERVAL.dp)
+        verticalArrangement = Arrangement.spacedBy(DefaultConfiguration.ALBUM_INTERVAL.dp),
     ) {
         items(
             count = albumPagingItems.itemCount

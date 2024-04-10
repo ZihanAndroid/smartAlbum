@@ -16,4 +16,16 @@ interface AlbumInfoDao : BaseDao<AlbumInfo> {
         WHERE path=:path
     """)
     suspend fun getAlbumByPath(path: String): Long?
+
+    @Query("""
+        SELECT * FROM album_info
+        WHERE album=:id
+    """)
+    suspend fun getAlbumById(id: Long): AlbumInfo?
+
+    @Query("""
+        DELETE FROM album_info
+        WHERE album=:album
+    """)
+    suspend fun deleteById(album: Long)
 }

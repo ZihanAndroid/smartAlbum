@@ -208,18 +208,19 @@ fun ImageItemRow(
             Text(
                 text = if (albumName.length > 30) albumName.substring(0, 30) + "..." else albumName,
                 style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
             )
             Text(
                 text = "$imageCount ${stringResource(R.string.images)}",
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.secondary
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
                 text = if (albumAbsolutePath.length > 40) {
                     albumAbsolutePath.substring(0, 40) + "..."
                 } else albumAbsolutePath,
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.secondary
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }

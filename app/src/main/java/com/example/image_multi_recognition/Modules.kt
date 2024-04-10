@@ -38,7 +38,7 @@ object DefaultConfiguration {
     const val ALBUM_INTERVAL = 6
     const val APP_DATASTORE = "APP_DATASTORE"
 
-    const val ACCEPTED_CONFIDENCE = 0.7f
+    const val ACCEPTED_CONFIDENCE = 0.5f
 
     const val DRAG_SCROLL_THRESHOLD = 100
 }
@@ -92,6 +92,7 @@ object ImageModules {
     ): ImageLabeler {
         // https://developers.google.com/ml-kit/vision/image-labeling/android
         val options = ImageLabelerOptions.Builder()
+            // set the confidence to the lowest possible value that the user can select
             .setConfidenceThreshold(DefaultConfiguration.ACCEPTED_CONFIDENCE)
             .setExecutor(executor)
             .build()

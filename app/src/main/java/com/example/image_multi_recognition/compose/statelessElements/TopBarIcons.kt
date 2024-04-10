@@ -30,7 +30,7 @@ fun TopBarIcons(
             Icon(
                 imageVector = imageVector,
                 contentDescription = contentDescriptionList[index],
-                modifier = Modifier.size(22.dp)
+                modifier = Modifier.size(21.dp)
             )
         }
     }
@@ -52,7 +52,7 @@ fun TopBarIcons(
                     .widthIn(min = (LocalConfiguration.current.screenWidthDp / 3).dp)
             ) {
                 popUpItems.forEachIndexed { index, item ->
-                    if (index > 0) Divider()
+                    if (index > 0) HorizontalDivider()
                     DropdownMenuItem(
                         onClick = {
                             menuOpened = false

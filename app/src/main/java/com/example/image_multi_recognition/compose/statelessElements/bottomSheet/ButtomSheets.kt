@@ -14,6 +14,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -24,7 +26,7 @@ import com.example.image_multi_recognition.db.AlbumInfo
 import com.example.image_multi_recognition.db.AlbumInfoWithLatestImage
 import com.example.image_multi_recognition.util.AlbumPathDecoder
 import com.example.image_multi_recognition.util.StorageHelper
-import com.example.image_multi_recognition.util.getCallSiteInfo
+import com.example.image_multi_recognition.util.getCallSiteInfoFunc
 import com.example.image_multi_recognition.util.showSnackBar
 import com.example.image_multi_recognition.viewmodel.basic.ImageFileOperationSupport
 import kotlinx.coroutines.launch
@@ -38,10 +40,54 @@ fun BottomSheetView(
     albumSelectState: AlbumSelectState,
     selectedImageIdList: List<Long>,    // copy and move are based on selected images
     onDismissRequest: () -> Unit,
-    onAlbumAddClick: () -> Unit
+    onAlbumAddClick: () -> Unit,
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
+
+    fun submitSelection(selectedAlbum: AlbumInfo, isAlbumNew: Boolean){
+        when (albumSelectState.purpose) {
+            AlbumSelectState.Purpose.MOVE_IMAGES -> {
+                onDismissRequest()
+                fileOperationSupport.requestImagesMove(
+                    imageIdList = selectedImageIdList,
+                    newAlbum = selectedAlbum,
+                    isAlbumNew = isAlbumNew,
+                ) {
+                    showSnackBar(
+                        snackbarHostState,
+                        "${context.getString(R.string.move_fail)}!"
+                    )
+                }
+            }
+
+            AlbumSelectState.Purpose.COPY_IMAGES -> {
+                onDismissRequest()
+                fileOperationSupport.copyImagesTo(
+                    newAlbum = selectedAlbum,
+                    isAlbumNew = isAlbumNew,
+                    imageIdList = selectedImageIdList
+                ) { failedPath ->
+                    showSnackBar(
+                        snackbarHostState = snackbarHostState,
+                        message = if (failedPath.isEmpty()) context.getString(R.string.copy_success)
+                        else {
+                            if (failedPath.find { it.second == StorageHelper.ImageCopyError.IO_ERROR } != null) {
+                                "${StorageHelper.ImageCopyError.IO_ERROR}"
+                            } else {
+                                context.getString(R.string.same_name_exist)
+                            }
+                        },
+                        delayTimeMillis = if (failedPath.isNotEmpty()) 3000 else 1000  // set a longer time period for an error message
+                    )
+                }
+            }
+            // should never be here!
+            else -> Log.e(getCallSiteInfoFunc(), "Error: ${albumSelectState.purpose}")
+        }
+    }
 
     val albumList by fileOperationSupport.albumListStateFlow.collectAsStateWithLifecycle()
     val sheetState = rememberModalBottomSheetState(
@@ -70,58 +116,33 @@ fun BottomSheetView(
         ) {
             BottomSheetContent(
                 albumInfoWithLatestImageList = albumList,
-                onItemClick = { selectedAlbum ->
-                    when (albumSelectState.purpose) {
-                        AlbumSelectState.Purpose.MOVE_IMAGES -> {
-                            onDismissRequest()
-                            fileOperationSupport.requestImagesMove(
-                                imageIdList = selectedImageIdList,
-                                newAlbum = selectedAlbum,
-                                isAlbumNew = false,
-                            ) {
-                                showSnackBar(
-                                    snackbarHostState,
-                                    "${context.getString(R.string.move_fail)}!"
-                                )
-                            }
-                        }
-
-                        AlbumSelectState.Purpose.COPY_IMAGES -> {
-                            onDismissRequest()
-                            fileOperationSupport.copyImagesTo(
-                                newAlbum = selectedAlbum,
-                                isAlbumNew = false,
-                                imageIdList = selectedImageIdList
-                            ) { failedPath ->
-                                showSnackBar(
-                                    snackbarHostState = snackbarHostState,
-                                    message = if (failedPath.isEmpty()) context.getString(R.string.copy_success)
-                                    else {
-                                        if (failedPath.find { it.second == StorageHelper.ImageCopyError.IO_ERROR } != null) {
-                                            "${StorageHelper.ImageCopyError.IO_ERROR}"
-                                        } else {
-                                            context.getString(R.string.same_name_exist)
-                                        }
-                                    },
-                                    delayTimeMillis = if (failedPath.isNotEmpty()) 3000 else 1000  // set a longer time period for an error message
-                                )
-                            }
-                        }
-                        // should never be here!
-                        else -> Log.e(getCallSiteInfo(), "Error: ${albumSelectState.purpose}")
-                    }
-                },
+                onItemClick = { selectedAlbum -> submitSelection(selectedAlbum, false) },
                 onAlbumAddClick = onAlbumAddClick
             )
         }
     } else {
-        val excludedAlbumSet = remember { AlbumPathDecoder.albumNamePathMap.map { it.value.name }.toSet() }
+        val excludedAlbumSet = remember { AlbumPathDecoder.albumNamePathMap.map { it.value.name.lowercase() }.toSet() }
         SimpleInputView(
             title = stringResource(R.string.new_album),
-            checkExcluded = {it in excludedAlbumSet},
+            checkExcluded = { it.trim().lowercase() in excludedAlbumSet },
             onDismiss = onDismissRequest,
             onConfirm = { newAlbum ->
-                Log.d("", "$newAlbum is required")
+                focusManager.clearFocus()
+                keyboardController?.hide()
+                fileOperationSupport.createAlbumSharedDir(newAlbum).let { albumFile ->
+                    if (albumFile == null){
+                        coroutineScope.launch {
+                            showSnackBar(
+                                snackbarHostState = snackbarHostState,
+                                message = context.getString(R.string.album_create_fail),
+                                delayTimeMillis = 3000
+                            )
+                        }
+                    }else{
+                        AlbumPathDecoder.albums
+                        submitSelection(AlbumInfo(path = albumFile.absolutePath), true)
+                    }
+                }
             }
         )
     }
@@ -131,7 +152,7 @@ fun BottomSheetView(
 fun BottomSheetContent(
     albumInfoWithLatestImageList: List<AlbumInfoWithLatestImage>,
     onItemClick: (AlbumInfo) -> Unit, // the chosen album
-    onAlbumAddClick: () -> Unit
+    onAlbumAddClick: () -> Unit,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 8.dp, start = 16.dp, end = 8.dp),

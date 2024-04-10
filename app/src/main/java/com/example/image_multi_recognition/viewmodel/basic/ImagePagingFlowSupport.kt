@@ -63,7 +63,7 @@ class ImagePagingFlowSupportImpl @Inject constructor(
 
     override fun Flow<PagingData<ImageInfo>>.convertImageInfoPagingFlow(pagingSourceType: ImagePagingFlowSupport.PagingSourceType): Flow<PagingData<UiModel>> {
         var count = 0
-        val epochTime = LocalDateTime.ofInstant(Instant.EPOCH, ZoneId.of("UTC"))
+        val epochTime = LocalDateTime.ofInstant(Instant.EPOCH, ZoneId.systemDefault())
 
         return this.map { pagingData ->
             // there are two ways to get more pagingData

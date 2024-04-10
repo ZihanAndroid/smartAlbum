@@ -115,7 +115,7 @@ enum class Destination(
         return buildDestinationFromNav(navDestination) == this
     }
 }
-fun List<Destination>.includeRouteAs(navDestination: NavDestination?): Boolean {
+fun List<Destination>.containsNavRoute(navDestination: NavDestination?): Boolean {
     forEach {
         if(it.sameRouteAs(navDestination)) return true
     }

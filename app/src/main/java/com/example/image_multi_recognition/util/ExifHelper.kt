@@ -60,9 +60,9 @@ object ExifHelper {
                 val exif = ExifInterface(imageFile) // may throw IOException
                 val createdTime = getImageCreatedTime(exif)
                 val (width, height) = getImageSize(exif)
-                val fileSize = (imageFile.length() / 1024).let { kb ->
-                    if (kb < 1024) "$kb KB"
-                    else "${kb / 1024} MB"
+                val fileSize = (imageFile.length() / 1024.0).let { kb ->
+                    if (kb < 1024) "${String.format("%.0f", kb)} KB"
+                    else "${String.format("%.2f", kb / 1024)} MB"
                 }
                 // val (longitude, latitude) = getImageLocation(exif)
                 // Log.d(getCallSiteInfo(), "location: ($longitude, $latitude)")
@@ -85,7 +85,7 @@ object ExifHelper {
                     // location?.let { getStringFromAddress(it) } ?: ""
                 )
             }
-        }catch (e: Throwable){
+        } catch (e: Throwable) {
             Log.e(getCallSiteInfo(), e.stackTraceToString())
             emptyList()
         }

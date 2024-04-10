@@ -13,6 +13,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.io.File
 import javax.inject.Inject
@@ -31,8 +32,11 @@ class LabelPhotoViewModel @Inject constructor(
     val labelRemoving: StateFlow<Boolean?>
         get() = _labelRemoving
 
-    fun requestThumbnail(file: File, imageInfo: ImageInfo) {
-        repository.genImageRequest(file, imageInfo)
+    private val thumbnailQualityFlow = settingRepository.thumbNailQualityFlow
+    private var thumbnailQuality: Float = 0.1f
+
+    init {
+        viewModelScope.launch { thumbnailQualityFlow.collectLatest { thumbnailQuality = it } }
     }
 
     val imagesPerRowFlow = settingRepository.imagesPerRowFlow

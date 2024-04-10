@@ -23,7 +23,7 @@ fun NavigationGraph(
     // photoViewModel: PhotoViewModel,
     rootSnackBarHostState: SnackbarHostState,
     onTopBottomBarHidden: (Boolean) -> Unit,
-    provideInitialSetting: () -> AppData
+    provideInitialSetting: () -> AppData,
 ) {
     val coroutineScope = rememberCoroutineScope()
 
@@ -42,11 +42,11 @@ fun NavigationGraph(
                     "${Destination.SINGLE_IMAGE.route}/1/${album}/$originalIndex".let { route ->
                         Log.d(getCallSiteInfoFunc(), "Navigation route: $route")
                         navController.navigate(route) {
-                       // launchSingleTop = true
-                       // popUpTo(navController.graph.findStartDestination().id) {
-                       //     saveState = true
-                       // }
-                       // restoreState = true
+                            // launchSingleTop = true
+                            // popUpTo(navController.graph.findStartDestination().id) {
+                            //     saveState = true
+                            // }
+                            // restoreState = true
                         }
                     }
                 },
@@ -105,9 +105,16 @@ fun NavigationGraph(
             arguments = Destination.SINGLE_IMAGE.arguments
         ) {
             // use hiltViewModel() to get a ViewModel whose lifecycle is scoped to the destination
-            SingleImageComposable(viewModel = hiltViewModel()) {
-                navController.popBackStack()
-            }
+            SingleImageComposable(
+                viewModel = hiltViewModel(),
+                onBackClick = { navController.popBackStack() },
+                onAlbumEmptyBack = {
+                    navController.popBackStack()
+                    if(!Destination.entries.filter { it.isRootDestination }.containsNavRoute(navController.currentDestination)){
+                        navController.popBackStack()
+                    }
+                }
+            )
         }
         // The same PhotoComposable for different route with different PhotoViewModel instance of different lifecycle
         composable(
@@ -116,7 +123,6 @@ fun NavigationGraph(
             arguments = Destination.ALBUM_PHOTO.arguments
         ) {
             // set all the parameters related to navigation in NavigationGraph
-
             PhotoComposable(
                 viewModel = hiltViewModel(),
                 onBack = {

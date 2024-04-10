@@ -331,9 +331,9 @@ class SingleImageViewModel @Inject constructor(
         )
     }
 
-    fun updateLabelAndResetOrderedList(imageLabels: List<com.example.image_multi_recognition.db.ImageLabel>) {
+    fun updateLabel(imageId: Long, imageLabels: List<com.example.image_multi_recognition.db.ImageLabel>) {
         viewModelScope.launch {
-            repository.updateImageLabelAndGetAllOrderedLabelList(imageLabels)
+            repository.updateImageLabel(imageId, imageLabels)
         }
     }
 

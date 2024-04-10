@@ -1,8 +1,8 @@
 package com.example.image_multi_recognition.compose.view
 
+import android.util.Log
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
@@ -49,6 +49,7 @@ fun PhotoComposable(
 
     var selectionMode by rememberSaveable { mutableStateOf(false) }
     val selectedImageIdSet = remember { MutableSetWithState<Long>() }
+    var deletionPerformed by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
@@ -61,6 +62,14 @@ fun PhotoComposable(
         support = viewModel,
         snackbarHostState = rootSnackBarHostState ?: snackbarHostState,
         imageIdList = selectedImageIdSet.toList(),
+        onDeleteSuccessExtra = {
+            // remove the album if there is no image left
+            if (pagingItems.itemCount == 0) {
+                viewModel.removeEmptyAlbum()
+                // Since there is no image left, we exit the current window
+                onBack()
+            }
+        }
     )
 
     Scaffold(
@@ -91,12 +100,13 @@ fun PhotoComposable(
                             imageVectorList = listOf(
                                 Icons.Filled.Favorite,
                                 Icons.Filled.Share,
-                                Icons.Filled.Delete
+                                // Icons.Filled.Delete
                             ),
-                            contentDescriptionList = listOf("favorite", "share", "delete"),
+                            contentDescriptionList = listOf("favorite", "share"),
                             popUpItems = listOf(
                                 stringResource(R.string.move_to),
                                 stringResource(R.string.copy_to),
+                                stringResource(R.string.delete),
                                 stringResource(R.string.select_all),
                                 stringResource(R.string.deselect_all)
                             ),
@@ -106,15 +116,6 @@ fun PhotoComposable(
                                 selectionMode = false
                             }, {
                                 viewModel.shareImages(selectedImageIdSet.toList())
-                                onTopBottomBarHidden(false)
-                                selectionMode = false
-                            }, {
-                                viewModel.requestImagesDeletion(selectedImageIdSet.toList()) {
-                                    showSnackBar(
-                                        rootSnackBarHostState ?: snackbarHostState,
-                                        "${context.getString(R.string.deletion_fail)}!"
-                                    )
-                                }
                                 onTopBottomBarHidden(false)
                                 selectionMode = false
                             }, {
@@ -135,6 +136,16 @@ fun PhotoComposable(
                                 )
                                 onTopBottomBarHidden(false)
                                 selectionMode = false
+                            }, {
+                                viewModel.requestImagesDeletion(selectedImageIdSet.toList(), viewModel.currentAlbum!!) {
+                                    showSnackBar(
+                                        rootSnackBarHostState ?: snackbarHostState,
+                                        "${context.getString(R.string.deletion_fail)}!"
+                                    )
+                                }
+                                onTopBottomBarHidden(false)
+                                selectionMode = false
+                                deletionPerformed = true
                             }, {
                                 // select all, note paging 3 library fetch data lazily and not all data are fetched,
                                 // so you cannot use the following method to select all
@@ -174,7 +185,15 @@ fun PhotoComposable(
                 modifier = Modifier.padding(paddingValues).fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
-                CircularProgressIndicator(modifier = Modifier.size(36.dp))
+                if(deletionPerformed){
+                    Text(
+                        text = stringResource(R.string.no_image),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }else {
+                    CircularProgressIndicator(modifier = Modifier.size(36.dp))
+                }
             }
         } else {
             ImagePagerView(
@@ -187,7 +206,6 @@ fun PhotoComposable(
                         viewModel.getValidOriginalIndex(imageInfoId)
                     )
                 },
-                onSendThumbnailRequest = viewModel::requestThumbnail,
                 selectionMode = selectionMode,
                 onLongPress = { imageId ->
                     if (!selectionMode && viewModel.noImageOperationOngoing()) {

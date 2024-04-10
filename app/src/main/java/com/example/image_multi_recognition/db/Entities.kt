@@ -3,14 +3,11 @@ package com.example.image_multi_recognition.db
 import android.graphics.Bitmap
 import android.graphics.Rect
 import android.util.Log
-import android.util.Size
 import androidx.room.*
 import com.example.image_multi_recognition.util.AlbumPathDecoder
 import com.example.image_multi_recognition.util.ExifHelper
 import com.example.image_multi_recognition.util.ScopedThumbNailStorage
 import com.example.image_multi_recognition.util.getCallSiteInfo
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -38,7 +35,7 @@ data class ImageInfo(
 
     @Ignore
     val thumbnailFile: File =
-        File(ScopedThumbNailStorage.imageStorage, "${album}_${path.replace("/", "_")}")
+        File(ScopedThumbNailStorage.thumbnailStorage, "${album}_${path.replace("/", "_")}")
 
     val rotationDegree: Int
         get() = ExifHelper.getImageRotationDegree(fullImageFile)
@@ -48,25 +45,25 @@ data class ImageInfo(
 
     // under each directory, we put the thumbnails into app's scoped external storage (not shared storage)
     // Not main-thread safe
-    fun setImageCache(bitmap: Bitmap) {
+    fun setImageCache(bitmap: Bitmap, thumbnailQuality: Float, onFinish: ()->Unit) {
         try {
-            if (!thumbnailFile.exists() || thumbnailFile.length() == 0L) {
-                FileOutputStream(thumbnailFile).use { outputStream ->
-                    // it seems that compressing to WEBP_LOSSY is much slower than JPEG
-                    if (!bitmap.compress(Bitmap.CompressFormat.JPEG, 15, outputStream)) {
-                        throw IOException("Failed to compress bitmap!")
-                    }
-                    Log.d(
-                        getCallSiteInfo(),
-                        "Thumbnail size: ${String.format("%d", thumbnailFile.length() / 1024)}KB"
-                    )
+            FileOutputStream(thumbnailFile).use { outputStream ->
+                // it seems that compressing to WEBP_LOSSY is much slower than JPEG
+                if (!bitmap.compress(Bitmap.CompressFormat.JPEG, (thumbnailQuality * 100).toInt(), outputStream)) {
+                    throw IOException("Failed to compress bitmap!")
                 }
+                Log.d(
+                    getCallSiteInfo(),
+                    "Thumbnail size: ${String.format("%d", thumbnailFile.length() / 1024)}KB"
+                )
             }
         } catch (e: IOException) {
             Log.e(
                 getCallSiteInfo(),
                 "Failed to write bitmap to thumbnail file: $thumbnailFile\n${e.stackTraceToString()}"
             )
+        }finally {
+            onFinish()
         }
     }
 }

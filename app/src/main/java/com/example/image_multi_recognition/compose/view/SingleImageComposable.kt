@@ -51,6 +51,7 @@ fun SingleImageComposable(
     viewModel: SingleImageViewModel,
     modifier: Modifier = Modifier,
     onBackClick: () -> Unit,
+    onAlbumEmptyBack: ()->Unit
 ) {
     Log.d(getCallSiteInfoFunc(), "Recomposition")
     val pagingDataFlow by viewModel.pagingFlow.collectAsStateWithLifecycle()
@@ -98,7 +99,15 @@ fun SingleImageComposable(
     ImageFileOperationComposableSupport(
         support = viewModel,
         snackbarHostState = snackbarHostState,
-        imageIdList = imageIdList
+        imageIdList = imageIdList,
+        onDeleteSuccessExtra = {
+            // remove the album if there is no image left
+            if (pagingItems.itemCount == 0) {
+                viewModel.removeEmptyAlbum()
+                // Since there is no image left, we exit the current window
+                onAlbumEmptyBack()
+            }
+        }
     )
     var rotationDegree by remember { mutableStateOf(RotationDegree.D0) }
     // Note if you use "LaunchedEffect{...}" it will run after the current recomposition
@@ -222,7 +231,7 @@ fun SingleImageComposable(
                 currentImageInfo?.id?.let { imageId ->
                     imageIdList.clear()
                     imageIdList.add(imageId)
-                    viewModel.requestImagesDeletion(listOf(imageId)) {
+                    viewModel.requestImagesDeletion(listOf(imageId), viewModel.currentAlbum!!) {
                         showSnackBar(snackbarHostState, "${context.getString(R.string.deletion_fail)}!")
                     }
                 }
@@ -285,9 +294,7 @@ fun SingleImageComposable(
                                         }
                                     }
                                     viewModel.resetImageLabelFlow()
-                                    if (isNotEmpty()) {
-                                        viewModel.updateLabelAndResetOrderedList(this)
-                                    }
+                                    viewModel.updateLabel(imageInfo.id, this)
                                 }
                                 // show selected labels
                                 Log.d(getCallSiteInfoFunc(), "selected labels: ${viewModel.selectedLabelSet}")
@@ -305,8 +312,9 @@ fun SingleImageComposable(
                                             }
                                         }
                                 }
-                                val newLabels = ((partImageResult ?: emptyList()) + (wholeImageResult ?: emptyList()))
-                                    .map { it.label }.toSet()
+                                val newLabels =
+                                    ((partImageResult ?: emptyList()) + (wholeImageResult ?: emptyList()))
+                                        .map { it.label }.toSet()
                                 // the image may have a label, and change its label can cause changes in PagingSource from DB, we need to check that by this "originalLabel"
                                 if (viewModel.currentLabel == null || viewModel.currentLabel in newLabels) {
                                     // when currentLabel is set to "", it will always fail the conditions and no result is shown except a snackBar
@@ -321,7 +329,10 @@ fun SingleImageComposable(
                                 } else {
                                     // show a snack instead of the labeling result because the page has gone after labeling
                                     coroutineScope.launch {
-                                        showSnackBar(snackbarHostState, context.getString(R.string.labeling_done) + "!")
+                                        showSnackBar(
+                                            snackbarHostState,
+                                            context.getString(R.string.labeling_done) + "!"
+                                        )
                                     }
                                 }
                             },

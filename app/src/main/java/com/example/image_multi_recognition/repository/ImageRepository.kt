@@ -4,6 +4,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.database.ContentObserver
 import android.net.Uri
+import android.os.Environment
 import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
@@ -127,21 +128,30 @@ class ImageRepository @Inject constructor(
         imageInfoDao.insert(*imageInfo)
     }
 
-    suspend fun updateImageAlbum(newAlbum: AlbumInfo? = null, imageInfoList: List<ImageInfo>) {
-        database.withTransaction {
-            if (newAlbum != null) {
-                insertAlbumInfo(newAlbum)
-            }
-            imageInfoDao.update(*imageInfoList.toTypedArray())
-        }
-    }
+    // suspend fun updateImageAlbum(newAlbum: AlbumInfo? = null, imageInfoList: List<ImageInfo>) {
+    //     database.withTransaction {
+    //         if (newAlbum != null) {
+    //             insertAlbumInfo(newAlbum)
+    //         }
+    //         imageInfoDao.update(*imageInfoList.toTypedArray())
+    //     }
+    // }
 
-    suspend fun createImageAlbum(newAlbum: AlbumInfo? = null, imageInfoList: List<ImageInfo>) {
+    suspend fun updateImageAlbum(newAlbum: AlbumInfo, imageInfoList: List<ImageInfo>, isImageMove: Boolean) {
+        var realNewAlbum = newAlbum
         database.withTransaction {
-            if (newAlbum != null) {
-                insertAlbumInfo(newAlbum)
+            if (newAlbum.album == 0L) {
+                val id = insertAlbumInfo(newAlbum)
+                realNewAlbum = newAlbum.copy(album = id[0])
             }
-            imageInfoDao.insert(*imageInfoList.toTypedArray())
+            AlbumPathDecoder.addAlbum(realNewAlbum)
+            // Note: you need to set the id to 0 to tell Room that the ImageInfo does not exist in the database (id not set yet)
+            // set it to any other value causes a conflict when inserting (resolved by something like: @Insert(onConflict = OnConflictStrategy.IGNORE))
+            if (!isImageMove) { // copy
+                imageInfoDao.insert(*(imageInfoList.map { it.copy(album = realNewAlbum.album, id = 0) }).toTypedArray())
+            } else {    // move
+                imageInfoDao.update(*(imageInfoList.map { it.copy(album = realNewAlbum.album, id = 0) }).toTypedArray())
+            }
         }
     }
 
@@ -149,18 +159,22 @@ class ImageRepository @Inject constructor(
         imageInfoDao.changeImageInfoFavorite(idList)
     }
 
-    suspend fun insertAlbumInfo(vararg albumInfo: AlbumInfo) {
-        albumInfoDao.insert(*albumInfo)
+    suspend fun insertAlbumInfo(vararg albumInfo: AlbumInfo): List<Long> {
+        return albumInfoDao.insert(*albumInfo)
     }
 
     suspend fun getAlbumByPath(path: String): Long? = albumInfoDao.getAlbumByPath(path)
 
+    suspend fun getAlbumById(album: Long): AlbumInfo? = albumInfoDao.getAlbumById(album)
+
     fun getAllOrderedLabelListFlow(): Flow<List<LabelInfo>> = imageLabelDao.getAllOrderedLabels()
 
-    suspend fun updateImageLabelAndGetAllOrderedLabelList(imageLabelList: List<ImageLabel>) {
+    suspend fun updateImageLabel(imageId: Long, imageLabelList: List<ImageLabel>) {
         database.withTransaction {
-            imageLabelDao.deleteById(imageLabelList.first().id)
-            imageLabelDao.insert(*imageLabelList.toTypedArray())
+            imageLabelDao.deleteById(imageId)
+            if (imageLabelList.isNotEmpty()) {
+                imageLabelDao.insert(*imageLabelList.toTypedArray())
+            }
         }
     }
 
@@ -207,7 +221,7 @@ class ImageRepository @Inject constructor(
         pagingSourceFactory = { imageInfoDao.getAlbumWithLatestImagePagingSource() }
     ).flow
 
-    fun genImageRequest(file: File, imageInfo: ImageInfo) {
+    fun genImageRequest(file: File, imageInfo: ImageInfo, thumbnailQuality: Float, onFinish: () -> Unit) {
         val request = ImageRequest.Builder(context)
             .data(file)
             .crossfade(true)
@@ -216,14 +230,15 @@ class ImageRepository @Inject constructor(
                     // Log.d(getCallSiteInfo(), "Current Thread: ${Thread.currentThread().name}")
                     // Log.d(getCallSiteInfo(), "load image success: ${imageInfo.fullImageFile.absolutePath}")
                     backgroundThreadPool.submit {
-                        imageInfo.setImageCache(drawable.toBitmap())
+                        imageInfo.setImageCache(drawable.toBitmap(), thumbnailQuality, onFinish)
                     }
                 },  // onSuccess is not a suspend function, it is assumed that Coil calls this callback from only one thread
                 onError = {
+                    onFinish()
                     Log.e(getCallSiteInfo(), "Failed to load image from: ${file.absolutePath}")
                 }
             ).build()
-        if (!imageInfo.isThumbnailAvailable) context.imageLoader.enqueue(request)
+        context.imageLoader.enqueue(request)
     }
 
     fun getInputImage(file: File): InputImage? {
@@ -273,6 +288,10 @@ class ImageRepository @Inject constructor(
 
     suspend fun deleteImagesById(imageIds: List<Long>) {
         imageInfoDao.deleteById(imageIds)
+    }
+
+    suspend fun deleteAlbumById(album: Long){
+        albumInfoDao.deleteById(album)
     }
 
     suspend fun getAlbumInfoWithLatestImage(excludedAlbum: Long = -1): List<AlbumInfoWithLatestImage> {
@@ -333,14 +352,14 @@ class ImageRepository @Inject constructor(
         }
     }
 
-    private suspend fun updateImageName(imageId: Long, newFileName: String) {
-        imageInfoDao.updateImageName(imageId, newFileName)
-    }
+    // private suspend fun updateImageName(imageId: Long, newFileName: String) {
+    //     imageInfoDao.updateImageName(imageId, newFileName)
+    // }
 
     suspend fun updateFileName(imageId: Long, absolutePath: String, newFileName: String): Boolean {
         return with(StorageHelper) {
             if (context.updateImageFileName(absolutePath, newFileName)) {
-                updateImageName(imageId, newFileName)
+                // updateImageName(imageId, newFileName)
                 true
             } else false
         }

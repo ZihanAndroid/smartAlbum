@@ -156,7 +156,6 @@ fun AlbumPhotoLabelingComposable(
                             viewModel.getValidOriginalIndex(imageInfoId)
                         )
                     },
-                    onSendThumbnailRequest = viewModel::requestThumbnail,
                     provideImagePerRow = { imagesPerRow }
                 )
             }
