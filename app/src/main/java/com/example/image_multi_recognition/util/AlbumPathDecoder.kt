@@ -15,7 +15,9 @@ object AlbumPathDecoder {
         get() = albumNamePathMap.map { it.key }
 
     fun initDecoder(namePathMap: Map<Long, File>) {
-        albumNamePathMapRef.set(namePathMap.toMutableMap())
+        albumNamePathMapRef.set(namePathMap.toMutableMap().apply {
+            put(-1, File("Favorites"))
+        })
     }
 
     fun decode(album: Long): File = if (album in albumNamePathMap.keys) {
@@ -32,11 +34,11 @@ object AlbumPathDecoder {
             Log.e(getCallSiteInfoFunc(), "Not recognized album: $album")
         }
 
-    fun addAlbum(albumInfo: AlbumInfo){
+    fun addAlbum(albumInfo: AlbumInfo) {
         albumNamePathMapRef.get()[albumInfo.album] = File(albumInfo.path)
     }
 
-    fun removeAlbum(album: Long){
+    fun removeAlbum(album: Long) {
         albumNamePathMapRef.get().remove(album)
     }
 }

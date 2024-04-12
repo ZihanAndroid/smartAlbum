@@ -39,7 +39,7 @@ fun SingleImageView(
     val handledSnackbarHostState by rememberUpdatedState(snackbarHostState)
 
     Scaffold(
-        snackbarHost = { SnackbarHost(handledSnackbarHostState) },
+        snackbarHost = { SnackbarHost(handledSnackbarHostState) { CustomSnackBar(it) } },
         topBar = {
             if (showAppBar) {
                 TopAppBar(
@@ -63,10 +63,10 @@ fun SingleImageView(
                                     onClick = topRightOnClicks[index]
                                 ) {
                                     Icon(
-                                        imageVector = item.imageVector,
+                                        imageVector = item.provideImageVector(),
                                         contentDescription = item.contentDescription,
                                         modifier = item.modifier.size(22.dp),
-                                        tint = item.tint ?: MaterialTheme.colorScheme.onSurfaceVariant
+                                        tint = item.provideTint() ?: MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }
@@ -80,7 +80,7 @@ fun SingleImageView(
                                             .widthIn(min = (LocalConfiguration.current.screenWidthDp / 3).dp)
                                     ) {
                                         moreVertItems.forEachIndexed { index, text ->
-                                            if (index > 0) Divider()
+                                            if (index > 0) HorizontalDivider()
                                             DropdownMenuItem(
                                                 onClick = {
                                                     showMoreVertItems = false
@@ -121,10 +121,10 @@ fun SingleImageView(
                                 onClick = bottomOnClicks[index]
                             ) {
                                 Icon(
-                                    imageVector = item.imageVector,
+                                    imageVector = item.provideImageVector(),
                                     contentDescription = item.contentDescription,
                                     modifier = item.modifier,
-                                    tint = item.tint ?: MaterialTheme.colorScheme.onSurfaceVariant
+                                    tint = item.provideTint() ?: MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
@@ -146,9 +146,9 @@ fun SingleImageView(
 }
 
 data class SingleImageViewItem(
-    val imageVector: ImageVector,
+    val provideImageVector: @Composable () -> ImageVector,
     val contentDescription: String,
     // you can add some changing effect to the icon by providing a modifier
     val modifier: Modifier = Modifier,
-    val tint: Color? = null,
+    val provideTint: @Composable () -> Color? = { null },
 )

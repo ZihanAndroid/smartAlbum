@@ -188,7 +188,11 @@ class ImageRepository @Inject constructor(
             enablePlaceholders = true
         ),
         pagingSourceFactory = {
-            imageInfoDao.getImageShowPagingSourceForAlbum(album).apply { prevImagePagingSource = this }
+            if (album != DefaultConfiguration.FAVORITES_ALBUM_ID) {
+                imageInfoDao.getImageShowPagingSourceForAlbum(album).apply { prevImagePagingSource = this }
+            } else {
+                imageInfoDao.getImageShowPagingSourceForFavorite().apply { prevImagePagingSource = this }
+            }
         }
     ).flow
 
@@ -257,7 +261,13 @@ class ImageRepository @Inject constructor(
     suspend fun getImagesByLabel(label: String) = imageInfoDao.getImagesByLabel("$label%")
 
     suspend fun getImageInfoById(ids: List<Long>) = imageInfoDao.getImageInfoByIds(*ids.toLongArray())
-    suspend fun getAllImagesByAlbum(album: Long) = imageInfoDao.getAllImagesByAlbum(album)
+    suspend fun getAllImagesByAlbum(album: Long): List<Long>{
+        return if(album != DefaultConfiguration.FAVORITES_ALBUM_ID){
+            imageInfoDao.getAllImagesByAlbum(album)
+        }else{
+            imageInfoDao.getAllFavoriteImages()
+        }
+    }
     suspend fun getAllFileNamesByCurrentAlbum(album: Long) = imageInfoDao.getAllFileNamesByCurrentAlbum(album)
 
     fun getUnlabeledAlbumPagerFlow(): Flow<PagingData<AlbumWithLatestImage>> = Pager(
@@ -290,7 +300,7 @@ class ImageRepository @Inject constructor(
         imageInfoDao.deleteById(imageIds)
     }
 
-    suspend fun deleteAlbumById(album: Long){
+    suspend fun deleteAlbumById(album: Long) {
         albumInfoDao.deleteById(album)
     }
 
@@ -313,6 +323,12 @@ class ImageRepository @Inject constructor(
     suspend fun getMoveImageRequest(imageInfoList: List<ImageInfo>): StorageHelper.MediaModifyRequest {
         return with(StorageHelper) {
             context.requestImageFileModification(imageInfoList.map { it.fullImageFile.absolutePath })
+        }
+    }
+
+    suspend fun getContentUris(absolutePaths: List<String>): List<StorageHelper.MediaStoreItem>{
+        return with(StorageHelper){
+            context.getContentUriForImageFile(absolutePaths)
         }
     }
 

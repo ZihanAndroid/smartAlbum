@@ -48,8 +48,8 @@ enum class Destination(
     SINGLE_IMAGE(
         route = "SINGLE_IMAGE",
         compulsoryArguments = mapOf(
-//            "album" to NavType.LongType,
-//            "label" to NavType.StringType,
+           // "album" to NavType.LongType,
+           // "label" to NavType.StringType,
             // argumentType: 1 means "album", 2 means "label", 3 means "album with image not labeled"
             "argumentType" to NavType.IntType,
             "argumentValue" to NavType.StringType,
@@ -74,6 +74,10 @@ enum class Destination(
     ),
     SETTING(
         route = "SETTING",
+        isRootDestination = false
+    ),
+    EXCLUDED_LABELS_SETTING(
+        route = "EXCLUDED_LABELS_SETTING",
         isRootDestination = false
     );
 

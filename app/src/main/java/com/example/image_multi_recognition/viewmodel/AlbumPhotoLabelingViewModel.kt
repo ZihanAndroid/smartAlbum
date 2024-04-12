@@ -1,5 +1,6 @@
 package com.example.image_multi_recognition.viewmodel
 
+import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import androidx.paging.Pager
@@ -41,6 +42,7 @@ class AlbumPhotoLabelingViewModel @Inject constructor(
     private val _unlabeledImagePagingFlow: MutableStateFlow<Flow<PagingData<UiModel>>> = MutableStateFlow(flowOf())
     val unlabeledImagePagingFlow: StateFlow<Flow<PagingData<UiModel>>>
         get() = _unlabeledImagePagingFlow
+    val unlabeledEmptyFlow = MutableStateFlow(false)
 
     private val thumbnailQualityFlow = settingRepository.thumbNailQualityFlow
     private var thumbnailQuality: Float = 0.1f
@@ -51,6 +53,7 @@ class AlbumPhotoLabelingViewModel @Inject constructor(
         viewModelScope.launch {
             // convert the list to pagingSource
             unlabeledImageInAlbumStateFlow.collect { imageInfoList ->
+                unlabeledEmptyFlow.value = imageInfoList.isEmpty()
                 _unlabeledImagePagingFlow.value = Pager(
                     config = PagingConfig(
                         pageSize = DefaultConfiguration.PAGE_SIZE,

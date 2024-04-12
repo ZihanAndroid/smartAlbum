@@ -40,6 +40,7 @@ import coil.compose.AsyncImage
 import com.example.image_multi_recognition.AppData
 import com.example.image_multi_recognition.DefaultConfiguration
 import com.example.image_multi_recognition.R
+import com.example.image_multi_recognition.compose.statelessElements.CustomSnackBar
 import com.example.image_multi_recognition.compose.statelessElements.PagingItemImage
 import com.example.image_multi_recognition.compose.statelessElements.ToggleIcon
 import com.example.image_multi_recognition.compose.statelessElements.TopAppBarForNotRootDestination
@@ -63,7 +64,7 @@ import kotlin.math.absoluteValue
 fun LabelingComposable(
     modifier: Modifier = Modifier,
     viewModel: LabelingViewModel,
-    rootSnackBarHostState: SnackbarHostState,
+    navBottomAppBar: @Composable () -> Unit,
     provideInitialSetting: () -> AppData,
     onSettingClick: () -> Unit,
     onAlbumClick: (Long) -> Unit,
@@ -71,7 +72,7 @@ fun LabelingComposable(
     var labelingClicked by rememberSaveable { mutableStateOf(false) }
     val labelingState by viewModel.labelingStateFlow.collectAsStateWithLifecycle()
     val labelAdding by viewModel.labelAddingStateFlow.collectAsStateWithLifecycle()
-    val rootSnackBar by remember { derivedStateOf { rootSnackBarHostState } }
+    val snackBarState = remember { SnackbarHostState() }
     val unlabeledImageList by viewModel.unlabeledImageListFlow.collectAsStateWithLifecycle()
     val imagesPerRow by viewModel.imagesPerRowFlow.collectAsStateWithLifecycle(provideInitialSetting().imagesPerRow)
 
@@ -90,6 +91,7 @@ fun LabelingComposable(
     val labelAddedString = stringResource(R.string.label_added)
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackBarState) { CustomSnackBar(it) } },
         topBar = {
             TopAppBarForNotRootDestination(
                 title = if (labelingClicked) {
@@ -123,7 +125,7 @@ fun LabelingComposable(
                                         viewModel.onLabelingConfirm(imageSelectedStateHolder) {
                                             // https://stackoverflow.com/questions/71471679/jetpack-compose-scaffold-possible-to-override-the-standard-durations-of-snackbar
                                             val job = launch {
-                                                rootSnackBar.showSnackbar(
+                                                snackBarState.showSnackbar(
                                                     labelAddedString,
                                                     duration = SnackbarDuration.Indefinite
                                                 )
@@ -160,15 +162,15 @@ fun LabelingComposable(
                     }
                 }
             }
-        }
+        },
+        bottomBar = navBottomAppBar
     ) { originalPaddingValues ->
         val paddingValues = PaddingValues(
             start = originalPaddingValues.calculateStartPadding(LayoutDirection.Ltr),
             end = originalPaddingValues.calculateEndPadding(LayoutDirection.Ltr),
             top = originalPaddingValues.calculateTopPadding(),
-            bottom = 0.dp
+            bottom = originalPaddingValues.calculateBottomPadding() + DefaultConfiguration.NAV_BOTTOM_APP_BAR_CROPPED.dp
         )
-
         Column(
             modifier = Modifier.padding(paddingValues),
             verticalArrangement = Arrangement.Center

@@ -66,6 +66,7 @@
     <string name="path">Path</string>
     <string name="resolution">Resolution</string>
     <string name="date_taken">Date taken</string>
+    <string name="mime_type">MIME type</string>
     <string name="location">Location</string>
     <string name="unknown_date">Unknown Date</string>
 

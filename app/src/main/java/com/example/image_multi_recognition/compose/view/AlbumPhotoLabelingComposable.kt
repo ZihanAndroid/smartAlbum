@@ -13,10 +13,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.example.image_multi_recognition.AppData
 import com.example.image_multi_recognition.R
+import com.example.image_multi_recognition.compose.statelessElements.CustomSnackBar
 import com.example.image_multi_recognition.compose.statelessElements.ImagePagerView
 import com.example.image_multi_recognition.compose.statelessElements.TopAppBarForNotRootDestination
 import com.example.image_multi_recognition.viewmodel.AlbumPhotoLabelingViewModel
@@ -34,6 +36,7 @@ fun AlbumPhotoLabelingComposable(
     val imageInfoList by viewModel.unlabeledImageInAlbumStateFlow.collectAsStateWithLifecycle()
     var labelingClicked by rememberSaveable { mutableStateOf(false) }
     val labelingState by viewModel.labelingStateFlow.collectAsStateWithLifecycle()
+    val unlabeledEmpty by viewModel.unlabeledEmptyFlow.collectAsStateWithLifecycle()
 
     // imageSelectedStateHolder and labelSelectedStateHolder are updated for "labelingState" change
     val imageSelectedStateHolder: Map<String, Map<Long, MutableState<Boolean>>> = remember(labelingState) {
@@ -54,7 +57,7 @@ fun AlbumPhotoLabelingComposable(
     val labelAddedString = stringResource(R.string.label_added)
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { SnackbarHost(snackbarHostState) { CustomSnackBar(it, 0.dp) } },
         topBar = {
             TopAppBarForNotRootDestination(
                 title = if (labelingClicked) {
@@ -96,7 +99,12 @@ fun AlbumPhotoLabelingComposable(
                                                 }
                                                 delay(1000)
                                                 job.cancel()
-                                                labelingClicked = false
+                                                // when unlabeledEmpty is empty, we will exit the current window, so there is no need to change the state
+                                                // After labeling, the itemCount may become 0, and we exit the current window.
+                                                // Note that we should not check pagingItems.itemCount because that value is lazily updated
+                                                // and its initial value is always zero when the page first loaded
+                                                if (!unlabeledEmpty) labelingClicked = false
+                                                else onBack()
                                             }
                                         }
                                     }
@@ -146,7 +154,6 @@ fun AlbumPhotoLabelingComposable(
             } else {
                 val imageListPagingItemsFlow by viewModel.unlabeledImagePagingFlow.collectAsStateWithLifecycle()
                 val pagingItems = imageListPagingItemsFlow.collectAsLazyPagingItems()
-
                 ImagePagerView(
                     modifier = modifier,
                     pagingItems = pagingItems,

@@ -1,10 +1,12 @@
 package com.example.image_multi_recognition.compose.view
 
 import android.annotation.SuppressLint
+import android.app.Activity
 import android.util.Log
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -13,6 +15,7 @@ import androidx.compose.foundation.pager.PagerDefaults
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.SnackbarHostState
@@ -21,11 +24,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.colorResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.collectAsLazyPagingItems
+import com.example.image_multi_recognition.DefaultConfiguration
 import com.example.image_multi_recognition.R
 import com.example.image_multi_recognition.compose.statelessElements.*
 import com.example.image_multi_recognition.compose.statelessElements.bottomSheet.AlbumSelectState
@@ -33,25 +37,23 @@ import com.example.image_multi_recognition.compose.statelessElements.bottomSheet
 import com.example.image_multi_recognition.compose.view.imageShow.SingleImagePage
 import com.example.image_multi_recognition.compose.view.imageShow.SingleImagePageLabelingDone
 import com.example.image_multi_recognition.db.ImageLabel
+import com.example.image_multi_recognition.model.RotationDegree
+import com.example.image_multi_recognition.ui.theme.md_theme_dark_primary
 import com.example.image_multi_recognition.util.getCallSiteInfoFunc
 import com.example.image_multi_recognition.util.showSnackBar
 import com.example.image_multi_recognition.util.splitLastBy
 import com.example.image_multi_recognition.viewmodel.ImageLabelResult
-import com.example.image_multi_recognition.model.RotationDegree
-import com.example.image_multi_recognition.ui.theme.md_theme_dark_onPrimaryContainer
-import com.example.image_multi_recognition.ui.theme.md_theme_dark_primary
 import com.example.image_multi_recognition.viewmodel.SingleImageViewModel
 import com.example.image_multi_recognition.viewmodel.basic.ImageFileOperationComposableSupport
 import kotlinx.coroutines.launch
 
 @SuppressLint("RememberReturnType")
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SingleImageComposable(
     viewModel: SingleImageViewModel,
     modifier: Modifier = Modifier,
     onBackClick: () -> Unit,
-    onAlbumEmptyBack: ()->Unit
+    onAlbumEmptyBack: () -> Unit,
 ) {
     Log.d(getCallSiteInfoFunc(), "Recomposition")
     val pagingDataFlow by viewModel.pagingFlow.collectAsStateWithLifecycle()
@@ -71,6 +73,7 @@ fun SingleImageComposable(
             context.getString(R.string.path),
             context.getString(R.string.resolution),
             context.getString(R.string.date_taken),
+            context.getString(R.string.mime_type),
             context.getString(R.string.location),
         )
     }
@@ -120,6 +123,8 @@ fun SingleImageComposable(
         viewModel.clearPage(pagerState.currentPage)
     }
     val pageScrolling by remember { derivedStateOf { pagerState.isScrollInProgress } }
+    // https://stackoverflow.com/questions/73873622/how-to-start-new-activity-in-jetpack-compose
+    val activity = LocalContext.current as Activity
 
     // a strange behavior, once I access "pagerState.pageCount" instead of "pagingItems.itemCount" here, it causes infinite recomposition
     // Log.d(getCallSiteInfoFunc(), "currentPage: ${pagerState.pageCount}")
@@ -133,8 +138,8 @@ fun SingleImageComposable(
             snackbarHostState = snackbarHostState,
             onBack = onBackClick,
             topRightItems = listOf(
-                SingleImageViewItem(ImageVector.vectorResource(R.drawable.baseline_new_label_24), "label"),
-                SingleImageViewItem(ImageVector.vectorResource(R.drawable.baseline_preview_24), "preview_label")
+                SingleImageViewItem({ ImageVector.vectorResource(R.drawable.baseline_new_label_24) }, "label"),
+                SingleImageViewItem({ ImageVector.vectorResource(R.drawable.baseline_preview_24) }, "preview_label")
             ),
             topRightOnClicks = listOf({
                 // labeling start
@@ -149,17 +154,23 @@ fun SingleImageComposable(
                 }
             }),
             bottomItems = listOf(
-                SingleImageViewItem(Icons.Default.Info, "info"),
-                SingleImageViewItem(ImageVector.vectorResource(R.drawable.baseline_rotate_left_24), "rotateLeft"),
-                SingleImageViewItem(ImageVector.vectorResource(R.drawable.baseline_rotate_right_24), "rotateRight"),
-                SingleImageViewItem(Icons.Default.Share, "share"),
+                SingleImageViewItem({ ImageVector.vectorResource(R.drawable.baseline_info_outline_24) }, "info"),
+                SingleImageViewItem({ ImageVector.vectorResource(R.drawable.baseline_rotate_left_24) }, "rotateLeft"),
+                SingleImageViewItem({ ImageVector.vectorResource(R.drawable.baseline_rotate_right_24) }, "rotateRight"),
+                SingleImageViewItem({ Icons.Default.Share }, "share"),
                 SingleImageViewItem(
-                    imageVector = Icons.Default.Favorite,
+                    provideImageVector = {
+                        if (pagingItems.itemSnapshotList.size > pagerState.currentPage && pagingItems.itemSnapshotList[pagerState.currentPage]?.favorite == true) {
+                            Icons.Default.Favorite
+                        } else Icons.Default.FavoriteBorder
+                    },
                     contentDescription = "favorite",
-                    tint = if (pagingItems.itemSnapshotList.size > pagerState.currentPage && pagingItems.itemSnapshotList[pagerState.currentPage]?.favorite == true) {
-                        md_theme_dark_primary
-                    } else {
-                        null
+                    provideTint = {
+                        if (pagingItems.itemSnapshotList.size > pagerState.currentPage && pagingItems.itemSnapshotList[pagerState.currentPage]?.favorite == true) {
+                            md_theme_dark_primary
+                        } else {
+                            null
+                        }
                     }
                 )
             ),
@@ -187,61 +198,73 @@ fun SingleImageComposable(
                     }
                 }
             }, {
-
+                // share an image
+                if (pagingItems.itemSnapshotList.size > pagerState.currentPage) {
+                    pagingItems.itemSnapshotList[pagerState.currentPage]?.let { imageInfo ->
+                        with(viewModel) { activity.shareImageInfo(listOf(imageInfo)) }
+                    }
+                }
             }, {
                 if (pagingItems.itemSnapshotList.size > pagerState.currentPage && viewModel.noImageOperationOngoing()) {
                     // Data has been retrieved from PagingSource
                     pagingItems.itemSnapshotList[pagerState.currentPage]?.let { imageInfo ->
+                        if (pagingItems.itemCount == 1 && imageInfo.favorite && viewModel.currentAlbum == DefaultConfiguration.FAVORITES_ALBUM_ID) {
+                            // after removing a favorite in the "favorite" window, the number may be zero
+                            onBackClick()
+                        }
                         viewModel.changeFavoriteImages(listOf(imageInfo.id))
                     }
                 }
             }),
-            moreVertItems = if (viewModel.argumentType == 1)
+            moreVertItems = if (viewModel.argumentType == 1 && viewModel.currentAlbum != DefaultConfiguration.FAVORITES_ALBUM_ID) {
                 listOf(
                     stringResource(R.string.move_to),
                     stringResource(R.string.copy_to),
                     stringResource(R.string.delete),
                     stringResource(R.string.rename)
-                ) else emptyList(),
-            moreVertItemOnClicks = if (viewModel.argumentType == 1) listOf({
-                currentImageInfo?.id?.let { imageId ->
-                    // set albums shown to the user
-                    viewModel.setAlbumListStateFlow(excludedAlbum = viewModel.currentAlbum!!)
-                    imageIdList.clear()
-                    imageIdList.add(imageId)
-                    albumSelectState = AlbumSelectState(
-                        selecting = true,
-                        newAlbumInput = false,
-                        AlbumSelectState.Purpose.MOVE_IMAGES
-                    )
-                }
-            }, {
-                currentImageInfo?.id?.let { imageId ->
-                    viewModel.setAlbumListStateFlow(excludedAlbum = viewModel.currentAlbum!!)
-                    imageIdList.clear()
-                    imageIdList.add(imageId)
-                    albumSelectState = AlbumSelectState(
-                        selecting = true,
-                        newAlbumInput = false,
-                        AlbumSelectState.Purpose.COPY_IMAGES
-                    )
-                }
-            }, {
-                // request deleting an image
-                currentImageInfo?.id?.let { imageId ->
-                    imageIdList.clear()
-                    imageIdList.add(imageId)
-                    viewModel.requestImagesDeletion(listOf(imageId), viewModel.currentAlbum!!) {
-                        showSnackBar(snackbarHostState, "${context.getString(R.string.deletion_fail)}!")
+                )
+            } else emptyList(),
+            moreVertItemOnClicks = if (viewModel.argumentType == 1 && viewModel.currentAlbum != DefaultConfiguration.FAVORITES_ALBUM_ID) {
+                listOf({
+                    currentImageInfo?.id?.let { imageId ->
+                        // set albums shown to the user
+                        viewModel.setAlbumListStateFlow(excludedAlbum = viewModel.currentAlbum!!)
+                        imageIdList.clear()
+                        imageIdList.add(imageId)
+                        albumSelectState = AlbumSelectState(
+                            selecting = true,
+                            newAlbumInput = false,
+                            AlbumSelectState.Purpose.MOVE_IMAGES
+                        )
                     }
-                }
-            }, {
-                // rename an image file
-                coroutineScope.launch {
-                    fileNamesInAlbum = viewModel.getAllFileNamesByCurrentAlbum(viewModel.currentAlbum!!)
-                    renamingImageOngoing = true
-                }
-            }) else emptyList()
+                }, {
+                    currentImageInfo?.id?.let { imageId ->
+                        viewModel.setAlbumListStateFlow(excludedAlbum = viewModel.currentAlbum!!)
+                        imageIdList.clear()
+                        imageIdList.add(imageId)
+                        albumSelectState = AlbumSelectState(
+                            selecting = true,
+                            newAlbumInput = false,
+                            AlbumSelectState.Purpose.COPY_IMAGES
+                        )
+                    }
+                }, {
+                    // request deleting an image
+                    currentImageInfo?.id?.let { imageId ->
+                        imageIdList.clear()
+                        imageIdList.add(imageId)
+                        viewModel.requestImagesDeletion(listOf(imageId), viewModel.currentAlbum!!) {
+                            showSnackBar(snackbarHostState, "${context.getString(R.string.deletion_fail)}!")
+                        }
+                    }
+                }, {
+                    // rename an image file
+                    coroutineScope.launch {
+                        fileNamesInAlbum = viewModel.getAllFileNamesByCurrentAlbum(viewModel.currentAlbum!!)
+                        renamingImageOngoing = true
+                    }
+                })
+            } else emptyList()
         ) { paddingValues ->
             Log.d(getCallSiteInfoFunc(), "paddingValues: $paddingValues")
             HorizontalPager(
@@ -251,7 +274,7 @@ fun SingleImageComposable(
                 flingBehavior = PagerDefaults.flingBehavior(
                     pagerState,
                     snapAnimationSpec = tween(Spring.StiffnessLow.toInt(), 0)
-                ),
+                )
                 // key = { pagingItems[it]?.id ?: (-1) }
             ) { itemIndex ->
                 pagingItems[itemIndex]?.let { imageInfo ->
@@ -333,6 +356,9 @@ fun SingleImageComposable(
                                             snackbarHostState,
                                             context.getString(R.string.labeling_done) + "!"
                                         )
+                                        // For labeling page, after labeling, the page may gone because of the change from unlabeled image to labeled image
+                                        // Note that if you use "pagingItem.itemCount" instead of "pagerState.pageCount", it will not work
+                                        if (pagerState.pageCount == 0) onAlbumEmptyBack()
                                     }
                                 }
                             },

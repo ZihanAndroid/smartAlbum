@@ -11,10 +11,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.example.image_multi_recognition.AppData
 import com.example.image_multi_recognition.R
+import com.example.image_multi_recognition.compose.statelessElements.CustomSnackBar
 import com.example.image_multi_recognition.compose.statelessElements.ImagePagerView
 import com.example.image_multi_recognition.compose.statelessElements.TopAppBarForNotRootDestination
 import com.example.image_multi_recognition.util.MutableSetWithState
@@ -44,7 +46,7 @@ fun LabelPhotoComposable(
     val labelRemovedString = stringResource(R.string.label_removed)
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { SnackbarHost(snackbarHostState){ CustomSnackBar(it, 0.dp) } },
         topBar = {
             TopAppBarForNotRootDestination(
                 title = if (!selectionMode) {
@@ -65,6 +67,7 @@ fun LabelPhotoComposable(
                                             // clear the selectedImageIdSet immediately after the deletion is completed
                                             selectedImageInfoSet.clear()
                                             showSnackBar(snackbarHostState, labelRemovedString)
+                                            if(pagingItems.itemCount == 0) onBack()
                                         }
                                     }
                                 }

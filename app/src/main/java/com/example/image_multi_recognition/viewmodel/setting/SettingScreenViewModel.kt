@@ -1,4 +1,4 @@
-package com.example.image_multi_recognition.viewmodel
+package com.example.image_multi_recognition.viewmodel.setting
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -19,7 +19,7 @@ import javax.inject.Inject
 class SettingScreenViewModel @Inject constructor(
     private val settingRepository: UserSettingRepository,
     private val imageRepository: ImageRepository,
-) : ViewModel(), LabelSearchSupport {
+) : ViewModel() {
     val themeSettingFlow: Flow<AppData.Theme> = settingRepository.themeSettingFlow
     val defaultAlbumPathFlow: Flow<String> = settingRepository.defaultAlbumPathFlow
     val imagesPerRowFlow: Flow<Int> = settingRepository.imagesPerRowFlow
@@ -28,18 +28,12 @@ class SettingScreenViewModel @Inject constructor(
     val imageLabelingConfidenceFlow: Flow<Float> = settingRepository.imageLabelingConfidenceFlow
     val excludedLabelsListFlow: Flow<List<String>> = settingRepository.excludedLabelsListFlow
     val excludedAlbumPathsListFlow: Flow<List<String>> = settingRepository.excludedAlbumPathsListFlow
-
     var allAlbums: List<AlbumInfoWithLatestImage> = emptyList()
-    override var orderedLabelList: List<LabelInfo> = emptyList()
-    private val orderedLabelListFlow: Flow<List<LabelInfo>> = imageRepository.getAllOrderedLabelListFlow()
 
     init {
         viewModelScope.launch {
             // setting page never modify albums, so we just get the list once instead of monitoring a flow
             allAlbums = imageRepository.getAlbumInfoWithLatestImage()
-            orderedLabelListFlow.collectLatest { labelList ->
-                orderedLabelList = labelList
-            }
         }
     }
 

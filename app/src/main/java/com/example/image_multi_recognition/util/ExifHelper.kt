@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.Rect
 import android.util.Log
 import androidx.exifinterface.media.ExifInterface
+import com.example.image_multi_recognition.util.StorageHelper.getMimeTypeForImageFile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -64,6 +65,7 @@ object ExifHelper {
                     if (kb < 1024) "${String.format("%.0f", kb)} KB"
                     else "${String.format("%.2f", kb / 1024)} MB"
                 }
+                val mimeType = getMimeTypeForImageFile(listOf(imageFile.absolutePath))
                 // val (longitude, latitude) = getImageLocation(exif)
                 // Log.d(getCallSiteInfo(), "location: ($longitude, $latitude)")
                 // val location = try {
@@ -82,6 +84,7 @@ object ExifHelper {
                     imageFile.path,
                     "$height * $width",
                     createdTime ?: "",
+                    mimeType[imageFile.absolutePath] ?: ""
                     // location?.let { getStringFromAddress(it) } ?: ""
                 )
             }

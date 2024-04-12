@@ -2,6 +2,7 @@ package com.example.image_multi_recognition.viewmodel.basic
 
 import android.app.Activity
 import android.app.PendingIntent
+import android.content.Intent
 import android.os.Environment
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -13,13 +14,15 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.image_multi_recognition.R
 import com.example.image_multi_recognition.db.AlbumInfo
 import com.example.image_multi_recognition.db.AlbumInfoWithLatestImage
 import com.example.image_multi_recognition.db.ImageInfo
 import com.example.image_multi_recognition.repository.ImageRepository
-import com.example.image_multi_recognition.util.*
+import com.example.image_multi_recognition.util.AlbumPathDecoder
+import com.example.image_multi_recognition.util.StorageHelper
+import com.example.image_multi_recognition.util.getCallSiteInfoFunc
+import com.example.image_multi_recognition.util.showSnackBar
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -72,7 +75,8 @@ interface ImageFileOperationSupport {
     }
 
     fun changeFavoriteImages(imageIdList: List<Long>)
-    fun shareImages(imageIdList: List<Long>)
+    fun Activity.shareImages(imageIdList: List<Long>)
+    fun Activity.shareImageInfo(imageInfoList: List<ImageInfo>)
     fun setAlbumListStateFlow(excludedAlbum: Long)
     fun noImageOperationOngoing(): Boolean
     suspend fun getAllImageIdsByCurrentAlbum(currentAlbum: Long): List<Long>
@@ -272,8 +276,36 @@ class ImageFileOperationSupportViewModel @Inject constructor(
         }
     }
 
-    override fun shareImages(imageIdList: List<Long>) {
-        Log.d(getCallSiteInfo(), "shareImages() is called")
+    override fun Activity.shareImageInfo(imageInfoList: List<ImageInfo>) {
+        viewModelScope.launch {
+            val contentUris = repository.getContentUris(imageInfoList.map { it.fullImageFile.absolutePath })
+            val shareIntent = if (imageInfoList.size == 1) {
+                Intent().apply {
+                    action = Intent.ACTION_SEND
+                    putExtra(Intent.EXTRA_STREAM, contentUris[0].contentUri)
+                    type = contentUris[0].mimeType
+                }
+            } else {
+                Intent().apply {
+                    action = Intent.ACTION_SEND_MULTIPLE
+                    putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(contentUris.map { it.contentUri }))
+                    // if we set "images/*" for multiple types (like image/png, image/jpeg), we get much less sharing candidates
+                    type = contentUris.map { it.mimeType }.distinct().let { distinctMimeTypes ->
+                        // Log.d("", "mime types: ${distinctMimeTypes.joinToString()}")
+                        distinctMimeTypes.max()
+                        // if (distinctMimeTypes.size == 1) distinctMimeTypes[0]
+                        // else "images/*"
+                    }
+                }
+            }
+            startActivity(Intent.createChooser(shareIntent, null))
+        }
+    }
+
+    override fun Activity.shareImages(imageIdList: List<Long>) {
+        viewModelScope.launch {
+            shareImageInfo(repository.getImageInfoById(imageIdList))
+        }
     }
 
     private val _albumListStateFlow: MutableStateFlow<List<AlbumInfoWithLatestImage>> = MutableStateFlow(emptyList())

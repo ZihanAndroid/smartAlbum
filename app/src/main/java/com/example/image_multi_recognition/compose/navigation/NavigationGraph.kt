@@ -1,16 +1,16 @@
 package com.example.image_multi_recognition.compose.navigation
 
 import android.util.Log
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.example.image_multi_recognition.AppData
+import com.example.image_multi_recognition.DefaultConfiguration
 import com.example.image_multi_recognition.compose.view.*
+import com.example.image_multi_recognition.compose.view.settingScreen.FullScreenSelectionView
 import com.example.image_multi_recognition.compose.view.settingScreen.SettingScreen
 import com.example.image_multi_recognition.util.getCallSiteInfoFunc
 
@@ -18,15 +18,10 @@ import com.example.image_multi_recognition.util.getCallSiteInfoFunc
 fun NavigationGraph(
     navController: NavHostController,
     modifier: Modifier = Modifier,
-    // Note the hiltViewModel() here does not within any destination,
-    // it can be seen as the global ViewModel for the app which has the same lifecycle as the Activity does
-    // photoViewModel: PhotoViewModel,
-    rootSnackBarHostState: SnackbarHostState,
-    onTopBottomBarHidden: (Boolean) -> Unit,
+    navTopAppBar: @Composable () -> Unit,
+    navBottomAppBar: @Composable () -> Unit,
     provideInitialSetting: () -> AppData,
 ) {
-    val coroutineScope = rememberCoroutineScope()
-
     NavHost(
         modifier = modifier,
         navController = navController,
@@ -50,15 +45,26 @@ fun NavigationGraph(
                         }
                     }
                 },
-                onTopBottomBarHidden = onTopBottomBarHidden,
-                rootSnackBarHostState = rootSnackBarHostState,
-                provideInitialSetting = provideInitialSetting
+                // onTopBottomBarHidden = onTopBottomBarHidden,
+                // rootSnackBarHostState = rootSnackBarHostState,
+                provideInitialSetting = provideInitialSetting,
+                navTopAppBar = navTopAppBar,
+                navBottomAppBar = navBottomAppBar,
             )
         }
         composable(
             route = Destination.ALBUM.navRoute,
         ) {
-            AlbumComposable(viewModel = hiltViewModel()) { album ->
+            AlbumComposable(
+                viewModel = hiltViewModel(),
+                navBottomAppBar = navBottomAppBar,
+                onSettingClick = { navController.navigate(Destination.SETTING.route) },
+                moveToFavorites = {
+                    "${Destination.ALBUM_PHOTO.route}/${DefaultConfiguration.FAVORITES_ALBUM_ID}".let { route ->
+                        navController.navigate(route)
+                    }
+                }
+            ) { album ->
                 "${Destination.ALBUM_PHOTO.route}/${album}".let { route ->
                     navController.navigate(route) {
 
@@ -72,6 +78,8 @@ fun NavigationGraph(
             // PhotoComposable(navController = navController, viewModel = photoViewModel)
             PhotoSearchComposable(
                 viewModel = hiltViewModel(),
+                navTopAppBar = navTopAppBar,
+                navBottomAppBar = navBottomAppBar,
                 provideInitialSetting = provideInitialSetting
             ) { label ->
                 "${Destination.LABEL_PHOTO.route}/${label}".let { route ->
@@ -86,11 +94,9 @@ fun NavigationGraph(
         ) {
             LabelingComposable(
                 viewModel = hiltViewModel(),
-                rootSnackBarHostState = rootSnackBarHostState,
+                navBottomAppBar = navBottomAppBar,
                 provideInitialSetting = provideInitialSetting,
-                onSettingClick = {
-                    navController.navigate(Destination.SETTING.route)
-                }
+                onSettingClick = { navController.navigate(Destination.SETTING.route) }
             ) { albumId ->
                 "${Destination.ALBUM_PHOTO_LABELING}/${albumId}".let { route ->
                     navController.navigate(route) {
@@ -110,7 +116,8 @@ fun NavigationGraph(
                 onBackClick = { navController.popBackStack() },
                 onAlbumEmptyBack = {
                     navController.popBackStack()
-                    if(!Destination.entries.filter { it.isRootDestination }.containsNavRoute(navController.currentDestination)){
+                    if (!Destination.entries.filter { it.isRootDestination }
+                            .containsNavRoute(navController.currentDestination)) {
                         navController.popBackStack()
                     }
                 }
@@ -139,7 +146,9 @@ fun NavigationGraph(
                         }
                     }
                 },
-                customTopBar = true,
+                customAppBar = true,
+                navTopAppBar = navTopAppBar,
+                navBottomAppBar = navBottomAppBar,
                 provideInitialSetting = provideInitialSetting
             )
         }
@@ -186,10 +195,20 @@ fun NavigationGraph(
         ) {
             SettingScreen(
                 viewModel = hiltViewModel(),
-                onBack = {
-                    navController.popBackStack()
-                },
-                provideInitialSetting = provideInitialSetting
+                onBack = { navController.popBackStack() },
+                provideInitialSetting = provideInitialSetting,
+                moveToFullScreenSelectionView = {
+                    navController.navigate(Destination.EXCLUDED_LABELS_SETTING.route)
+                }
+            )
+        }
+        composable(
+            route = Destination.EXCLUDED_LABELS_SETTING.navRoute
+        ) {
+            FullScreenSelectionView(
+                viewModel = hiltViewModel(),
+                onDismiss = { navController.popBackStack() },
+                provideInitialSetting = provideInitialSetting,
             )
         }
     }

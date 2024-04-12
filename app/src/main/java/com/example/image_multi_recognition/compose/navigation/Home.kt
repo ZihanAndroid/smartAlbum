@@ -22,96 +22,40 @@ import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.image_multi_recognition.AppData
+import com.example.image_multi_recognition.DefaultConfiguration
 import com.example.image_multi_recognition.R
 import com.example.image_multi_recognition.compose.statelessElements.crop
 import com.example.image_multi_recognition.util.getCallSiteInfoFunc
 
 @Composable
-fun Home(
-    modifier: Modifier = Modifier,
-    refreshAllImages: () -> Unit,
-    provideInitialSetting: () -> AppData,
-    // photoViewModel: PhotoViewModel,
-) {
-
+fun Home(provideInitialSetting: () -> AppData) {
     val navController = rememberNavController()
-    val snackBarHostState = remember { SnackbarHostState() }
-    var contentShownBySnackBar by remember { mutableStateOf("") }
-
     val currentBackStack by navController.currentBackStackEntryAsState()
     val currentDestination = currentBackStack?.destination
     Log.d(getCallSiteInfoFunc(), "current destination: ${currentDestination?.route?.split("/")?.get(0)}")
-    // the child destination may want to hide the top and bottom bar
-    var topBottomBarHidden by rememberSaveable { mutableStateOf(false) }
 
-    // for Root destination, use Scaffold,
-    // for non-root destination, avoid showing topBar and bottomBar here, (they are parts of destination composable, not part of Scaffold)
-    if (Destination.buildDestinationFromNav(currentDestination)?.isRootDestination == true) {
-        Scaffold(
-            snackbarHost = { SnackbarHost(snackBarHostState) },
-            topBar = {
-                // show different topBar based on current destination
-                if (!topBottomBarHidden && !Destination.LABEL.sameRouteAs(currentDestination)) {
-                    ScaffoldTopBar(
-                        refreshAllImages = refreshAllImages,
-                        popUpItems = listOf(stringResource(R.string.NavPopUpItem_NotDone)),
-                        onPopUpItemClick = listOf(
-                            { contentShownBySnackBar = it }
-                        ),
-                        onSettingClick = {
-                            navController.navigate(Destination.SETTING.route)
-                        }
-                    )
-                }
-            },
-            bottomBar = {
-                if (!topBottomBarHidden) {
-                    ScaffoldBottomBar(
-                        navController = navController,
-                        items = Destination.entries.filter { it.isRootDestination },
-                        currentDestination = currentDestination
-                    )
-                }
-            },
-            modifier = modifier
-        ) { suggestedPadding ->
-            val paddingValues = PaddingValues(
-                start = suggestedPadding.calculateStartPadding(LayoutDirection.Ltr),
-                end = suggestedPadding.calculateEndPadding(LayoutDirection.Ltr),
-                top = if (!topBottomBarHidden && !Destination.LABEL.sameRouteAs(currentDestination)) suggestedPadding.calculateTopPadding() else 0.dp,
-                bottom = suggestedPadding.calculateBottomPadding() + 20.dp,
-            )
-
-            NavigationGraph(
+    NavigationGraph(
+        navController = navController,
+        // photoViewModel = photoViewModel,
+        // onTopBottomBarHidden = { topBottomBarHidden = it },
+        // rootSnackBarHostState = snackBarHostState,
+        provideInitialSetting = provideInitialSetting,
+        navTopAppBar = {
+            ScaffoldTopBar(onSettingClick = { navController.navigate(Destination.SETTING.route) })
+        },
+        navBottomAppBar = {
+            ScaffoldBottomBar(
                 navController = navController,
-                modifier = Modifier.padding(paddingValues),
-                // photoViewModel = photoViewModel,
-                rootSnackBarHostState = snackBarHostState,
-                onTopBottomBarHidden = { topBottomBarHidden = it },
-                provideInitialSetting = provideInitialSetting
+                items = Destination.entries.filter { it.isRootDestination },
             )
-        }
-    } else {
-        NavigationGraph(
-            navController = navController,
-            // photoViewModel = photoViewModel,
-            onTopBottomBarHidden = { topBottomBarHidden = it },
-            rootSnackBarHostState = snackBarHostState,
-            provideInitialSetting = provideInitialSetting
-        )
-    }
-
-    LaunchedEffect(contentShownBySnackBar) {
-        if (contentShownBySnackBar.isNotEmpty()) {
-            snackBarHostState.showSnackbar(message = contentShownBySnackBar)
-        }
-    }
+        },
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ScaffoldTopBar(
-    refreshAllImages: () -> Unit,
+    refreshAllImages: () -> Unit = {},
     popUpItems: List<String> = emptyList(),
     onPopUpItemClick: List<(String) -> Unit> = emptyList(),
     onSettingClick: () -> Unit = {},
@@ -174,11 +118,10 @@ fun ScaffoldTopBar(
 @Composable
 fun ScaffoldBottomBar(
     navController: NavController,
-    items: List<Destination>,
-    currentDestination: NavDestination?,
+    items: List<Destination>
 ) {
     BottomAppBar(
-        modifier = Modifier.crop(vertical = 20.dp)
+        modifier = Modifier.crop(vertical = DefaultConfiguration.NAV_BOTTOM_APP_BAR_CROPPED.dp)
     ) {
         items.forEach { destination ->
             NavigationBarItem(
@@ -191,7 +134,7 @@ fun ScaffoldBottomBar(
                             contentDescription = destination.name,
                             modifier = Modifier.size(28.dp)
                         )
-                        if (destination.sameRouteAs(currentDestination)) {
+                        if (destination.sameRouteAs(navController.currentDestination)) {
                             Text(
                                 text = stringResource(destination.label!!),
                                 style = MaterialTheme.typography.labelSmall
@@ -199,7 +142,7 @@ fun ScaffoldBottomBar(
                         }
                     }
                 },
-                selected = destination.sameRouteAs(currentDestination),
+                selected = destination.sameRouteAs(navController.currentDestination),
                 onClick = {
                     navController.navigate(destination.route) {
                         popUpTo(navController.graph.findStartDestination().id) {

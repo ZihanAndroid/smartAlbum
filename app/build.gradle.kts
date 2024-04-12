@@ -73,16 +73,16 @@ android {
     }
 }
 
-val roomVersion = "2.6.1"
-val hiltVersion = "2.51"
-val daggerVersion = "2.51"
-val pagingVersion = "3.2.1"
-val glideVersion = "4.16.0"
-val lifecycleVersion = "2.7.0"
-val navigationVersion = "2.7.7"
-val coilVersion = "2.6.0"
-
 dependencies {
+    val workVersion = "2.9.0"
+    val roomVersion = "2.6.1"
+    val hiltVersion = "2.51"
+    val daggerVersion = "2.51"
+    val pagingVersion = "3.2.1"
+    val glideVersion = "4.16.0"
+    val lifecycleVersion = "2.7.0"
+    val navigationVersion = "2.7.7"
+    val coilVersion = "2.6.0"
 
     implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("androidx.core:core-ktx:1.12.0")
@@ -143,6 +143,9 @@ dependencies {
     //implementation("com.google.protobuf:protobuf-javalite:3.25.2")
     // Access Exif tag for image files
     implementation("androidx.exifinterface:exifinterface:1.3.7")
+    // WorkManager, Kotlin + coroutines
+    implementation("androidx.work:work-runtime-ktx:$workVersion")
+
 
     // gRPC, from
     // https://github.com/grpc/grpc-kotlin/tree/master/compiler

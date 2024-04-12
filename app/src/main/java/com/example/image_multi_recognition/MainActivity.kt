@@ -119,8 +119,7 @@ class MainActivity : ComponentActivity() {
                     // A surface container using the 'background' color from the theme
                     Surface(modifier = Modifier.fillMaxSize(), tonalElevation = 2.dp) {
                         Home(
-                            // photoViewModel = viewModel(),
-                            refreshAllImages = { repository.resetAllImages() },
+                            // refreshAllImages = { repository.resetAllImages() },
                             provideInitialSetting = { appDataSetting }
                         )
                     }

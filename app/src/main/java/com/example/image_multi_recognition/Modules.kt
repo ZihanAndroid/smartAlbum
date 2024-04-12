@@ -29,7 +29,7 @@ import javax.inject.Singleton
 
 object DefaultConfiguration {
     const val PAGE_SIZE = 80
-
+    const val NAV_BOTTOM_APP_BAR_CROPPED = 20
     // SQLITE_MAX_VARIABLE_NUMBER in SQLite is 999 by default, set "DB_BATCH_SIZE" to a value smaller than that
     const val DB_BATCH_SIZE = 950
     const val IMAGE_MAX_HEIGHT_PROPORTION = 0.62
@@ -37,9 +37,8 @@ object DefaultConfiguration {
     const val IMAGE_INTERVAL = 2
     const val ALBUM_INTERVAL = 6
     const val APP_DATASTORE = "APP_DATASTORE"
-
+    const val FAVORITES_ALBUM_ID = -1L
     const val ACCEPTED_CONFIDENCE = 0.5f
-
     const val DRAG_SCROLL_THRESHOLD = 100
 }
 

@@ -61,6 +61,12 @@ interface ImageInfoDao : BaseDao<ImageInfo> {
     suspend fun getAllImagesByAlbum(album: Long): List<Long>
 
     @Query("""
+        SELECT id FROM image_info
+        where favorite=true
+    """)
+    suspend fun getAllFavoriteImages(): List<Long>
+
+    @Query("""
         SELECT * FROM image_info
         where album=:album
     """)
@@ -78,6 +84,13 @@ interface ImageInfoDao : BaseDao<ImageInfo> {
         ORDER BY time_created DESC
     """)
     fun getImageShowPagingSourceForAlbum(album: Long): PagingSource<Int, ImageInfo>
+
+    @Query("""
+        SELECT * FROM image_info
+        WHERE favorite=true
+        ORDER BY time_created DESC
+    """)
+    fun getImageShowPagingSourceForFavorite(): PagingSource<Int, ImageInfo>
 
     @Query("""
         SELECT i1.id, path, album, time_created, i1.favorite 

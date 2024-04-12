@@ -2,6 +2,7 @@ package com.example.image_multi_recognition.compose.statelessElements
 
 import android.util.Log
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
@@ -23,6 +24,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -224,4 +226,15 @@ fun ImageItemRow(
             )
         }
     }
+}
+
+@Composable
+fun CustomSnackBar(snackbarData: SnackbarData, extraBottomPadding: Dp = 20.dp) {
+    Snackbar(
+        snackbarData = snackbarData,
+        modifier = Modifier.padding(bottom = extraBottomPadding),
+        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+        contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+        shape = ShapeDefaults.Large
+    )
 }

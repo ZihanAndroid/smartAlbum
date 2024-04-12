@@ -35,18 +35,19 @@ fun InputSearch(
     onSearchClickNoFurther: () -> Unit,
     onSearchTextChange: (String) -> List<LabelInfo>,
 ) {
-    var inputSelected by rememberSaveable { mutableStateOf(true) }
-    var inputText by rememberSaveable { mutableStateOf("") }
-    var dropDownItems: List<LabelInfo> by rememberSaveable { mutableStateOf(emptyList()) }
+    var inputSelected by remember { mutableStateOf(true) }
+    var inputText by remember { mutableStateOf("") }
+    var dropDownItems: List<LabelInfo> by remember { mutableStateOf(emptyList()) }
     val textFieldFocusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
 
-    LaunchedEffect(true) {
+    LaunchedEffect(Unit) {
         if (onStartFocused) {
             textFieldFocusRequester.requestFocus()
         } else {
             focusManager.clearFocus()
         }
+        dropDownItems = onSearchTextChange("")
     }
 
     ExposedDropdownMenuBox(
@@ -111,7 +112,7 @@ fun InputSearch(
                         },
                         onClick = {
                             onDropDownItemClick(dropDownItems[index].label)
-                            inputText = dropDownItems[index].label
+                            // inputText = dropDownItems[index].label
                             focusManager.clearFocus()
                         },
                         modifier = Modifier.height(dropDownItemHeight.dp),
@@ -127,7 +128,7 @@ fun InputSearchWithoutDropdownMenu(
     modifier: Modifier = Modifier,
     // inputText change caused by user input
     onSearchTextChange: (String) -> Unit,
-    onSearchClick: ()->Unit
+    onSearchClick: () -> Unit,
 ) {
     var inputText by rememberSaveable { mutableStateOf("") }
 

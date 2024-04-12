@@ -8,9 +8,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Done
@@ -24,28 +22,20 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.image_multi_recognition.AppData
 import com.example.image_multi_recognition.R
 import com.example.image_multi_recognition.compose.statelessElements.ImageItemRow
-import com.example.image_multi_recognition.compose.statelessElements.InputSearchWithoutDropdownMenu
-import com.example.image_multi_recognition.compose.statelessElements.LabelSelectionElement
 import com.example.image_multi_recognition.compose.statelessElements.TopAppBarForNotRootDestination
 import com.example.image_multi_recognition.compose.statelessElements.settingChoices.MultiItemChoiceView
 import com.example.image_multi_recognition.dataStore.AppDataSerializer
 import com.example.image_multi_recognition.db.AlbumInfoWithLatestImage
-import com.example.image_multi_recognition.db.LabelInfo
 import com.example.image_multi_recognition.model.ChoiceSettingItem
-import com.example.image_multi_recognition.model.ContextualFlowItem
 import com.example.image_multi_recognition.model.SettingGroup
-import com.example.image_multi_recognition.util.MutableSetWithState
 import com.example.image_multi_recognition.util.SliderColorsNoTicks
-import com.example.image_multi_recognition.viewmodel.SettingScreenViewModel
+import com.example.image_multi_recognition.viewmodel.setting.SettingScreenViewModel
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -54,6 +44,7 @@ import java.io.File
 fun SettingScreen(
     viewModel: SettingScreenViewModel,
     provideInitialSetting: () -> AppData,
+    moveToFullScreenSelectionView: ()->Unit,
     onBack: () -> Unit,
 ) {
     val coroutineScope = rememberCoroutineScope()
@@ -78,7 +69,6 @@ fun SettingScreen(
     var multipleChoiceItem by remember { mutableStateOf(MultipleChoiceItem.notOpen) }
     // Type.VIEW_CHOICE
     var viewChoiceItem by remember { mutableStateOf(ViewChoiceItem.notOpen) }
-    var fullScreenShow by remember { mutableStateOf(false) }
 
     // prepare setting data
     val settingGroupList = remember {
@@ -183,9 +173,7 @@ fun SettingScreen(
     }
 
     Box(
-        modifier = Modifier.fillMaxSize().pointerInput(fullScreenShow) {
-            if(!fullScreenShow) detectTapGestures { dismiss() }
-        },
+        modifier = Modifier.fillMaxSize()
     ) {
         Scaffold(
             topBar = {
@@ -279,141 +267,11 @@ fun SettingScreen(
                 }
 
                 ViewChoiceItem.ViewChoicePurpose.EXCLUDED_LABEL -> {
-                    fullScreenShow = true
+                    moveToFullScreenSelectionView()
+                    viewChoiceItem = ViewChoiceItem.notOpen
                 }
 
                 ViewChoiceItem.ViewChoicePurpose.NOT_OPEN -> {}
-            }
-        }
-        // fullScreenShow is enabled only for ViewChoicePurpose.EXCLUDED_LABEL
-        if (fullScreenShow) {
-            FullScreenSelectionView(
-                title = viewChoiceItem.title,
-                allLabels = viewModel.orderedLabelList,
-                provideInitialSelectedLabels = viewChoiceItem.provideInitialSelection,
-                onSelectDone = viewChoiceItem.onChoices,
-                onDismiss = {
-                    fullScreenShow = false
-                    viewChoiceItem = ViewChoiceItem.notOpen
-                },
-                onSearchTextChange = { viewModel.getLabelListByPrefix(it) }
-            )
-        }
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-fun FullScreenSelectionView(
-    title: String,
-    allLabels: List<LabelInfo>,
-    provideInitialSelectedLabels: () -> List<String>,
-    onSelectDone: (List<String>) -> Unit,
-    // onSearchTextChange returns emptyList for empty String, we can use allLabels instead
-    onSearchTextChange: (String) -> List<LabelInfo>,
-    onDismiss: () -> Unit,
-) {
-    fun titleConverter(prev: String, current: String): String {
-        return if (prev.isEmpty() || prev.first() != current.first()) {
-            current.first().toString()
-        } else {
-            ""
-        }
-    }
-
-    val mappedAllLabels = remember {
-        ContextualFlowItem.mapToContextualFlowItemWithTitle(
-            items = allLabels.map { it.label },
-            emptyItem = "",
-            onNewTitle = ::titleConverter
-        )
-    }
-    val selectedAlbumSet = remember { MutableSetWithState(provideInitialSelectedLabels().toMutableSet()) }
-    var labelsInSearch by remember { mutableStateOf(mappedAllLabels) }
-    var currentInputTextEmpty by remember { mutableStateOf(true) }
-    val keyboardController = LocalSoftwareKeyboardController.current
-    val focusManager = LocalFocusManager.current
-
-    Scaffold(
-        topBar = {
-            TopAppBarForNotRootDestination(
-                title = title,
-                onBack = onDismiss
-            ) {
-                IconButton(
-                    onClick = {
-                        onSelectDone(selectedAlbumSet.toList())
-                        onDismiss()
-                    }
-                ) {
-                    Icon(Icons.Filled.Done, "done")
-                }
-            }
-        }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier.padding(paddingValues)
-        ) {
-            InputSearchWithoutDropdownMenu(
-                onSearchTextChange = { searchText ->
-                    onSearchTextChange(searchText).let { labels ->
-                        if (currentInputTextEmpty != searchText.isEmpty()) {
-                            currentInputTextEmpty = !currentInputTextEmpty
-                        }
-
-                        labelsInSearch = if (!currentInputTextEmpty) {
-                            ContextualFlowItem.mapToContextualFlowItem(labels.map { it.label })
-                        } else mappedAllLabels
-                    }
-                },
-                onSearchClick = {
-                    keyboardController?.hide()
-                    focusManager.clearFocus()
-                },
-                modifier = Modifier.padding(horizontal = 18.dp)
-            )
-            // show labelsInSearch in a lazy FlowRow
-            // https://developer.android.com/reference/kotlin/androidx/compose/foundation/layout/package-summary#ContextualFlowRow
-            // https://slack-chats.kotlinlang.org/t/16754637/hey-there-folks-yesterday-i-built-an-app-with-a-macrobenchma
-            // https://developer.android.com/develop/ui/compose/layouts/flow#lazy-flow
-            ContextualFlowRow(
-                modifier = Modifier.safeDrawingPadding().padding(18.dp)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                itemCount = labelsInSearch.size,
-                maxItemsInEachRow = 4
-            ) { index ->
-                if (index !in labelsInSearch.indices) return@ContextualFlowRow
-                labelsInSearch[index].let { item ->
-                    when (item) {
-                        is ContextualFlowItem.Title -> {
-                            Text(
-                                text = item.title,
-                                style = MaterialTheme.typography.titleMedium,
-                                // occupy the whole row in the ContextualFlowRow
-                                modifier = Modifier.fillMaxWidth(1f)
-                            )
-                        }
-
-                        is ContextualFlowItem.Item -> {
-                            key(item.item, item.item in selectedAlbumSet) {
-                                LabelSelectionElement(
-                                    label = item.item,
-                                    initialSelected = item.item in selectedAlbumSet,
-                                    onClick = { label, currentSelected ->
-                                        if (currentSelected) {
-                                            Log.d("", "added label: $label")
-                                            selectedAlbumSet.add(label)
-                                        } else {
-                                            selectedAlbumSet.remove(label)
-                                        }
-                                    }
-                                )
-                            }
-                        }
-                    }
-                }
             }
         }
     }
