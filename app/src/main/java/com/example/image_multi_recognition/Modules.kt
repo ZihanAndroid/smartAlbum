@@ -41,7 +41,7 @@ object DefaultConfiguration {
     const val ACCEPTED_CONFIDENCE = 0.5f
     const val DRAG_SCROLL_THRESHOLD = 100
     // when the number of remained images is larger than 100, we use a workManager
-    const val WORK_MANAGER_THRESHOLD = 100
+    const val WORK_MANAGER_THRESHOLD = 20000
     const val ML_DEEP_LINK = "app://labeling"
     const val ML_ALBUM_DEEP_LINK = "app://labeling.album"
 }
