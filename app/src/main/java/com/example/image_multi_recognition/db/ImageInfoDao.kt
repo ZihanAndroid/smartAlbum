@@ -182,6 +182,15 @@ interface ImageInfoDao : BaseDao<ImageInfo> {
         WHERE NOT EXISTS (
             SELECT * FROM image_labels 
             WHERE image_info.id = image_labels.id
+        ) 
+    """)
+    fun getAllUnlabeledImagesList(): List<ImageInfo>
+
+    @Query("""
+        SELECT * FROM image_info
+        WHERE NOT EXISTS (
+            SELECT * FROM image_labels 
+            WHERE image_info.id = image_labels.id
         ) and album=:album
         ORDER BY time_created DESC
     """)
@@ -196,6 +205,16 @@ interface ImageInfoDao : BaseDao<ImageInfo> {
         ORDER BY time_created DESC
     """)
     fun getUnlabeledImagesByAlbum(album: Long): Flow<List<ImageInfo>>
+
+    @Query("""
+        SELECT * FROM image_info
+        WHERE NOT EXISTS (
+            SELECT * FROM image_labels 
+            WHERE image_info.id = image_labels.id
+        ) and album=:album
+        ORDER BY time_created DESC
+    """)
+    fun getUnlabeledImagesListByAlbum(album: Long): List<ImageInfo>
 
     @Query("""
         UPDATE image_info

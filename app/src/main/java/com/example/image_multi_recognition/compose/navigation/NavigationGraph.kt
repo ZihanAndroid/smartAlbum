@@ -7,6 +7,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.navDeepLink
 import com.example.image_multi_recognition.AppData
 import com.example.image_multi_recognition.DefaultConfiguration
 import com.example.image_multi_recognition.compose.view.*
@@ -91,6 +92,7 @@ fun NavigationGraph(
         }
         composable(
             route = Destination.LABEL.navRoute,
+            deepLinks = listOf(navDeepLink { uriPattern = DefaultConfiguration.ML_DEEP_LINK })
         ) {
             LabelingComposable(
                 viewModel = hiltViewModel(),
@@ -173,7 +175,9 @@ fun NavigationGraph(
         }
         composable(
             route = Destination.ALBUM_PHOTO_LABELING.navRoute,
-            arguments = Destination.ALBUM_PHOTO_LABELING.arguments
+            arguments = Destination.ALBUM_PHOTO_LABELING.arguments,
+            // "album" is a parameter similar to the Compose Navigation
+            deepLinks = listOf(navDeepLink { uriPattern = "${DefaultConfiguration.ML_ALBUM_DEEP_LINK}/{album}" })
         ) {
             AlbumPhotoLabelingComposable(
                 viewModel = hiltViewModel(),

@@ -1,6 +1,9 @@
 package com.example.image_multi_recognition.compose.view
 
+import android.Manifest
+import android.os.Build
 import android.util.Log
+import androidx.activity.ComponentActivity
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -25,6 +28,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.stringResource
@@ -59,6 +63,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.io.File
 import kotlin.math.absoluteValue
+import kotlin.reflect.KProperty
 
 @Composable
 fun LabelingComposable(
@@ -75,6 +80,7 @@ fun LabelingComposable(
     val snackBarState = remember { SnackbarHostState() }
     val unlabeledImageList by viewModel.unlabeledImageListFlow.collectAsStateWithLifecycle()
     val imagesPerRow by viewModel.imagesPerRowFlow.collectAsStateWithLifecycle(provideInitialSetting().imagesPerRow)
+    val labelingStatus by viewModel.labelingStatusFlow.collectAsStateWithLifecycle(provideInitialSetting().labelingStatus)
 
     val imageSelectedStateHolder: Map<String, Map<Long, MutableState<Boolean>>> = remember(labelingState) {
         // viewModel.labelImagesMap is the backing data of pagingItem from viewModel.labelImagesFlow
@@ -89,6 +95,7 @@ fun LabelingComposable(
     }
     val coroutineScope = rememberCoroutineScope()
     val labelAddedString = stringResource(R.string.label_added)
+    val activity = LocalContext.current as ComponentActivity
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackBarState) { CustomSnackBar(it) } },
@@ -141,15 +148,66 @@ fun LabelingComposable(
                         }
                     }
                 } else if (!labelingClicked) {
+                    var showPermissionRational by remember { mutableStateOf(false) }
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        with(viewModel.permissionAccessor) {
+                            activity.setupPermissionRequest(
+                                permission = Manifest.permission.POST_NOTIFICATIONS,
+                                provideShowPermissionRational = { showPermissionRational },
+                                setShowPermissionRational = { showPermissionRational = it },
+                                onPermissionGranted = {
+                                    viewModel.scanImagesByWorkManager(
+                                        album = 0L,
+                                        onProgressChange = {
+                                            if (!labelingClicked) labelingClicked = true
+                                        },
+                                        onWorkCanceled = { labelingClicked = false },
+                                        onWorkFinished = {}
+                                    )
+                                },
+                                onPermissionDenied = {
+                                    viewModel.scanImages(unlabeledImageList)
+                                    labelingClicked = true
+                                }
+                            )
+                        }
+                    }
                     IconButton(
                         onClick = {
-                            viewModel.scanImages(unlabeledImageList)
-                            labelingClicked = true
+                            if (unlabeledImageList.size > DefaultConfiguration.WORK_MANAGER_THRESHOLD) {
+                                // check POST_NOTIFICATION permission first, if no permission, do not use workManager which requires notification
+                                with(viewModel.permissionAccessor) {
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                                        && !activity.hasPermission(Manifest.permission.POST_NOTIFICATIONS)
+                                    ) {
+                                        // setup permission requester in permissionAccessor
+                                        if (activity.shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)) {
+                                            showPermissionRational = true
+                                        } else {
+                                            // shouldShowRequestPermissionRationale returns false if the permission has not been asked before
+                                            permissionRequester.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                        }
+                                    } else {
+                                        // we do not need POST_NOTIFICATIONS, just run WorkManager with notification
+                                        viewModel.scanImagesByWorkManager(
+                                            album = 0L,
+                                            onProgressChange = {
+                                                if (!labelingClicked) labelingClicked = true
+                                            },
+                                            onWorkCanceled = { labelingClicked = false },
+                                            onWorkFinished = {}
+                                        )
+                                    }
+                                }
+                            } else {
+                                viewModel.scanImages(unlabeledImageList)
+                                labelingClicked = true
+                            }
                         }
                     ) {
                         Icon(
                             imageVector = ImageVector.vectorResource(R.drawable.baseline_new_label_24),
-                            contentDescription = "autoLabeling",
+                            contentDescription = "autoLabeling"
                         )
                     }
                     IconButton(
@@ -157,7 +215,7 @@ fun LabelingComposable(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Settings,
-                            contentDescription = "setting",
+                            contentDescription = "setting"
                         )
                     }
                 }
@@ -188,8 +246,8 @@ fun LabelingComposable(
                 } else {
                     val scanPaused by viewModel.scanPaused.collectAsStateWithLifecycle()
                     LabelingOnProgress(
-                        progress = labelingState.labeledImageCount.toFloat() / viewModel.imageObjectsMap.size,
-                        text = "${stringResource(R.string.labeling)}...    ${labelingState.labeledImageCount}/${viewModel.imageObjectsMap.size}",
+                        progress = labelingState.labeledImageCount.toFloat() / viewModel.unlabeledSize,
+                        text = "${stringResource(R.string.labeling)}...    ${labelingState.labeledImageCount}/${viewModel.unlabeledSize}",
                         onResumePauseClicked = { viewModel.reverseScanPaused() },
                         onCancelClicked = {
                             viewModel.scanCancelled = true
@@ -273,7 +331,7 @@ fun ImageLabelingResultShow(
     var doubleClickedImageInfo: ImageInfo? by remember { mutableStateOf(null) }
     val gridState = rememberLazyGridState()
 
-    var scrollingAmount by remember { mutableStateOf(0f) }
+    var scrollingAmount by remember { mutableFloatStateOf(0f) }
     val scrolledFlow = remember { MutableStateFlow(false) }
 
     LaunchedEffect(scrollingAmount) {
@@ -644,3 +702,13 @@ private data class ImageIdAndLabel(
 )
 
 private fun LabelUiModel.Item.toImageIdAndLabel() = ImageIdAndLabel(imageInfo.id, label)
+
+data class Wrapper<T>(var value: T)
+
+@Suppress("NOTHING_TO_INLINE")
+inline operator fun <T> Wrapper<T>.getValue(thisObj: Any?, property: KProperty<*>): T = value
+
+@Suppress("NOTHING_TO_INLINE")
+inline operator fun <T> Wrapper<T>.setValue(thisObj: Any?, property: KProperty<*>, value: T) {
+    this.value = value
+}

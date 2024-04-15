@@ -45,6 +45,7 @@ class UserSettingRepository @Inject constructor(
         settingFlow.map { it.excludedAlbumPathsList }.distinctUntilChanged(::collectionDistinct)
     val excludedAlbumPathsSetFlow: Flow<Set<String>> =
         settingFlow.map { it.excludedAlbumPathsList.toSet() }.distinctUntilChanged(::collectionDistinct)
+    val labelingStatusFlow: Flow<AppData.LabelingStatus> = settingFlow.map { it.labelingStatus }.distinctUntilChanged()
 
     suspend fun updateThemeSetting(newTheme: AppData.Theme) {
         appDataStore.updateData { it.toBuilder().setThemeSetting(newTheme).build() }
@@ -78,5 +79,9 @@ class UserSettingRepository @Inject constructor(
 
     suspend fun updateExcludedLabels(excludedLabels: List<String>) {
         appDataStore.updateData { it.toBuilder().clearExcludedLabels().addAllExcludedLabels(excludedLabels).build() }
+    }
+
+    suspend fun updateLabelingStatus(state: AppData.LabelingStatus) {
+        appDataStore.updateData { it.toBuilder().setLabelingStatus(state).build() }
     }
 }

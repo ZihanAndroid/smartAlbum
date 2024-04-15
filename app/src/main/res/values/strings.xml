@@ -15,6 +15,7 @@
     <string name="no_permission">No Permission</string>
     <string name="no_permission_message_cancelled">The Permission:\n%s\nnot granted, the app will stop running.</string>
     <string name="no_permission_message_denied">The Permission:\n%s\nnot granted, the app will stop running.\n\nPlease grant permission manually through system setting next time</string>
+    <string name="require_notification_permission">Please grant the notification permission to allow running the image labeling task in the background</string>
     <string name="ok">OK</string>
     <string name="fatal_error">Fatal Error</string>
     <string name="fatal_error_message">Cannot access app scoped storage, failed to start the app</string>
@@ -69,6 +70,9 @@
     <string name="mime_type">MIME type</string>
     <string name="location">Location</string>
     <string name="unknown_date">Unknown Date</string>
+    <string name="notification_title">Image Labeling</string>
+    <string name="notification_channel_id">ImageLabeling</string>
+    <string name="notification_channel_name">Image labeling</string>
 
     <!-- user settings -->
     <string name="setting">Setting</string>

@@ -5,6 +5,7 @@ import androidx.datastore.core.Serializer
 import com.example.image_multi_recognition.AppData
 import com.example.image_multi_recognition.copy
 import com.example.image_multi_recognition.util.capitalizeFirstChar
+import com.example.image_multi_recognition.viewmodel.basic.LabelingState
 import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
@@ -35,6 +36,7 @@ class AppDataSerializer @Inject constructor() : Serializer<AppData> {
             imageCacheEnabled = false
             thumbNailQuality = 0.1f
             imageLabelingConfidence = 0.7f
+            labelingStatus = AppData.LabelingStatus.NOT_STARTED
         }
 
         // naming convention: the enum names are capital letters and underscores

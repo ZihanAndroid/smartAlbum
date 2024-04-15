@@ -140,8 +140,8 @@ fun AlbumPhotoLabelingComposable(
                 } else {
                     val scanPaused by viewModel.scanPaused.collectAsStateWithLifecycle()
                     LabelingOnProgress(
-                        progress = labelingState.labeledImageCount.toFloat() / viewModel.imageObjectsMap.size,
-                        text = "${stringResource(R.string.labeling)}...    ${labelingState.labeledImageCount}/${viewModel.imageObjectsMap.size}",
+                        progress = labelingState.labeledImageCount.toFloat() / viewModel.unlabeledSize,
+                        text = "${stringResource(R.string.labeling)}...    ${labelingState.labeledImageCount}/${viewModel.unlabeledSize}",
                         onResumePauseClicked = { viewModel.reverseScanPaused() },
                         onCancelClicked = {
                             viewModel.scanCancelled = true

@@ -12,6 +12,7 @@ import com.example.image_multi_recognition.db.ImageInfo
 import com.example.image_multi_recognition.model.UiModel
 import com.example.image_multi_recognition.repository.ImageRepository
 import com.example.image_multi_recognition.repository.UserSettingRepository
+import com.example.image_multi_recognition.repository.WorkManagerRepository
 import com.example.image_multi_recognition.util.toPagingSource
 import com.example.image_multi_recognition.viewmodel.basic.ImagePagingFlowSupport
 import com.example.image_multi_recognition.viewmodel.basic.ImagePagingFlowSupportImpl
@@ -28,11 +29,12 @@ import javax.inject.Inject
 class AlbumPhotoLabelingViewModel @Inject constructor(
     private val repository: ImageRepository,
     settingRepository: UserSettingRepository,
+    workManagerRepository: WorkManagerRepository,
     objectDetector: ObjectDetector,
     imageLabeler: ImageLabeler,
     savedStateHandle: SavedStateHandle,
     imagePagingFlowSupportImpl: ImagePagingFlowSupportImpl,
-) : LabelingSupportViewModel(repository, settingRepository, objectDetector, imageLabeler),
+) : LabelingSupportViewModel(repository, settingRepository, workManagerRepository, objectDetector, imageLabeler),
     ImagePagingFlowSupport by imagePagingFlowSupportImpl {
     val album = savedStateHandle.get<Long>("album")!!
 

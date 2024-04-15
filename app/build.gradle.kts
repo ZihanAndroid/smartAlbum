@@ -83,6 +83,8 @@ dependencies {
     val lifecycleVersion = "2.7.0"
     val navigationVersion = "2.7.7"
     val coilVersion = "2.6.0"
+    val hiltWorkManager = "1.2.0"
+    val moshiVersion = "1.15.0"
 
     implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("androidx.core:core-ktx:1.12.0")
@@ -104,6 +106,10 @@ dependencies {
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
     // Moshi JSON
     implementation("com.squareup.retrofit2:converter-moshi:2.9.0")
+    //Moshi Library Dependencies - Core Moshi JSON Library and Moshi's Kotlin support and converter factory
+    implementation("com.squareup.moshi:moshi:$moshiVersion")
+    implementation("com.squareup.moshi:moshi-kotlin:$moshiVersion")
+    ksp("com.squareup.moshi:moshi-kotlin-codegen:$moshiVersion")
     // Use FusedLocationProviderClient to get user's current location
     implementation("com.google.android.gms:play-services-location:21.2.0")
     // WorkManager
@@ -175,10 +181,13 @@ dependencies {
     // Coil for loading image
     implementation("io.coil-kt:coil:$coilVersion")
     implementation("io.coil-kt:coil-compose:$coilVersion")
-    // implementation("io.coil-kt.coil3:coil:3.0.0-alpha06")
-    // implementation("io.coil-kt.coil3:coil-compose:3.0.0-alpha06")
-    // implementation("io.coil-kt.coil3:coil-core:3.0.0-alpha06")
-    // implementation("io.coil-kt.coil3:coil-compose-core:3.0.0-alpha06")
+    // Hilt for WorkManager
+    // https://developer.android.com/training/dependency-injection/hilt-jetpack#workmanager
+    implementation("androidx.hilt:hilt-work:$hiltWorkManager")
+    // When using Kotlin.
+    ksp("androidx.hilt:hilt-compiler:$hiltWorkManager")
+
+
 
     // Kotest
     testImplementation("io.kotest:kotest-runner-junit5-jvm:5.8.0")

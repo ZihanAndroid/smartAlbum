@@ -8,6 +8,7 @@ import com.example.image_multi_recognition.util.AlbumPathDecoder
 import com.example.image_multi_recognition.util.ExifHelper
 import com.example.image_multi_recognition.util.ScopedThumbNailStorage
 import com.example.image_multi_recognition.util.getCallSiteInfo
+import com.squareup.moshi.Json
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -24,11 +25,11 @@ import java.io.IOException
     indices = [Index(value = ["album"])]
 )
 data class ImageInfo(
-    @PrimaryKey(autoGenerate = true) @ColumnInfo(name = "id") val id: Long = 0,
-    @ColumnInfo(name = "path") val path: String, // image file name
-    @ColumnInfo(name = "album") val album: Long,  // directory, also used as album
-    @ColumnInfo(name = "time_created") val timestamp: Long,
-    @ColumnInfo(name = "favorite") val favorite: Boolean = false,
+    @field:Json(name = "id") @PrimaryKey(autoGenerate = true) @ColumnInfo(name = "id") val id: Long = 0,
+    @field:Json(name = "path") @ColumnInfo(name = "path") val path: String, // image file name
+    @field:Json(name = "album") @ColumnInfo(name = "album") val album: Long,  // directory, also used as album
+    @field:Json(name = "time_created") @ColumnInfo(name = "time_created") val timestamp: Long,
+    @field:Json(name = "favorite") @ColumnInfo(name = "favorite") val favorite: Boolean = false,
 ) {
     @Ignore
     val fullImageFile: File = File(AlbumPathDecoder.decode(album), path)

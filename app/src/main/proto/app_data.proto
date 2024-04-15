@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-option java_package="com.example.image_multi_recognition";
+option java_package = "com.example.image_multi_recognition";
 option java_multiple_files = true;
 
 message AppData{
@@ -17,10 +17,18 @@ message AppData{
   float imageLabelingConfidence = 6;  // 0.7
   repeated string excludedAlbumPaths = 7;
   repeated string excludedLabels = 8;
+  LabelingStatus labelingStatus = 9;
 
   enum Theme{
     DARK = 0;
     LIGHT = 1;
     SYSTEM_DEFAULT = 2;
-  }
+  };
+
+  enum LabelingStatus{
+    NOT_STARTED = 0;
+    ONGOING = 1;
+    FINISHED = 2;
+    CANCELED = 3;
+  };
 }

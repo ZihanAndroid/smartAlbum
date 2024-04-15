@@ -280,9 +280,14 @@ class ImageRepository @Inject constructor(
 
     fun getAllUnlabeledImages(): Flow<List<ImageInfo>> = imageInfoDao.getAllUnlabeledImages().distinctUntilChanged()
 
+    fun getAllUnlabeledImagesList(): List<ImageInfo> = imageInfoDao.getAllUnlabeledImagesList()
+
     val unlabeledAlbumImagesFlow: Flow<List<ImageInfo>>? = null
     fun getUnlabeledImagesByAlbum(album: Long): Flow<List<ImageInfo>> =
         imageInfoDao.getUnlabeledImagesByAlbum(album).distinctUntilChanged()
+
+    fun getUnlabeledImagesListByAlbum(album: Long): List<ImageInfo> =
+        imageInfoDao.getUnlabeledImagesListByAlbum(album)
 
     suspend fun insertImageLabels(imageLabels: List<ImageLabel>) {
         imageLabelDao.insert(*imageLabels.toTypedArray())
