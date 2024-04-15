@@ -232,7 +232,9 @@ class MLWorker @AssistedInject constructor(
                         )
                     )
                     if (!workCanceled) {
-                        notificationBuilder.updateNotification(_labelingStateFlow.value.let { "${it.labeledImageCount}/${imageInfoList.size}" })
+                        notificationBuilder.updateNotification(_labelingStateFlow.value.let {
+                            "${applicationContext.getString(R.string.loading)}...    ${it.labeledImageCount}/${imageInfoList.size}"
+                        })
                     }
                     // once the CoroutineWorker is canceled. all the coroutines are canceled automatically
                     delay(100)
@@ -364,5 +366,5 @@ class MLWorker @AssistedInject constructor(
 
 data class LabelingResult(
     @field:Json(name = "imageObjectsMap") val imageObjectsMap: Map<Long, Int>,
-    @field:Json(name = "labelImagesMap") val labelImagesMap: Map<String, Set<ImageInfo>>
+    @field:Json(name = "labelImagesMap") val labelImagesMap: Map<String, Set<ImageInfo>>,
 )
