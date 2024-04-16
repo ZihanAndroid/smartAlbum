@@ -79,7 +79,6 @@ dependencies {
     val hiltVersion = "2.51"
     val daggerVersion = "2.51"
     val pagingVersion = "3.2.1"
-    val glideVersion = "4.16.0"
     val lifecycleVersion = "2.7.0"
     val navigationVersion = "2.7.7"
     val coilVersion = "2.6.0"

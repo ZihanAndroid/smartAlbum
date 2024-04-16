@@ -2,15 +2,12 @@ package com.example.image_multi_recognition.compose.view
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.rememberScrollableState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
@@ -19,12 +16,10 @@ import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
@@ -96,7 +91,6 @@ fun AlbumComposable(
                 albumPagingItems[index]?.let { albumWithLatestImage ->
                     key(albumWithLatestImage.album) {
                         AlbumPagingItem(
-                            // albumImage = albumWithLatestImage,
                             imagePath = File(
                                 AlbumPathDecoder.decode(albumWithLatestImage.album),
                                 albumWithLatestImage.path
@@ -141,8 +135,8 @@ fun AlbumPagingItem(
             text = title,
             style = MaterialTheme.typography.labelLarge.copy(fontSize = 16.sp),
             textAlign = TextAlign.Center,
-            color = md_theme_dark_onPrimaryContainer
+            color = md_theme_dark_onPrimaryContainer,
+            modifier = Modifier.padding(horizontal = 12.dp)
         )
     }
 }
-

@@ -3,7 +3,7 @@ An photo album app written in Jetpack Compose, capable of managing photos,
 labeling images by ML Kit (machine learning) and searching images based on labeling results.
 
 # Progress
-Ready to publish to Google Play
+Waiting for publishing to Google Play
 
 # Techniques used in this App
 Jetpack Compose, Coroutine & Flow, ML Kit, Android Room, Paging 3, Coil, DataStore, WorkManager, Hilt, etc.
