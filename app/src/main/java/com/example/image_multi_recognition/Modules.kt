@@ -18,6 +18,8 @@ import com.google.mlkit.vision.label.ImageLabeling
 import com.google.mlkit.vision.label.defaults.ImageLabelerOptions
 import com.google.mlkit.vision.objects.ObjectDetection
 import com.google.mlkit.vision.objects.defaults.ObjectDetectorOptions
+import com.squareup.moshi.Moshi
+import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -40,10 +42,11 @@ object DefaultConfiguration {
     const val FAVORITES_ALBUM_ID = -1L
     const val ACCEPTED_CONFIDENCE = 0.5f
     const val DRAG_SCROLL_THRESHOLD = 100
-    // when the number of remained images is larger than 100, we use a workManager
-    const val WORK_MANAGER_THRESHOLD = 20000
+    // when the number of remained images is larger than 200, we use a workManager
+    const val WORK_MANAGER_THRESHOLD = 100
     const val ML_DEEP_LINK = "app://labeling"
     const val ML_ALBUM_DEEP_LINK = "app://labeling.album"
+    const val WORKER_RESULT_DIR = "WORKER_RESULT_DIR"
 }
 
 @Module
@@ -158,6 +161,10 @@ object DataStoreModule {
                 AppData.getDefaultInstance()
             }
         )
+
+    @Provides
+    @Singleton
+    fun provideMoshi(): Moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
 }
 
 // @Module

@@ -1,5 +1,8 @@
 package com.example.image_multi_recognition.compose.view
 
+import android.Manifest
+import android.os.Build
+import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -11,16 +14,19 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.example.image_multi_recognition.AppData
+import com.example.image_multi_recognition.DefaultConfiguration
 import com.example.image_multi_recognition.R
 import com.example.image_multi_recognition.compose.statelessElements.CustomSnackBar
 import com.example.image_multi_recognition.compose.statelessElements.ImagePagerView
 import com.example.image_multi_recognition.compose.statelessElements.TopAppBarForNotRootDestination
+import com.example.image_multi_recognition.util.showSnackBar
 import com.example.image_multi_recognition.viewmodel.AlbumPhotoLabelingViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -55,6 +61,31 @@ fun AlbumPhotoLabelingComposable(
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val labelAddedString = stringResource(R.string.label_added)
+    val activity = LocalContext.current as ComponentActivity
+
+    LaunchedEffect(Unit) {
+        // Since WorkManager lives longer than Activity's lifecycle, when the previous Worker finished its task,
+        // so the result file may not be handled yet, check it first
+        coroutineScope.launch {
+            viewModel.getPreviousResultFileName().let { fileName ->
+                if (fileName.isNotEmpty()) {
+                    with(viewModel) {
+                        activity.setWorkManagerLabelingResult {
+                            labelingClicked = false
+                            coroutineScope.launch {
+                                showSnackBar(
+                                    snackbarHostState,
+                                    activity.getString(R.string.labeling_failed),
+                                    3000
+                                )
+                            }
+                        }
+                        labelingClicked = true
+                    }
+                }
+            }
+        }
+    }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) { CustomSnackBar(it, 0.dp) } },
@@ -73,10 +104,90 @@ fun AlbumPhotoLabelingComposable(
                 onBack = onBack,
                 actions = {
                     if (!labelingClicked) {
+                        var showPermissionRational by remember { mutableStateOf(false) }
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            with(viewModel.permissionAccessor) {
+                                activity.setupPermissionRequest(
+                                    permission = android.Manifest.permission.POST_NOTIFICATIONS,
+                                    provideShowPermissionRational = { showPermissionRational },
+                                    setShowPermissionRational = { showPermissionRational = it },
+                                    onPermissionGranted = {
+                                        viewModel.scanImagesByWorkManager(
+                                            album = viewModel.album,
+                                            onStateChange = {
+                                                if (!labelingClicked) labelingClicked = true
+                                            },
+                                            onWorkCanceled = { labelingClicked = false },
+                                            onWorkFinished = {
+                                                with(viewModel) {
+                                                    activity.setWorkManagerLabelingResult {
+                                                        labelingClicked = false
+                                                        coroutineScope.launch {
+                                                            showSnackBar(
+                                                                snackbarHostState,
+                                                                activity.getString(R.string.labeling_failed),
+                                                                3000
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        )
+                                    },
+                                    onPermissionDenied = {
+                                        viewModel.scanImages(imageInfoList)
+                                        labelingClicked = true
+                                    }
+                                )
+                            }
+                        }
+
                         IconButton(
                             onClick = {
-                                viewModel.scanImages(imageInfoList)
-                                labelingClicked = true
+                                if (imageInfoList.size > DefaultConfiguration.WORK_MANAGER_THRESHOLD) {
+                                    // check POST_NOTIFICATION permission first, if no permission, do not use workManager which requires notification
+                                    with(viewModel.permissionAccessor) {
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                                            && !activity.hasPermission(Manifest.permission.POST_NOTIFICATIONS)
+                                        ) {
+                                            // setup permission requester in permissionAccessor
+                                            if (activity.shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)) {
+                                                showPermissionRational = true
+                                            } else {
+                                                // shouldShowRequestPermissionRationale returns false if the permission has not been asked before
+                                                permissionRequester.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                            }
+                                        } else {
+                                            // we do not need POST_NOTIFICATIONS, just run WorkManager with notification
+                                            viewModel.scanImagesByWorkManager(
+                                                album = viewModel.album,
+                                                onStateChange = {
+                                                    if (!labelingClicked) labelingClicked = true
+                                                },
+                                                onWorkCanceled = {
+                                                    labelingClicked = false
+                                                },
+                                                onWorkFinished = {
+                                                    with(viewModel) {
+                                                        activity.setWorkManagerLabelingResult {
+                                                            labelingClicked = false
+                                                            coroutineScope.launch {
+                                                                showSnackBar(
+                                                                    snackbarHostState,
+                                                                    activity.getString(R.string.labeling_failed),
+                                                                    3000
+                                                                )
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            )
+                                        }
+                                    }
+                                } else {
+                                    viewModel.scanImages(imageInfoList)
+                                    labelingClicked = true
+                                }
                             }
                         ) {
                             Icon(
@@ -121,6 +232,7 @@ fun AlbumPhotoLabelingComposable(
             )
         }
     ) { paddingValues ->
+        val activity = LocalContext.current as ComponentActivity
         Column(modifier = modifier.padding(paddingValues)) {
             if (labelingClicked) {
                 if (labelingState.labelingDone) {
@@ -136,7 +248,6 @@ fun AlbumPhotoLabelingComposable(
                             provideImagePerRow = { imagesPerRow }
                         )
                     }
-
                 } else {
                     val scanPaused by viewModel.scanPaused.collectAsStateWithLifecycle()
                     LabelingOnProgress(
@@ -148,7 +259,8 @@ fun AlbumPhotoLabelingComposable(
                             viewModel.resumeScanPaused()
                             labelingClicked = false
                         },
-                        scanPaused = scanPaused
+                        scanPaused = scanPaused,
+                        showPauseCancel = with(viewModel) { activity.isRunWorker() }
                     )
                 }
             } else {

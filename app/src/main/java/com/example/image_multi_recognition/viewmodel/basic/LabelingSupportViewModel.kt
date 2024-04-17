@@ -1,11 +1,17 @@
 package com.example.image_multi_recognition.viewmodel.basic
 
+import android.Manifest
+import android.app.Activity
+import android.content.Context
+import android.content.pm.PackageManager
 import android.graphics.Rect
+import android.os.Build
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
+import com.example.image_multi_recognition.DefaultConfiguration
 import com.example.image_multi_recognition.db.ImageInfo
 import com.example.image_multi_recognition.db.ImageLabel
 import com.example.image_multi_recognition.model.LabelUiModel
@@ -13,15 +19,19 @@ import com.example.image_multi_recognition.repository.ImageRepository
 import com.example.image_multi_recognition.repository.UserSettingRepository
 import com.example.image_multi_recognition.repository.WorkManagerRepository
 import com.example.image_multi_recognition.util.*
+import com.example.image_multi_recognition.workManager.LabelingResult
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.label.ImageLabeler
 import com.google.mlkit.vision.objects.ObjectDetector
+import com.squareup.moshi.JsonAdapter
+import com.squareup.moshi.Moshi
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.internal.synchronized
+import java.io.File
 
 abstract class LabelingSupportViewModel(
     private val repository: ImageRepository,
@@ -29,11 +39,12 @@ abstract class LabelingSupportViewModel(
     private val workManagerRepository: WorkManagerRepository,
     private val objectDetector: ObjectDetector,
     private val imageLabeler: ImageLabeler,
+    private val moshi: Moshi,
 ) : ViewModel() {
     // imageId: object count
     private val imageObjectsMap: MutableMap<Long, Int> = mutableMapOf()
     var unlabeledSize = 1
-    val labelImagesMap: MutableMap<String, MutableSet<ImageInfo>> = mutableMapOf()
+    var labelImagesMap: MutableMap<String, MutableSet<ImageInfo>> = mutableMapOf()
     private val imageLabelConfidence: MutableMap<ImageLabelIdentity, Float> = mutableMapOf()
     val labelImagesFlow = Pager(
         initialKey = 0,
@@ -166,11 +177,12 @@ abstract class LabelingSupportViewModel(
 
     open fun scanImagesByWorkManager(
         album: Long,
-        onProgressChange: () -> Unit,
+        onStateChange: () -> Unit,
         onWorkCanceled: () -> Unit,
         onWorkFinished: () -> Unit,
     ) {
         resetLabeling()
+        var stateChanged = false
         with(workManagerRepository) {
             viewModelScope.sendImageLabelingRequest(
                 album = album,
@@ -180,8 +192,11 @@ abstract class LabelingSupportViewModel(
                         labelingDone = finished
                     )
                     unlabeledSize = totalSize
-                    // call onProgressChange after the state value has been set
-                    onProgressChange()
+                    // call onProgressChange only once, after the state value has been set
+                    if(!stateChanged) {
+                        onStateChange()
+                        stateChanged = true
+                    }
                 },
                 onWorkCanceled = onWorkCanceled,
                 onWorkFinished = onWorkFinished
@@ -298,6 +313,41 @@ abstract class LabelingSupportViewModel(
             }
         }
     }
+
+    fun Context.setWorkManagerLabelingResult(onFail: ()->Unit) {
+        // deserialize the result file and set labelImagesMap
+        viewModelScope.launch {
+            val fileName = settingRepository.workerResultFileNameFlow.first()
+            val resultRead = try {
+                File(File(filesDir, DefaultConfiguration.WORKER_RESULT_DIR), fileName).readText()
+                    .let { jsonString ->
+                        val adapter: JsonAdapter<LabelingResult> = moshi.adapter(LabelingResult::class.java)
+                        adapter.fromJson(jsonString)?.let { labelingResult ->
+                            labelImagesMap =
+                                labelingResult.labelImagesMap.map { it.key to it.value.toMutableSet() }.toMap()
+                                    .toMutableMap()
+                            true
+                        } ?: false
+                    }
+            }catch (e: Exception){
+                Log.e(getCallSiteInfo(), e.stackTraceToString())
+                false
+            }
+            if(!resultRead) onFail()
+            else _labelingStateFlow.value = _labelingStateFlow.value.copy(labelingDone = true)
+            // clear previous result file and record
+            File(filesDir, DefaultConfiguration.WORKER_RESULT_DIR).listFiles()?.forEach { it.deleteRecursively() }
+            settingRepository.updateWorkerResultFileName("")
+        }
+    }
+
+    fun Activity.isRunWorker(): Boolean{
+        return unlabeledSize <= DefaultConfiguration.WORK_MANAGER_THRESHOLD
+                || Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU
+                || checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+    }
+
+    suspend fun getPreviousResultFileName(): String = settingRepository.workerResultFileNameFlow.first()
 
     fun startLabelAdding() {
         _labelAdding.value = true

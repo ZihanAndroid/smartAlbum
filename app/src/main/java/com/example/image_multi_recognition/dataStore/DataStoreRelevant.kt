@@ -37,6 +37,7 @@ class AppDataSerializer @Inject constructor() : Serializer<AppData> {
             thumbNailQuality = 0.1f
             imageLabelingConfidence = 0.7f
             labelingStatus = AppData.LabelingStatus.NOT_STARTED
+            workerResultFileName = ""
         }
 
         // naming convention: the enum names are capital letters and underscores

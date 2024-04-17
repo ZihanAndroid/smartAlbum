@@ -10,6 +10,7 @@ import androidx.paging.cachedIn
 import com.example.image_multi_recognition.DefaultConfiguration
 import com.example.image_multi_recognition.db.ImageInfo
 import com.example.image_multi_recognition.model.UiModel
+import com.example.image_multi_recognition.permission.PermissionAccessor
 import com.example.image_multi_recognition.repository.ImageRepository
 import com.example.image_multi_recognition.repository.UserSettingRepository
 import com.example.image_multi_recognition.repository.WorkManagerRepository
@@ -19,6 +20,7 @@ import com.example.image_multi_recognition.viewmodel.basic.ImagePagingFlowSuppor
 import com.example.image_multi_recognition.viewmodel.basic.LabelingSupportViewModel
 import com.google.mlkit.vision.label.ImageLabeler
 import com.google.mlkit.vision.objects.ObjectDetector
+import com.squareup.moshi.Moshi
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -27,14 +29,16 @@ import javax.inject.Inject
 
 @HiltViewModel
 class AlbumPhotoLabelingViewModel @Inject constructor(
-    private val repository: ImageRepository,
+    repository: ImageRepository,
     settingRepository: UserSettingRepository,
     workManagerRepository: WorkManagerRepository,
     objectDetector: ObjectDetector,
     imageLabeler: ImageLabeler,
     savedStateHandle: SavedStateHandle,
     imagePagingFlowSupportImpl: ImagePagingFlowSupportImpl,
-) : LabelingSupportViewModel(repository, settingRepository, workManagerRepository, objectDetector, imageLabeler),
+    val permissionAccessor: PermissionAccessor,
+    moshi: Moshi
+) : LabelingSupportViewModel(repository, settingRepository, workManagerRepository, objectDetector, imageLabeler, moshi),
     ImagePagingFlowSupport by imagePagingFlowSupportImpl {
     val album = savedStateHandle.get<Long>("album")!!
 

@@ -11,6 +11,7 @@ import com.example.image_multi_recognition.repository.WorkManagerRepository
 import com.example.image_multi_recognition.viewmodel.basic.LabelingSupportViewModel
 import com.google.mlkit.vision.label.ImageLabeler
 import com.google.mlkit.vision.objects.ObjectDetector
+import com.squareup.moshi.Moshi
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -26,14 +27,13 @@ class LabelingViewModel @Inject constructor(
     getUnlabeledAlbumsUseCase: GetUnlabeledAlbumsUseCase,
     objectDetector: ObjectDetector,
     imageLabeler: ImageLabeler,
-    val permissionAccessor: PermissionAccessor
-) : LabelingSupportViewModel(repository, settingRepository, workManagerRepository, objectDetector, imageLabeler) {
+    val permissionAccessor: PermissionAccessor,
+    moshi: Moshi
+) : LabelingSupportViewModel(repository, settingRepository, workManagerRepository, objectDetector, imageLabeler, moshi) {
 
     val unlabeledImageListFlow: StateFlow<List<ImageInfo>> =
         getAllUnlabeledImagesUseCase().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), emptyList())
 
     val unlabeledImageAlbumFlow = with(getUnlabeledAlbumsUseCase) { viewModelScope.invoke() }
-
-    val ALL_ALBUM_SCAN = 0L
 }
 

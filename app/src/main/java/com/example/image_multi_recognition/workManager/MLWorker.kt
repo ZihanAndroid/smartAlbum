@@ -40,6 +40,9 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import java.io.File
+import java.io.IOException
+import java.time.Instant
 
 // https://developer.android.com/develop/background-work/background-tasks/persistent/how-to/long-running#long-running-kotlin
 // https://developer.android.com/training/dependency-injection/hilt-jetpack#workmanager
@@ -52,6 +55,7 @@ class MLWorker @AssistedInject constructor(
     private val settingRepository: UserSettingRepository,
     private val objectDetector: ObjectDetector,
     private val imageLabeler: ImageLabeler,
+    private val moshi: Moshi,
 ) : CoroutineWorker(context, parameters) {
     // imageId: object count
     private val imageObjectsMap: MutableMap<Long, Int> = mutableMapOf()
@@ -244,12 +248,37 @@ class MLWorker @AssistedInject constructor(
         return if (_labelingStateFlow.value.labelingDone) {
             // We store the result in DataStore, because WorkManager works in the background
             // and the Activity that starts the WorkManager may be destroyed before the work is finished.
-            // Store the result in DataStore file makes sure that the next time the activity started again, it can still access the previous result
+            // Store the result in file and DataStore makes sure that the next time the activity started again, it can still access the previous result
             settingRepository.updateLabelingStatus(AppData.LabelingStatus.FINISHED)
-            val moshi: Moshi = Moshi.Builder().build()
             val adapter: JsonAdapter<LabelingResult> = moshi.adapter(LabelingResult::class.java)
-            val jsonString = adapter.toJson(LabelingResult(imageObjectsMap, labelImagesMap))
-            Log.d("", "json: $jsonString")
+            adapter.toJson(LabelingResult(album, labelImagesMap)).let { jsonStr ->
+                val fileName = "workerResult_${Instant.now()}"
+                try {
+                    // save file in app's scoped internal storage
+                    File(applicationContext.filesDir, DefaultConfiguration.WORKER_RESULT_DIR).let { dir ->
+                        if (!dir.exists()) dir.mkdirs()
+                    }
+                    File(File(applicationContext.filesDir, DefaultConfiguration.WORKER_RESULT_DIR), fileName).writeText(
+                        jsonStr
+                    )
+                    Log.d(
+                        getCallSiteInfo(),
+                        "worker result file: [${File(applicationContext.filesDir, fileName)}] is created"
+                    )
+                    settingRepository.updateWorkerResultFileName(fileName)
+                } catch (e: IOException) {
+                    Log.e(getCallSiteInfoFunc(), e.stackTraceToString())
+                }
+            }
+            // send final notification
+            // https://stackoverflow.com/questions/60693832/workmanager-keep-notification-after-work-is-done
+            notificationManager.notify(
+                NOTIFICATION_ID + 1,
+                notificationBuilder.setContentText(applicationContext.getString(R.string.labeling_finished))
+                    .setAutoCancel(true)
+                    .setOngoing(false)
+                    .build()
+            )
             Result.success()
         } else {
             // we ignore the failed tasks
@@ -335,7 +364,7 @@ class MLWorker @AssistedInject constructor(
 
     private suspend fun startForegroundService(album: Long): NotificationCompat.Builder {
         createNotificationChannel()
-        // an Intent for a composable deep link
+        // an Intent for a composable deep link, when notification is clicked, move to the navigation destination
         val pendingIntent = if (album == 0L) {
             getPendingIntentForDeepLink(DefaultConfiguration.ML_DEEP_LINK)
         } else {
@@ -365,6 +394,6 @@ class MLWorker @AssistedInject constructor(
 }
 
 data class LabelingResult(
-    @field:Json(name = "imageObjectsMap") val imageObjectsMap: Map<Long, Int>,
+    @field:Json(name = "album") val album: Long,
     @field:Json(name = "labelImagesMap") val labelImagesMap: Map<String, Set<ImageInfo>>,
 )

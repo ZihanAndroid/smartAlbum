@@ -85,7 +85,6 @@ fun NavigationGraph(
             ) { label ->
                 "${Destination.LABEL_PHOTO.route}/${label}".let { route ->
                     navController.navigate(route) {
-                        // Not done yet!
                     }
                 }
             }
@@ -102,7 +101,6 @@ fun NavigationGraph(
             ) { albumId ->
                 "${Destination.ALBUM_PHOTO_LABELING}/${albumId}".let { route ->
                     navController.navigate(route) {
-                        // Not done yet!
                     }
                 }
             }

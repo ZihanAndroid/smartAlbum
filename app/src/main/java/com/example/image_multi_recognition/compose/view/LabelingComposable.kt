@@ -55,6 +55,7 @@ import com.example.image_multi_recognition.model.LabelUiModel
 import com.example.image_multi_recognition.util.AlbumPathDecoder
 import com.example.image_multi_recognition.util.getCallSiteInfo
 import com.example.image_multi_recognition.util.pointerInput.*
+import com.example.image_multi_recognition.util.showSnackBar
 import com.example.image_multi_recognition.viewmodel.LabelingViewModel
 import com.example.image_multi_recognition.viewmodel.basic.LabelingSupportViewModel
 import kotlinx.coroutines.delay
@@ -97,6 +98,26 @@ fun LabelingComposable(
     val labelAddedString = stringResource(R.string.label_added)
     val activity = LocalContext.current as ComponentActivity
 
+    LaunchedEffect(Unit) {
+        // Since WorkManager lives longer than Activity's lifecycle, when the previous Worker finished its task,
+        // so the result file may not be handled yet, check it first
+        coroutineScope.launch {
+            viewModel.getPreviousResultFileName().let { fileName ->
+                if (fileName.isNotEmpty()) {
+                    with(viewModel) {
+                        activity.setWorkManagerLabelingResult {
+                            labelingClicked = false
+                            coroutineScope.launch {
+                                showSnackBar(snackBarState, activity.getString(R.string.labeling_failed), 3000)
+                            }
+                        }
+                        labelingClicked = true
+                    }
+                }
+            }
+        }
+    }
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackBarState) { CustomSnackBar(it) } },
         topBar = {
@@ -112,7 +133,7 @@ fun LabelingComposable(
                 },
                 onBack = if (labelingClicked) {
                     {
-                        if (labelingClicked && !labelingState.labelingDone) {
+                        if (!labelingState.labelingDone && !with(viewModel) { activity.isRunWorker() }) {
                             viewModel.scanCancelled = true
                             viewModel.resumeScanPaused()
                         }
@@ -158,11 +179,24 @@ fun LabelingComposable(
                                 onPermissionGranted = {
                                     viewModel.scanImagesByWorkManager(
                                         album = 0L,
-                                        onProgressChange = {
+                                        onStateChange = {
                                             if (!labelingClicked) labelingClicked = true
                                         },
                                         onWorkCanceled = { labelingClicked = false },
-                                        onWorkFinished = {}
+                                        onWorkFinished = {
+                                            with(viewModel) {
+                                                activity.setWorkManagerLabelingResult {
+                                                    labelingClicked = false
+                                                    coroutineScope.launch {
+                                                        showSnackBar(
+                                                            snackBarState,
+                                                            activity.getString(R.string.labeling_failed),
+                                                            3000
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
                                     )
                                 },
                                 onPermissionDenied = {
@@ -191,11 +225,24 @@ fun LabelingComposable(
                                         // we do not need POST_NOTIFICATIONS, just run WorkManager with notification
                                         viewModel.scanImagesByWorkManager(
                                             album = 0L,
-                                            onProgressChange = {
+                                            onStateChange = {
                                                 if (!labelingClicked) labelingClicked = true
                                             },
                                             onWorkCanceled = { labelingClicked = false },
-                                            onWorkFinished = {}
+                                            onWorkFinished = {
+                                                with(viewModel) {
+                                                    activity.setWorkManagerLabelingResult {
+                                                        labelingClicked = false
+                                                        coroutineScope.launch {
+                                                            showSnackBar(
+                                                                snackBarState,
+                                                                activity.getString(R.string.labeling_failed),
+                                                                3000
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
                                         )
                                     }
                                 }
@@ -256,7 +303,9 @@ fun LabelingComposable(
                             // change window content
                             labelingClicked = false
                         },
-                        scanPaused = scanPaused
+                        scanPaused = scanPaused,
+                        // if WorkManager is started, we do not show resume and cancel button in the screen
+                        showPauseCancel = with(viewModel) { activity.isRunWorker() }
                     )
                 }
             } else {
@@ -641,6 +690,7 @@ fun LabelingOnProgress(
     progress: Float,
     text: String,
     scanPaused: Boolean,
+    showPauseCancel: Boolean,
     onResumePauseClicked: () -> Unit,
     onCancelClicked: () -> Unit,
     modifier: Modifier = Modifier,
@@ -661,18 +711,20 @@ fun LabelingOnProgress(
                 text = text,
                 style = MaterialTheme.typography.labelLarge
             )
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                ElevatedButton(
-                    onClick = onResumePauseClicked
+            if (showPauseCancel) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    Text(stringResource(if (scanPaused) R.string.resume else R.string.pause))
-                }
-                ElevatedButton(
-                    onClick = onCancelClicked
-                ) {
-                    Text(stringResource(R.string.cancel))
+                    ElevatedButton(
+                        onClick = onResumePauseClicked
+                    ) {
+                        Text(stringResource(if (scanPaused) R.string.resume else R.string.pause))
+                    }
+                    ElevatedButton(
+                        onClick = onCancelClicked
+                    ) {
+                        Text(stringResource(R.string.cancel))
+                    }
                 }
             }
         }

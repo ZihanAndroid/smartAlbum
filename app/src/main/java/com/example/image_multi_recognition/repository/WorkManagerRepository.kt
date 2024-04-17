@@ -9,6 +9,7 @@ import com.example.image_multi_recognition.workManager.MLWorker
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.random.Random
@@ -18,6 +19,7 @@ class WorkManagerRepository @Inject constructor(
     @ApplicationContext val context: Context,
 ) {
     private val workManager = WorkManager.getInstance(context)
+    private var prevWorkId: UUID? = null
 
     // album: 0 for all unlabeled images, >0 for unlabeled images in certain album
     fun CoroutineScope.sendImageLabelingRequest(
@@ -26,6 +28,8 @@ class WorkManagerRepository @Inject constructor(
         onWorkCanceled: () -> Unit,
         onWorkFinished: () -> Unit,
     ) {
+        // cancel the previous task if exists
+        prevWorkId?.let { workManager.cancelWorkById(it) }
         val mlWorkerBuilder = OneTimeWorkRequestBuilder<MLWorker>()
         Data.Builder().putLong("album", album).build().let { inputData ->
             mlWorkerBuilder.setInputData(inputData)
@@ -38,14 +42,15 @@ class WorkManagerRepository @Inject constructor(
                         val totalCount = workInfo.progress.getInt(MLWorker.TOTAL_KEY, -1)
                         val labelingFinished = workInfo.progress.getBoolean(MLWorker.FINISHED_KEY, false)
                         if (totalCount != -1) onProgressChange(labeledCount, totalCount, labelingFinished)
-                        if(workInfo.state == WorkInfo.State.FAILED || workInfo.state == WorkInfo.State.CANCELLED){
+                        if (workInfo.state == WorkInfo.State.FAILED || workInfo.state == WorkInfo.State.CANCELLED) {
                             onWorkCanceled()
-                        }else if(workInfo.state == WorkInfo.State.SUCCEEDED){
+                        } else if (workInfo.state == WorkInfo.State.SUCCEEDED) {
                             onWorkFinished()
                         }
                     }
                 }
             }
+            prevWorkId = workRequest.id
             workManager.enqueue(workRequest)
         }
     }

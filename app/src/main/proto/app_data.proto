@@ -18,6 +18,7 @@ message AppData{
   repeated string excludedAlbumPaths = 7;
   repeated string excludedLabels = 8;
   LabelingStatus labelingStatus = 9;
+  string workerResultFileName = 10;
 
   enum Theme{
     DARK = 0;

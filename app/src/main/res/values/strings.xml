@@ -23,6 +23,7 @@
     <string name="resume">Resume</string>
     <string name="pause">Pause</string>
     <string name="done">Done</string>
+    <string name="labeling_finished">Labeling Finished</string>
     <string name="no_label">No label</string>
     <string name="input_label">Input a label</string>
     <string name="loading">Loading</string>
@@ -60,6 +61,7 @@
     <string name="same_name_exist">Duplicated file names</string>
     <string name="copy_success">Image copied</string>
     <string name="copy_fail">Failed to copy images</string>
+    <string name="labeling_failed">Labeling failed</string>
     <string name="no_image">No image</string>
     <string name="album_create_fail">Failed to create the album</string>
     <string name="name">Name</string>
