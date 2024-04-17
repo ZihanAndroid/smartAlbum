@@ -1,9 +1,12 @@
 package com.example.image_multi_recognition.compose.navigation
 
 import android.util.Log
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -26,7 +29,9 @@ fun NavigationGraph(
     NavHost(
         modifier = modifier,
         navController = navController,
-        startDestination = Destination.PHOTO.navRoute
+        startDestination = Destination.PHOTO.navRoute,
+        enterTransition = { EnterTransition.None },
+        exitTransition = { ExitTransition.None }
     ) {
         composable(
             route = Destination.PHOTO.navRoute,
@@ -67,9 +72,7 @@ fun NavigationGraph(
                 }
             ) { album ->
                 "${Destination.ALBUM_PHOTO.route}/${album}".let { route ->
-                    navController.navigate(route) {
-
-                    }
+                    navController.navigate(route)
                 }
             }
         }
@@ -84,8 +87,7 @@ fun NavigationGraph(
                 provideInitialSetting = provideInitialSetting
             ) { label ->
                 "${Destination.LABEL_PHOTO.route}/${label}".let { route ->
-                    navController.navigate(route) {
-                    }
+                    navController.navigate(route)
                 }
             }
         }
@@ -100,8 +102,7 @@ fun NavigationGraph(
                 onSettingClick = { navController.navigate(Destination.SETTING.route) }
             ) { albumId ->
                 "${Destination.ALBUM_PHOTO_LABELING}/${albumId}".let { route ->
-                    navController.navigate(route) {
-                    }
+                    navController.navigate(route)
                 }
             }
         }
@@ -137,13 +138,7 @@ fun NavigationGraph(
                 },
                 onImageClick = { album, originalIndex ->
                     "${Destination.SINGLE_IMAGE.route}/1/${album}/$originalIndex".let { route ->
-                        navController.navigate(route) {
-//                            launchSingleTop = true
-//                            popUpTo(navController.graph.findStartDestination().id) {
-//                                saveState = true
-//                            }
-//                            restoreState = true
-                        }
+                        navController.navigate(route)
                     }
                 },
                 customAppBar = true,
@@ -160,9 +155,7 @@ fun NavigationGraph(
                 viewModel = hiltViewModel(),
                 onImageClick = { originalIndex, label ->
                     "${Destination.SINGLE_IMAGE.route}/2/${label}/$originalIndex".let { route ->
-                        navController.navigate(route) {
-                            // Not Done yet
-                        }
+                        navController.navigate(route)
                     }
                 },
                 onBack = {
@@ -181,9 +174,7 @@ fun NavigationGraph(
                 viewModel = hiltViewModel(),
                 onImageClick = { album, originalIndex ->
                     "${Destination.SINGLE_IMAGE.route}/3/${album}/$originalIndex".let { route ->
-                        navController.navigate(route) {
-                            // Not Done yet
-                        }
+                        navController.navigate(route)
                     }
                 },
                 onBack = {
