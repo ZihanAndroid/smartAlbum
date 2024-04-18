@@ -7,6 +7,8 @@ import android.content.pm.PackageManager
 import android.graphics.Rect
 import android.os.Build
 import android.util.Log
+import androidx.activity.ComponentActivity
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.paging.Pager
@@ -25,6 +27,7 @@ import com.google.mlkit.vision.label.ImageLabeler
 import com.google.mlkit.vision.objects.ObjectDetector
 import com.squareup.moshi.JsonAdapter
 import com.squareup.moshi.Moshi
+import dagger.Component
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -314,7 +317,7 @@ abstract class LabelingSupportViewModel(
         }
     }
 
-    fun Context.setWorkManagerLabelingResult(onFail: ()->Unit) {
+    fun ComponentActivity.setWorkManagerLabelingResult(onFail: ()->Unit) {
         // deserialize the result file and set labelImagesMap
         viewModelScope.launch {
             val fileName = settingRepository.workerResultFileNameFlow.first()
@@ -336,6 +339,13 @@ abstract class LabelingSupportViewModel(
             if(!resultRead) onFail()
             else _labelingStateFlow.value = _labelingStateFlow.value.copy(labelingDone = true)
             // clear previous result file and record
+            // if the activity is in the background, we do not delete labeling results
+            // because the user may click the notification and navigate to LabelingDone window again and we need to show these results
+            if(this@setWorkManagerLabelingResult.lifecycle.currentState.isAtLeast(Lifecycle.State.CREATED) &&
+                !this@setWorkManagerLabelingResult.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+                Log.d("", "started not resumed")
+                return@launch
+            }
             File(filesDir, DefaultConfiguration.WORKER_RESULT_DIR).listFiles()?.forEach { it.deleteRecursively() }
             settingRepository.updateWorkerResultFileName("")
         }

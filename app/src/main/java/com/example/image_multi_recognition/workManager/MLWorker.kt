@@ -365,11 +365,12 @@ class MLWorker @AssistedInject constructor(
     private suspend fun startForegroundService(album: Long): NotificationCompat.Builder {
         createNotificationChannel()
         // an Intent for a composable deep link, when notification is clicked, move to the navigation destination
-        val pendingIntent = if (album == 0L) {
-            getPendingIntentForDeepLink(DefaultConfiguration.ML_DEEP_LINK)
-        } else {
-            getPendingIntentForDeepLink(DefaultConfiguration.ML_ALBUM_DEEP_LINK + "/${album}")
-        }
+        val pendingIntent = getPendingIntentForDeepLink(DefaultConfiguration.ML_DEEP_LINK)
+        //     if (album == 0L) {
+        //     getPendingIntentForDeepLink(DefaultConfiguration.ML_DEEP_LINK)
+        // } else {
+        //     getPendingIntentForDeepLink(DefaultConfiguration.ML_ALBUM_DEEP_LINK + "/${album}")
+        // }
         val notificationBuilder = getNotificationBuilder(pendingIntent, "started")
         setForeground(
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {

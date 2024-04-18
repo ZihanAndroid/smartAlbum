@@ -1,5 +1,6 @@
 package com.example.image_multi_recognition
 
+import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
 import android.os.Environment
@@ -18,6 +19,8 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.rememberNavController
 import com.example.image_multi_recognition.compose.navigation.Home
 import com.example.image_multi_recognition.dataStore.AppDataSerializer
 import com.example.image_multi_recognition.permission.PermissionAccessor
@@ -41,7 +44,6 @@ class MainActivity : ComponentActivity() {
     lateinit var settingRepository: UserSettingRepository
 
     private var initialSetting: AppData = AppDataSerializer.defaultAppData
-
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -120,7 +122,7 @@ class MainActivity : ComponentActivity() {
                     Surface(modifier = Modifier.fillMaxSize(), tonalElevation = 2.dp) {
                         Home(
                             // refreshAllImages = { repository.resetAllImages() },
-                            provideInitialSetting = { appDataSetting }
+                            provideInitialSetting = { appDataSetting },
                         )
                     }
                 }

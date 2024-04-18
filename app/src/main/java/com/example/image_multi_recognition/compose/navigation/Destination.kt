@@ -48,8 +48,8 @@ enum class Destination(
     SINGLE_IMAGE(
         route = "SINGLE_IMAGE",
         compulsoryArguments = mapOf(
-           // "album" to NavType.LongType,
-           // "label" to NavType.StringType,
+            // "album" to NavType.LongType,
+            // "label" to NavType.StringType,
             // argumentType: 1 means "album", 2 means "label", 3 means "album with image not labeled"
             "argumentType" to NavType.IntType,
             "argumentValue" to NavType.StringType,
@@ -119,9 +119,10 @@ enum class Destination(
         return buildDestinationFromNav(navDestination) == this
     }
 }
+
 fun List<Destination>.containsNavRoute(navDestination: NavDestination?): Boolean {
     forEach {
-        if(it.sameRouteAs(navDestination)) return true
+        if (it.sameRouteAs(navDestination)) return true
     }
     return false
 }

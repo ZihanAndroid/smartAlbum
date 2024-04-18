@@ -1,6 +1,7 @@
 package com.example.image_multi_recognition.compose.navigation
 
 import android.util.Log
+import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
@@ -11,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.unit.LayoutDirection
@@ -25,7 +27,9 @@ import com.example.image_multi_recognition.AppData
 import com.example.image_multi_recognition.DefaultConfiguration
 import com.example.image_multi_recognition.R
 import com.example.image_multi_recognition.compose.statelessElements.crop
+import com.example.image_multi_recognition.util.getCallSiteInfo
 import com.example.image_multi_recognition.util.getCallSiteInfoFunc
+import kotlinx.coroutines.flow.first
 
 @Composable
 fun Home(provideInitialSetting: () -> AppData) {
@@ -118,8 +122,9 @@ fun ScaffoldTopBar(
 @Composable
 fun ScaffoldBottomBar(
     navController: NavController,
-    items: List<Destination>
+    items: List<Destination>,
 ) {
+    val activity = LocalContext.current as ComponentActivity
     BottomAppBar(
         modifier = Modifier.crop(vertical = DefaultConfiguration.NAV_BOTTOM_APP_BAR_CROPPED.dp)
     ) {
@@ -144,12 +149,17 @@ fun ScaffoldBottomBar(
                 },
                 selected = destination.sameRouteAs(navController.currentDestination),
                 onClick = {
-                    navController.navigate(destination.route) {
-                        popUpTo(navController.graph.findStartDestination().id) {
-                            saveState = true
+                    if (destination == Destination.PHOTO && navController.previousBackStackEntry != null) {
+                        // call system "back" to handle deepLinks
+                        activity.onBackPressedDispatcher.onBackPressed()
+                    } else {
+                        navController.navigate(destination.route) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
                         }
-                        launchSingleTop = true
-                        restoreState = true
                     }
                 },
                 alwaysShowLabel = false,

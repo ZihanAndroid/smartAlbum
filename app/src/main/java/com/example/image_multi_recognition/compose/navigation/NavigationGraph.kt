@@ -6,7 +6,6 @@ import androidx.compose.animation.ExitTransition
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -42,13 +41,7 @@ fun NavigationGraph(
                     // set argument "label" to empty whitespace String
                     "${Destination.SINGLE_IMAGE.route}/1/${album}/$originalIndex".let { route ->
                         Log.d(getCallSiteInfoFunc(), "Navigation route: $route")
-                        navController.navigate(route) {
-                            // launchSingleTop = true
-                            // popUpTo(navController.graph.findStartDestination().id) {
-                            //     saveState = true
-                            // }
-                            // restoreState = true
-                        }
+                        navController.navigate(route)
                     }
                 },
                 // onTopBottomBarHidden = onTopBottomBarHidden,
@@ -168,7 +161,7 @@ fun NavigationGraph(
             route = Destination.ALBUM_PHOTO_LABELING.navRoute,
             arguments = Destination.ALBUM_PHOTO_LABELING.arguments,
             // "album" is a parameter similar to the Compose Navigation
-            deepLinks = listOf(navDeepLink { uriPattern = "${DefaultConfiguration.ML_ALBUM_DEEP_LINK}/{album}" })
+            // deepLinks = listOf(navDeepLink { uriPattern = "${DefaultConfiguration.ML_ALBUM_DEEP_LINK}/{album}" })
         ) {
             AlbumPhotoLabelingComposable(
                 viewModel = hiltViewModel(),
